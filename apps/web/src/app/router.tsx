@@ -7,6 +7,7 @@ import { LoginForm } from '../features/auth';
 import { PasswordResetForm } from '../features/auth/components/PasswordResetForm';
 import { UpdatePasswordForm } from '../features/auth/components/UpdatePasswordForm';
 import { ImportsPage } from '../features/imports';
+import { HouseholdsPage } from '../features/households';
 
 function Dashboard() {
   return (
@@ -60,6 +61,16 @@ export function Router() {
                     <ImportsPage />
                   </AppShell>
                 </RoleGuard>
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/households"
+            element={
+              <AuthGuard>
+                <AppShell>
+                  <HouseholdsPage />
+                </AppShell>
               </AuthGuard>
             }
           />

@@ -17,6 +17,7 @@ export default defineConfig({
     include: [
       'src/features/auth/__tests__/*.test.{ts,tsx}',
       'src/features/imports/__tests__/*.test.{ts,tsx}',
+      'src/features/households/__tests__/*.test.{ts,tsx}',
     ],
     globals: true,
   },

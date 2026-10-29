@@ -10,6 +10,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, profile, roles, signOut } = useAuth();
   const navigate = useNavigate();
   const canImport = roles.includes('admin') || roles.includes('operator');
+  const canViewHouseholds = roles.some((role) =>
+    ['admin', 'operator', 'case_worker', 'reviewer', 'auditor'].includes(role),
+  );
 
   const handleSignOut = async () => {
     await signOut();
@@ -60,6 +63,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   }
                 >
                   Excel imports
+                </NavLink>
+              )}
+              {canViewHouseholds && (
+                <NavLink
+                  to="/households"
+                  className={({ isActive }) =>
+                    `${linkBase} ${isActive ? 'font-semibold underline decoration-2' : 'text-[#3f3b34]'}`
+                  }
+                >
+                  Households
                 </NavLink>
               )}
             </nav>
