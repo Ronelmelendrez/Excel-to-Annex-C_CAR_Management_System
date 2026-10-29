@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useSignIn } from '../hooks/useSignIn';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { DEMO_EMAIL, DEMO_PASSWORD } from '../../../shared/demo';
+import { isDemoMode } from '../../../shared/supabase';
 
 export function LoginForm() {
   const [searchParams] = useSearchParams();
   const { signIn, loading, error: hookError } = useSignIn();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState(isDemoMode ? DEMO_EMAIL : '');
+  const [password, setPassword] = useState(isDemoMode ? DEMO_PASSWORD : '');
   const [formError, setFormError] = useState<string | null>(null);
   const navigate = useNavigate();
 
@@ -40,6 +42,18 @@ export function LoginForm() {
           </h1>
           <p className="mt-1 text-sm text-[#4a4a4a]">Sign in to your account</p>
         </header>
+
+        {isDemoMode && (
+          <div className="mb-8 border-l-4 border-[#7a1f1f] border-y border-r border-[#7a1f1f] bg-[#f2e4e1] px-4 py-3">
+            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#7a1f1f]">
+              Demo mode / Supabase not connected
+            </p>
+            <p className="mt-1 text-sm leading-6 text-[#3f3b34]">
+              The credentials are pre-filled. Any email and password sign in as the demo
+              operator; data stays in this browser.
+            </p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} noValidate className="space-y-6">
           {formError && (

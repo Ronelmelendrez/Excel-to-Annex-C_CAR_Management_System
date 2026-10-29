@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../providers';
+import { isDemoMode } from '../../shared/supabase';
 
 const linkBase =
   'px-1 py-2 text-sm underline-offset-[6px] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]';
@@ -23,6 +24,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         Skip to content
       </a>
+
+      {isDemoMode && (
+        <div className="border-b border-[#161512] bg-[#161512] text-[#f4f1ea]">
+          <p className="mx-auto max-w-[1180px] px-4 py-2 font-mono text-[10px] uppercase tracking-[0.16em] sm:px-6">
+            Demo build / Supabase not connected / local mock data only
+          </p>
+        </div>
+      )}
 
       <header className="border-b border-[#161512] bg-[#f4f1ea]">
         <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-between gap-x-8 gap-y-3 px-4 py-4 sm:px-6">

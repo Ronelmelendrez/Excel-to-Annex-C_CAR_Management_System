@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 
 vi.mock('../../../shared/supabase', () => ({
+  isDemoMode: false,
   supabase: {
     auth: {
       signInWithPassword: vi.fn(),

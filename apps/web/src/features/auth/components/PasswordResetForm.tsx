@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { usePasswordReset } from '../hooks/usePasswordReset';
 import { useNavigate } from 'react-router-dom';
+import { isDemoMode } from '../../../shared/supabase';
 
 export function PasswordResetForm() {
   const { sendReset, loading, error, sent } = usePasswordReset();
@@ -53,6 +54,12 @@ export function PasswordResetForm() {
         </header>
 
         <form onSubmit={handleSubmit} noValidate className="space-y-6">
+          {isDemoMode && (
+            <p className="border-l-4 border-[#7a1f1f] bg-[#f2e4e1] px-4 py-3 text-sm leading-6 text-[#3f3b34]">
+              Demo mode: no email is sent. Password recovery is disabled until Supabase is
+              connected.
+            </p>
+          )}
           {error && (
             <p role="alert" className="text-sm text-[#8b0000]">{error}</p>
           )}

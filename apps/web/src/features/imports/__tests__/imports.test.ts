@@ -14,6 +14,7 @@ import {
 const { apiCallMock } = vi.hoisted(() => ({ apiCallMock: vi.fn() }));
 
 vi.mock("../../../shared/supabase", () => ({
+  isDemoMode: false,
   supabase: {
     auth: { getSession: vi.fn() },
     storage: { from: vi.fn() },
