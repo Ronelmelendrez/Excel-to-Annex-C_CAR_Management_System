@@ -16,6 +16,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const canAuthorCars = roles.includes('admin') || roles.includes('case_worker');
   const canReviewCars = roles.includes('reviewer');
   const canManageTemplates = roles.includes('admin');
+  const canViewDocuments = roles.some((role) =>
+    ['admin', 'case_worker', 'reviewer', 'auditor'].includes(role),
+  );
 
   const handleSignOut = async () => {
     await signOut();
@@ -106,6 +109,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   }
                 >
                   Templates
+                </NavLink>
+              )}
+              {canViewDocuments && (
+                <NavLink
+                  to="/documents"
+                  className={({ isActive }) =>
+                    `${linkBase} ${isActive ? 'font-semibold underline decoration-2' : 'text-[#3f3b34]'}`
+                  }
+                >
+                  Documents
                 </NavLink>
               )}
             </nav>
