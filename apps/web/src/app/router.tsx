@@ -10,6 +10,7 @@ import { ImportsPage } from '../features/imports';
 import { HouseholdsPage } from '../features/households';
 import { CarsPage } from '../features/cars';
 import { ReviewPage } from '../features/review';
+import { TemplatesPage } from '../features/templates';
 
 function Dashboard() {
   return (
@@ -101,6 +102,18 @@ export function Router() {
                 <RoleGuard roles={['reviewer']}>
                   <AppShell>
                     <ReviewPage />
+                  </AppShell>
+                </RoleGuard>
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/templates"
+            element={
+              <AuthGuard>
+                <RoleGuard roles={['admin']}>
+                  <AppShell>
+                    <TemplatesPage />
                   </AppShell>
                 </RoleGuard>
               </AuthGuard>
