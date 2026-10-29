@@ -13,6 +13,7 @@ import { ReviewPage } from '../features/review';
 import { TemplatesPage } from '../features/templates';
 import { DocumentsPage } from '../features/documents';
 import { DashboardPage } from '../features/dashboard';
+import { AuditPage } from '../features/audit';
 
 export function Router() {
   return (
@@ -97,6 +98,18 @@ export function Router() {
                 <RoleGuard roles={['admin', 'case_worker', 'reviewer', 'auditor']}>
                   <AppShell>
                     <DocumentsPage />
+                  </AppShell>
+                </RoleGuard>
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/audit"
+            element={
+              <AuthGuard>
+                <RoleGuard roles={['admin', 'auditor']}>
+                  <AppShell>
+                    <AuditPage />
                   </AppShell>
                 </RoleGuard>
               </AuthGuard>
