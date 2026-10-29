@@ -1,4 +1,5 @@
 import React from "react";
+import { Label } from "../../../components/ui/label";
 import type { CarDraft } from "../types";
 
 export function FamilyCompositionSection({
@@ -37,7 +38,7 @@ export function FamilyCompositionSection({
               {members.map((member) => (
                 <tr key={member.id} className={member.include ? "odd:bg-[#fbf9f4]" : "bg-[#ece7dc] text-[#777166]"}>
                   <td className="border-b border-[#e2ddd1] px-2 py-2">
-                    <label className="flex min-h-[36px] items-center gap-2">
+                    <Label className="flex min-h-[36px] items-center gap-2">
                       <input
                         type="checkbox"
                         checked={member.include}
@@ -45,7 +46,7 @@ export function FamilyCompositionSection({
                         className="h-4 w-4 accent-[#7a1f1f]"
                       />
                       <span className="text-xs">{member.include ? "Included" : "Excluded from draft"}</span>
-                    </label>
+                    </Label>
                   </td>
                   <th scope="row" className="border-b border-[#e2ddd1] px-2 py-2 font-medium">
                     {member.name}

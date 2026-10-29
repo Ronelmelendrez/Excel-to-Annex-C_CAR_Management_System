@@ -19,6 +19,7 @@ export default defineConfig({
       'src/features/imports/__tests__/*.test.{ts,tsx}',
       'src/features/households/__tests__/*.test.{ts,tsx}',
       'src/features/cars/__tests__/*.test.tsx',
+      'src/features/review/__tests__/*.test.tsx',
     ],
     globals: true,
   },

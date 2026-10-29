@@ -1,4 +1,5 @@
 import React from "react";
+import { Label } from "../../../components/ui/label";
 import type { CarDraft } from "../types";
 
 const interventionTypes = [
@@ -52,7 +53,7 @@ export function InterventionPlanSection({
               </legend>
               <div className="grid gap-3 sm:grid-cols-[minmax(160px,0.7fr)_minmax(0,1.3fr)]">
                 <div>
-                  <label htmlFor={`${intervention.id}-type`} className="block text-xs font-semibold">Type</label>
+                  <Label htmlFor={`${intervention.id}-type`} className="block text-xs font-semibold">Type</Label>
                   <select
                     id={`${intervention.id}-type`}
                     value={intervention.type}
@@ -67,7 +68,7 @@ export function InterventionPlanSection({
                   </select>
                 </div>
                 <div>
-                  <label htmlFor={`${intervention.id}-details`} className="block text-xs font-semibold">Details</label>
+                  <Label htmlFor={`${intervention.id}-details`} className="block text-xs font-semibold">Details</Label>
                   <textarea
                     id={`${intervention.id}-details`}
                     value={intervention.details}

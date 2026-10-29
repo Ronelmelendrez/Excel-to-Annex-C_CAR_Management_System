@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Label } from "../../../components/ui/label";
 import { SectionCard } from "../../../components/ui/section-card";
 import type { CarDraft, ValidatedHousehold } from "../types";
 
@@ -29,9 +30,9 @@ export function CarDraftList({
           </span>
         }
       >
-        <label htmlFor="car-household" className="block text-xs font-semibold">
+        <Label htmlFor="car-household" className="block text-xs font-semibold">
           Household
-        </label>
+        </Label>
         <select
           id="car-household"
           value={householdId}

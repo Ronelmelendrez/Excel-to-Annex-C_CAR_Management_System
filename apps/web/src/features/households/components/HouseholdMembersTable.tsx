@@ -1,4 +1,5 @@
 import React from "react";
+import { Label } from "../../../components/ui/label";
 import type { HouseholdMember, HouseholdRecord, HouseholdOverlay } from "../types";
 
 function MemberExclusionForm({
@@ -20,9 +21,9 @@ function MemberExclusionForm({
       <p className="mt-1 text-xs leading-5 text-[#5b574e]">
         This mock overlay does not delete the source row. A reason is required.
       </p>
-      <label htmlFor="exclusion-reason" className="sr-only">
+      <Label htmlFor="exclusion-reason" className="sr-only">
         Reason for exclusion
-      </label>
+      </Label>
       <textarea
         id="exclusion-reason"
         value={reason}

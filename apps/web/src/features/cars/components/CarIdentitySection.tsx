@@ -1,4 +1,5 @@
 import React from "react";
+import { Label } from "../../../components/ui/label";
 import type { CarDraft, ValidatedHousehold } from "../types";
 
 export function CarIdentitySection({
@@ -45,9 +46,9 @@ export function CarIdentitySection({
       </dl>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="templateVersion" className="block text-xs font-semibold">
+          <Label htmlFor="templateVersion" className="block text-xs font-semibold">
             Template version
-          </label>
+          </Label>
           <select
             id="templateVersion"
             value={draft.templateVersion}
@@ -62,9 +63,9 @@ export function CarIdentitySection({
           <p className="mt-1 text-xs text-[#5b574e]">Sample option only; template management is not connected.</p>
         </div>
         <div>
-          <label htmlFor="datePrepared" className="block text-xs font-semibold">
+          <Label htmlFor="datePrepared" className="block text-xs font-semibold">
             Date prepared
-          </label>
+          </Label>
           <input
             id="datePrepared"
             type="date"

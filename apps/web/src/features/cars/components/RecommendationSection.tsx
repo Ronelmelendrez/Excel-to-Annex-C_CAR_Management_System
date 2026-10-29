@@ -1,4 +1,5 @@
 import React from "react";
+import { Label } from "../../../components/ui/label";
 
 export function RecommendationSection({
   value,
@@ -10,7 +11,7 @@ export function RecommendationSection({
   return (
     <section aria-labelledby="recommendation-heading" className="px-4 py-5 sm:px-5">
       <h3 id="recommendation-heading" className="mb-4 font-serif text-xl">Recommendation</h3>
-      <label htmlFor="recommendation" className="block text-sm font-semibold">Case worker recommendation</label>
+      <Label htmlFor="recommendation" className="block text-sm font-semibold">Case worker recommendation</Label>
       <p className="mt-1 text-xs leading-5 text-[#5b574e]">
         Enter the responsible case worker’s recommendation. No suggested text is generated.
       </p>

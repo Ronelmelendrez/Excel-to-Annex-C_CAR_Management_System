@@ -1,4 +1,5 @@
 import React from "react";
+import { Label } from "../../../components/ui/label";
 import type { HouseholdRecord, HouseholdOverlay } from "../types";
 
 export function GranteeResolutionForm({
@@ -29,7 +30,7 @@ export function GranteeResolutionForm({
         {household.members.map((member) => {
           const isExcluded = overlay?.excludedMemberIds.includes(member.id) ?? false;
           return (
-            <label
+            <Label
               key={member.id}
               className="flex min-h-[44px] items-center gap-3 border border-[#d6cdb9] bg-[#f8f5ee] px-3 py-2 text-sm"
             >
@@ -51,13 +52,13 @@ export function GranteeResolutionForm({
                   {isExcluded ? " · excluded from this household" : ""}
                 </span>
               </span>
-            </label>
+            </Label>
           );
         })}
       </fieldset>
-      <label htmlFor="resolution-reason" className="mt-3 block text-xs font-semibold">
+      <Label htmlFor="resolution-reason" className="mt-3 block text-xs font-semibold">
         Reason for correction
-      </label>
+      </Label>
       <textarea
         id="resolution-reason"
         value={reason}

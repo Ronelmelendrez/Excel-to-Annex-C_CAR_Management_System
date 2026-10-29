@@ -1,4 +1,5 @@
 import React from "react";
+import { Label } from "../../../components/ui/label";
 import type { ReviewFilter } from "../types";
 import { HouseholdStat } from "./primitives";
 
@@ -42,9 +43,9 @@ export function HouseholdFilters({
       <section aria-label="Household search and filters" className="border-b border-[#c9c3b6] py-5">
         <div className="grid gap-3 md:grid-cols-[minmax(220px,1.5fr)_minmax(160px,1fr)_minmax(180px,1fr)]">
           <div>
-            <label htmlFor="household-search" className="mb-1 block text-xs font-semibold">
+            <Label htmlFor="household-search" className="mb-1 block text-xs font-semibold">
               Search households
-            </label>
+            </Label>
             <input
               id="household-search"
               type="search"
@@ -55,9 +56,9 @@ export function HouseholdFilters({
             />
           </div>
           <div>
-            <label htmlFor="review-filter" className="mb-1 block text-xs font-semibold">
+            <Label htmlFor="review-filter" className="mb-1 block text-xs font-semibold">
               Grantee status
-            </label>
+            </Label>
             <select
               id="review-filter"
               value={reviewFilter}
@@ -71,9 +72,9 @@ export function HouseholdFilters({
             </select>
           </div>
           <div>
-            <label htmlFor="import-filter" className="mb-1 block text-xs font-semibold">
+            <Label htmlFor="import-filter" className="mb-1 block text-xs font-semibold">
               Import version
-            </label>
+            </Label>
             <select
               id="import-filter"
               value={versionFilter}

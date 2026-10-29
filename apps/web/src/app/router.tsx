@@ -9,6 +9,7 @@ import { UpdatePasswordForm } from '../features/auth/components/UpdatePasswordFo
 import { ImportsPage } from '../features/imports';
 import { HouseholdsPage } from '../features/households';
 import { CarsPage } from '../features/cars';
+import { ReviewPage } from '../features/review';
 
 function Dashboard() {
   return (
@@ -88,6 +89,18 @@ export function Router() {
                 <RoleGuard roles={['admin', 'case_worker']}>
                   <AppShell>
                     <CarsPage />
+                  </AppShell>
+                </RoleGuard>
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/review"
+            element={
+              <AuthGuard>
+                <RoleGuard roles={['reviewer']}>
+                  <AppShell>
+                    <ReviewPage />
                   </AppShell>
                 </RoleGuard>
               </AuthGuard>

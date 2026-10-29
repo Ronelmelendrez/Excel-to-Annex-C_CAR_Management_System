@@ -1,4 +1,5 @@
 import React from "react";
+import { Label } from "../../../components/ui/label";
 import type { CarDraft } from "../types";
 
 function NarrativeField({
@@ -18,7 +19,7 @@ function NarrativeField({
 }) {
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-semibold">{label}</label>
+      <Label htmlFor={id} className="block text-sm font-semibold">{label}</Label>
       <p className="mt-1 text-xs leading-5 text-[#5b574e]">{hint}</p>
       <textarea
         id={id}
