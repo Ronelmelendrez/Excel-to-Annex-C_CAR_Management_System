@@ -28,8 +28,27 @@ flowchart LR
 | Document worker | Render DOCX, convert PDF, verify output | Trusted, isolated |
 | Job queue | Durable, retryable, idempotent jobs (DB-backed acceptable) | Trusted |
 
+
 ## 3. Recommended Stack
-React + TypeScript + Vite (or existing framework) · Tailwind · Supabase Auth/Postgres/Storage · SheetJS (xlsx parse) · Docxtemplater (+ table loop support) · Recharts · server-side PDF conversion (e.g., LibreOffice headless in a sandboxed worker) · DB-backed queue (e.g., `FOR UPDATE SKIP LOCKED`) or a managed queue.
+- **Frontend:** React + TypeScript + Vite (retain the existing framework after auditing the repository)
+- **UI styling:** Tailwind CSS
+- **Backend platform:** Supabase
+- **Authentication:** Supabase Auth
+- **Database:** Supabase PostgreSQL
+- **Database security:** PostgreSQL Row-Level Security (RLS)
+- **File storage:** Supabase Storage with private buckets
+- **Server-side functions:** Supabase Edge Functions using TypeScript for privileged workflows, authorization checks, validation, and orchestration where appropriate
+- **Excel processing:** SheetJS (`xlsx`), with server-side parsing for committed imports
+- **DOCX generation:** Docxtemplater with table-loop support
+- **PDF generation:** A controlled, server-side DOCX-to-PDF conversion worker, such as sandboxed LibreOffice
+- **Job queue:** PostgreSQL-backed job queue using transactions and `FOR UPDATE SKIP LOCKED`, or a suitable managed queue
+- **Charts and dashboards:** Recharts
+- **Testing:** TypeScript-aware unit tests, integration tests, RLS and authorization tests, and end-to-end tests
+- **Deployment:** Existing frontend hosting, Supabase services, and a separate worker deployment if required for reliable DOCX/PDF generation
+
+**Language standard:** Use TypeScript for frontend code and Supabase Edge Functions. Enable strict type checking where supported. Define shared types for API payloads, database records, import-validation results, CAR states, and document-generation jobs. Validate incoming requests and Excel data at runtime; TypeScript types alone do not validate untrusted input.
+
+**Backend principle:** Use Supabase as the primary backend platform. Do not add a separate Express/Node.js API unless a documented requirement cannot be handled appropriately by Supabase services and functions.
 
 ## 4. Auth & Authorization Architecture
 ```mermaid
