@@ -8,6 +8,7 @@ import { PasswordResetForm } from '../features/auth/components/PasswordResetForm
 import { UpdatePasswordForm } from '../features/auth/components/UpdatePasswordForm';
 import { ImportsPage } from '../features/imports';
 import { HouseholdsPage } from '../features/households';
+import { CarsPage } from '../features/cars';
 
 function Dashboard() {
   return (
@@ -19,8 +20,8 @@ function Dashboard() {
         The dashboard is not wired to records yet.
       </h1>
       <p className="mt-5 max-w-[52ch] text-[15px] leading-7 text-[#3f3b34]">
-        Excel import is the first working surface. Dashboard metrics and CAR authoring are separate
-        features in the release order, so this page deliberately shows no invented numbers.
+        Household review and CAR authoring now have local mock screens. Dashboard metrics remain
+        unwired until the app has persisted records, so this page deliberately shows no invented numbers.
       </p>
       <p className="mt-8">
         <Link
@@ -28,6 +29,12 @@ function Dashboard() {
           className="inline-block border border-[#161512] bg-[#161512] px-4 py-3 text-sm text-[#f4f1ea] hover:bg-[#7a1f1f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
         >
           Go to Excel imports
+        </Link>
+        <Link
+          to="/cars"
+          className="ml-3 inline-block border border-[#161512] px-4 py-3 text-sm hover:bg-[#e6e0d4] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+        >
+          Open CAR drafts
         </Link>
       </p>
     </div>
@@ -71,6 +78,18 @@ export function Router() {
                 <AppShell>
                   <HouseholdsPage />
                 </AppShell>
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/cars"
+            element={
+              <AuthGuard>
+                <RoleGuard roles={['admin', 'case_worker']}>
+                  <AppShell>
+                    <CarsPage />
+                  </AppShell>
+                </RoleGuard>
               </AuthGuard>
             }
           />

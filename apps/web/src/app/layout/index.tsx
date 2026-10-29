@@ -13,6 +13,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const canViewHouseholds = roles.some((role) =>
     ['admin', 'operator', 'case_worker', 'reviewer', 'auditor'].includes(role),
   );
+  const canAuthorCars = roles.includes('admin') || roles.includes('case_worker');
 
   const handleSignOut = async () => {
     await signOut();
@@ -73,6 +74,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   }
                 >
                   Households
+                </NavLink>
+              )}
+              {canAuthorCars && (
+                <NavLink
+                  to="/cars"
+                  className={({ isActive }) =>
+                    `${linkBase} ${isActive ? 'font-semibold underline decoration-2' : 'text-[#3f3b34]'}`
+                  }
+                >
+                  CARs
                 </NavLink>
               )}
             </nav>
