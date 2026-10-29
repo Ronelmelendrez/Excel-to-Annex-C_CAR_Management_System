@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './providers';
 import { AuthGuard, RoleGuard } from './guards';
 import { AppShell } from './layout';
@@ -12,37 +12,7 @@ import { CarsPage } from '../features/cars';
 import { ReviewPage } from '../features/review';
 import { TemplatesPage } from '../features/templates';
 import { DocumentsPage } from '../features/documents';
-
-function Dashboard() {
-  return (
-    <div className="max-w-[680px]">
-      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#5b574e]">
-        Case register / dashboard
-      </p>
-      <h1 className="mt-3 font-serif text-4xl leading-[1.05] tracking-tight sm:text-5xl">
-        The dashboard is not wired to records yet.
-      </h1>
-      <p className="mt-5 max-w-[52ch] text-[15px] leading-7 text-[#3f3b34]">
-        Household review and CAR authoring now have local mock screens. Dashboard metrics remain
-        unwired until the app has persisted records, so this page deliberately shows no invented numbers.
-      </p>
-      <p className="mt-8">
-        <Link
-          to="/imports"
-          className="inline-block border border-[#161512] bg-[#161512] px-4 py-3 text-sm text-[#f4f1ea] hover:bg-[#7a1f1f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
-        >
-          Go to Excel imports
-        </Link>
-        <Link
-          to="/cars"
-          className="ml-3 inline-block border border-[#161512] px-4 py-3 text-sm hover:bg-[#e6e0d4] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
-        >
-          Open CAR drafts
-        </Link>
-      </p>
-    </div>
-  );
-}
+import { DashboardPage } from '../features/dashboard';
 
 export function Router() {
   return (
@@ -57,7 +27,7 @@ export function Router() {
             element={
               <AuthGuard>
                 <AppShell>
-                  <Dashboard />
+                  <DashboardPage />
                 </AppShell>
               </AuthGuard>
             }

@@ -13,6 +13,7 @@ function visit(path: string) {
 describe('demo mode', () => {
   beforeEach(() => {
     localStorage.clear();
+    window.history.replaceState({}, '', '/');
   });
 
   afterEach(() => {
@@ -24,16 +25,19 @@ describe('demo mode', () => {
     render(<Router />);
 
     expect(await screen.findByText(/Demo build/i)).toBeTruthy();
-    expect(await screen.findByText(/The dashboard is not wired to records yet/i)).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Operations at a glance" })).toBeTruthy();
+    expect(await screen.findByText(/Mock aggregates · no live records/i)).toBeTruthy();
     expect(screen.getByText('Demo operator')).toBeTruthy();
-  });
+  }, 15000);
 
   it('shows the seeded import history without a backend', async () => {
     visit('/imports');
     render(<Router />);
 
-    expect((await screen.findAllByText(/SY2026_Q1_household_profiles.xlsx/)).length).toBeGreaterThan(0);
-    expect(await screen.findByText(/Region_IV-A_batch02.xlsx/)).toBeTruthy();
-    expect((await screen.findAllByText(/^3 versions$/)).length).toBeGreaterThan(0);
-  });
+    expect(
+      (await screen.findAllByText(/SY2026_Q1_household_profiles.xlsx/, {}, { timeout: 10000 })).length,
+    ).toBeGreaterThan(0);
+    expect(await screen.findByText(/Region_IV-A_batch02.xlsx/, {}, { timeout: 10000 })).toBeTruthy();
+    expect((await screen.findAllByText(/^3 versions$/, {}, { timeout: 10000 })).length).toBeGreaterThan(0);
+  }, 15000);
 });

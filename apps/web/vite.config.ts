@@ -22,6 +22,7 @@ export default defineConfig({
       'src/features/review/__tests__/*.test.tsx',
       'src/features/templates/__tests__/*.test.tsx',
       'src/features/documents/__tests__/*.test.tsx',
+      'src/features/dashboard/__tests__/*.test.tsx',
     ],
     globals: true,
   },
