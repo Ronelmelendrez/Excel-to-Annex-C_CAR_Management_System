@@ -11,7 +11,14 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "strict": true
+    "strict": true,
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@import-domain": ["../../supabase/functions/_shared/import-domain.ts"]
+    }
   },
-  "include": ["src"]
+  "include": ["src", "../../supabase/functions/_shared/import-domain.ts"],
+  "exclude": ["src/**/__tests__/**"]
 }
