@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { SectionCard } from "../../../components/ui/section-card";
 import type { CarDraft, ValidatedHousehold } from "../types";
 
 export function CarDraftList({
@@ -17,16 +18,18 @@ export function CarDraftList({
   const [householdId, setHouseholdId] = useState("");
 
   return (
-    <aside className="min-w-0" aria-label="CAR drafts">
-      <section className="border border-[#c9c3b6] bg-[#f8f5ee] p-4">
-        <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#5b574e]">
-          Start a CAR
-        </p>
-        <h2 className="mt-1 font-serif text-xl">Choose a validated household</h2>
-        <p className="mt-2 text-xs leading-5 text-[#5b574e]">
-          Only households with exactly one supported GRANTEE=Yes flag can start a CAR.
-        </p>
-        <label htmlFor="car-household" className="mt-4 block text-xs font-semibold">
+    <aside className="min-w-0 space-y-5" aria-label="CAR drafts">
+      <SectionCard
+        id="car-new-draft-heading"
+        eyebrow="Start a CAR"
+        title="Choose a validated household"
+        description={
+          <span className="text-xs leading-5">
+            Only households with exactly one supported GRANTEE=Yes flag can start a CAR.
+          </span>
+        }
+      >
+        <label htmlFor="car-household" className="block text-xs font-semibold">
           Household
         </label>
         <select
@@ -53,15 +56,17 @@ export function CarDraftList({
         >
           Create draft
         </button>
-      </section>
+      </SectionCard>
 
-      <section aria-labelledby="car-drafts-heading" className="mt-5">
-        <div className="flex items-baseline justify-between border-b border-[#161512] pb-2">
-          <h2 id="car-drafts-heading" className="font-serif text-xl">Drafts</h2>
-          <span className="font-mono text-[10px] text-[#5b574e]">{drafts.length} records</span>
-        </div>
+      <SectionCard
+        id="car-drafts-heading"
+        title="Drafts"
+        cardClassName="overflow-hidden"
+        contentClassName="p-0"
+        action={<span className="font-mono text-[10px] text-[#5b574e]">{drafts.length} records</span>}
+      >
         {drafts.length === 0 ? (
-          <p className="border-b border-[#c9c3b6] px-2 py-5 text-sm leading-6 text-[#5b574e]">
+          <p className="px-3 py-5 text-sm leading-6 text-[#5b574e]">
             No CAR drafts yet. Select a validated household above to begin.
           </p>
         ) : (
@@ -94,7 +99,7 @@ export function CarDraftList({
             })}
           </ul>
         )}
-      </section>
+      </SectionCard>
     </aside>
   );
 }

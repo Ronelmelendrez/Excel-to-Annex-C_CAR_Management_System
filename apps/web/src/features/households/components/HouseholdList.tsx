@@ -1,4 +1,5 @@
 import React from "react";
+import { SectionCard } from "../../../components/ui/section-card";
 import type { HouseholdListItem } from "../types";
 import { HouseholdStatusLabel } from "./primitives";
 
@@ -12,17 +13,20 @@ export function HouseholdList({
   onSelect: (id: string) => void;
 }) {
   return (
-    <section aria-labelledby="household-list-heading" className="min-w-0">
-      <div className="flex items-baseline justify-between border-b border-[#161512] pb-2">
-        <h2 id="household-list-heading" className="font-serif text-xl">
-          Household list
-        </h2>
+    <SectionCard
+      id="household-list-heading"
+      title="Household list"
+      className="min-w-0"
+      cardClassName="overflow-hidden"
+      contentClassName="p-0"
+      action={
         <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[#5b574e]">
           {items.length} shown
         </span>
-      </div>
+      }
+    >
       {items.length === 0 ? (
-        <div className="border-b border-[#c9c3b6] px-3 py-8">
+        <div className="px-3 py-8">
           <p className="font-serif text-lg">No households match those filters.</p>
           <p className="mt-1 text-sm leading-6 text-[#5b574e]">
             Clear the search or choose a different import version.
@@ -62,6 +66,6 @@ export function HouseholdList({
           })}
         </ul>
       )}
-    </section>
+    </SectionCard>
   );
 }

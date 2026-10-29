@@ -1,4 +1,5 @@
 import React from "react";
+import { SectionCard } from "../../../components/ui/section-card";
 import type { CarChecklistItem } from "../types";
 
 export function CarChecklist({
@@ -11,20 +12,19 @@ export function CarChecklist({
   onJumpToField: (fieldId: string) => void;
 }) {
   return (
-    <section aria-labelledby="car-checklist-heading" className="border border-[#c9c3b6] bg-[#f8f5ee] p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#5b574e]">
-            Working checklist
-          </p>
-          <h2 id="car-checklist-heading" className="mt-1 font-serif text-xl">Draft completeness</h2>
-        </div>
-        <span className="font-mono text-sm tabular-nums">{missingCount} missing</span>
-      </div>
-      <p className="mt-2 text-xs leading-5 text-[#5b574e]">
-        Sample checks for this mock UI. The official CAR template and required-field policy are not connected.
-      </p>
-      <ul className="mt-3 divide-y divide-[#e2ddd1]">
+    <SectionCard
+      id="car-checklist-heading"
+      eyebrow="Working checklist"
+      title="Draft completeness"
+      description={
+        <span className="text-xs leading-5">
+          Sample checks for this mock UI. The official CAR template and required-field policy are not connected.
+        </span>
+      }
+      action={<span className="font-mono text-sm tabular-nums">{missingCount} missing</span>}
+      contentClassName="pt-0"
+    >
+      <ul className="divide-y divide-[#e2ddd1]">
         {items.map((item) => (
           <li key={item.id} className="py-2">
             {item.complete ? (
@@ -46,6 +46,6 @@ export function CarChecklist({
           </li>
         ))}
       </ul>
-    </section>
+    </SectionCard>
   );
 }

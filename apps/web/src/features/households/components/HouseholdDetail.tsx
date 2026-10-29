@@ -1,4 +1,5 @@
 import React from "react";
+import { SectionCard } from "../../../components/ui/section-card";
 import type { HouseholdOverlay, HouseholdRecord, HouseholdStatus } from "../types";
 import { GranteeResolutionForm } from "./GranteeResolutionForm";
 import { HouseholdHistory } from "./HouseholdHistory";
@@ -49,61 +50,51 @@ export function HouseholdDetail({
 }) {
   if (!household) {
     return (
-      <section
-        aria-labelledby="household-detail-heading"
-        className="min-w-0 border border-[#c9c3b6] bg-[#f8f5ee] px-5 py-10"
+      <SectionCard
+        id="household-detail-heading"
+        title="Select a household"
+        className="min-w-0"
+        contentClassName="px-5 py-6 sm:py-10"
       >
-        <h2 id="household-detail-heading" className="font-serif text-2xl">
-          Select a household
-        </h2>
-        <p className="mt-2 text-sm leading-6 text-[#5b574e]">
+        <p className="text-sm leading-6 text-[#5b574e]">
           Choose a row to inspect member details and source references.
         </p>
-      </section>
+      </SectionCard>
     );
   }
 
   const grantee = household.members.find((member) => member.id === granteeId);
 
   return (
-    <section
-      aria-labelledby="household-detail-heading"
-      className="min-w-0 border border-[#c9c3b6] bg-[#f8f5ee]"
+    <SectionCard
+      id="household-detail-heading"
+      title={`HH_ID ${household.hhId}`}
+      titleClassName="font-mono text-2xl font-semibold tabular-nums"
+      eyebrow={`Household detail / ${household.importName} · version ${household.importVersion}`}
+      description={`${household.barangay}, ${household.municipality}`}
+      className="min-w-0"
+      cardClassName="overflow-hidden"
+      contentClassName="p-0"
+      action={status && <HouseholdStatusLabel status={status} />}
     >
-      <header className="border-b border-[#c9c3b6] px-4 py-4 sm:px-5">
-        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#5b574e]">
-          Household detail / {household.importName} · version {household.importVersion}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#e2ddd1] px-4 py-3 sm:px-5">
+        <p className="text-sm">
+          <span className="font-semibold">Grantee:</span>{" "}
+          {grantee ? `${grantee.name} · source row ${grantee.sourceRow}` : "Not validated"}
         </p>
-        <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 id="household-detail-heading" className="font-mono text-2xl font-semibold tabular-nums">
-              HH_ID {household.hhId}
-            </h2>
-            <p className="mt-1 text-sm text-[#3f3b34]">
-              {household.barangay}, {household.municipality}
-            </p>
-          </div>
-          {status && <HouseholdStatusLabel status={status} />}
-        </div>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[#e2ddd1] pt-3">
-          <p className="text-sm">
-            <span className="font-semibold">Grantee:</span>{" "}
-            {grantee ? `${grantee.name} · source row ${grantee.sourceRow}` : "Not validated"}
-          </p>
-          {status === "valid" && (
-            <span className="text-xs font-medium text-[#244b2e]">Exactly one supported Yes flag</span>
-          )}
-          {canCorrect && status !== "valid" && status !== "resolved" && (
-            <button
-              type="button"
-              onClick={onToggleResolveForm}
-              className="min-h-[40px] border border-[#161512] px-3 py-2 text-xs font-semibold hover:bg-[#161512] hover:text-[#f4f1ea] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
-            >
-              {showResolveForm ? "Cancel correction" : "Resolve grantee"}
-            </button>
-          )}
-        </div>
-      </header>
+        {status === "valid" && (
+          <span className="text-xs font-medium text-[#244b2e]">Exactly one supported Yes flag</span>
+        )}
+        {canCorrect && status !== "valid" && status !== "resolved" && (
+          <button
+            type="button"
+            onClick={onToggleResolveForm}
+            className="min-h-[40px] border border-[#161512] px-3 py-2 text-xs font-semibold hover:bg-[#161512] hover:text-[#f4f1ea] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+          >
+            {showResolveForm ? "Cancel correction" : "Resolve grantee"}
+          </button>
+        )}
+      </div>
 
       {showResolveForm && canCorrect && (
         <GranteeResolutionForm
@@ -135,6 +126,6 @@ export function HouseholdDetail({
         <HouseholdHistory overlay={overlay} />
         <LinkedCars household={household} />
       </div>
-    </section>
+    </SectionCard>
   );
 }
