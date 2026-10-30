@@ -811,7 +811,7 @@ export function ImportWizard({ wizard }: { wizard: ImportWizardState }) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#5b574e]">
-            Feature 3 / Excel import
+             Excel import
           </p>
           <h1 id="wizard-heading" className="mt-2 font-serif text-3xl leading-tight tracking-tight sm:text-4xl">
             {heading}

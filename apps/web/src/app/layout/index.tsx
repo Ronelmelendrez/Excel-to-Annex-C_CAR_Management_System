@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../providers';
 import { isDemoMode } from '../../shared/supabase';
+import { useScrolledPast } from '../../shared/hooks';
 
 const linkBase =
   'px-1 py-2 text-sm underline-offset-[6px] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]';
@@ -9,6 +10,7 @@ const linkBase =
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, profile, roles, signOut } = useAuth();
   const navigate = useNavigate();
+  const condensed = useScrolledPast(24);
   const canImport = roles.includes('admin') || roles.includes('operator');
   const canViewHouseholds = roles.some((role) =>
     ['admin', 'operator', 'case_worker', 'reviewer', 'auditor'].includes(role),
@@ -43,11 +45,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      <header className="border-b border-[#161512] bg-[#f4f1ea]">
-        <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-between gap-x-8 gap-y-3 px-4 py-4 sm:px-6">
+      <header
+        className={`sticky top-0 z-40 border-b border-[#161512] transition-[background-color,box-shadow] duration-300 ease-out ${
+          condensed
+            ? 'bg-[#f4f1ea]/95 shadow-[0_1px_0_0_rgba(22,21,18,0.08),0_8px_24px_-12px_rgba(22,21,18,0.35)] backdrop-blur supports-[backdrop-filter]:bg-[#f4f1ea]/80'
+            : 'bg-[#f4f1ea] shadow-none'
+        }`}
+      >
+        <div
+          className={`mx-auto flex max-w-[1180px] flex-wrap items-center justify-between gap-x-8 gap-y-3 px-4 transition-[padding] duration-300 ease-out sm:px-6 ${
+            condensed ? 'py-2.5' : 'py-4'
+          }`}
+        >
           <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
             <NavLink to="/dashboard" className="group flex items-baseline gap-2">
-              <span className="font-serif text-lg leading-none tracking-tight">Annex C</span>
+              <span
+                className={`font-serif leading-none tracking-tight transition-[font-size] duration-300 ease-out ${
+                  condensed ? 'text-base' : 'text-lg'
+                }`}
+              >
+                Annex C
+              </span>
               <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#5b574e]">
                 CAR register
               </span>

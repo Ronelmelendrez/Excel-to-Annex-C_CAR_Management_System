@@ -32,7 +32,7 @@ export function DocumentsPage() {
     <div>
       <header className="border-b border-[#161512] pb-5">
         <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#5b574e]">
-          F8 / Document generation &amp; downloads
+          Document generation &amp; downloads
         </p>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
           <div>
