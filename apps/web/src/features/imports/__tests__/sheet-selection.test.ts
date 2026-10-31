@@ -12,6 +12,7 @@ import {
   inspectWorkbookSheet,
   parseWorkbookBuffer,
   readWorkbookWithSheetRecovery,
+  SHAPE_SNIFF_COLS,
   type ParsedSheet,
 } from "../lib/workbook-engine";
 
@@ -319,4 +320,97 @@ describe("damaged or unreadable worksheets", () => {
     });
     await expect(inspectInitialSheet(["Sheet1", "Sheet2"])).rejects.toThrow("All Sheet1 broken");
   });
+});
+
+describe("workbook with a bloated Sheet1 (huge used range)", () => {
+  /**
+   * Sheet1 exactly as it exists AFTER the dense-mode rescue: the used range
+   * spans the whole grid (stray formatting to the last row/column — the cause
+   * of the browser's "Too many properties to enumerate"), but only a couple of
+   * cover cells exist. Built in memory because serializing a full-grid range
+   * through XLSX.write would itself take minutes.
+   */
+  function bloatedParsedWorkbook(): ParsedSheet {
+    const farHeaderCell = `${XLSX.utils.encode_col(600)}1`;
+    const sheet1: any = {
+      "!ref": "A1:XFD1048576",
+      A1: { t: "s", v: "Annex C cover sheet" },
+      A2: { t: "s", v: "generated 2026-10-31" },
+      [farHeaderCell]: { t: "s", v: "FAR_JUNK" },
+    };
+    return {
+      workbook: {
+        SheetNames: ["Sheet1", "Sheet2"],
+        Sheets: { Sheet1: sheet1, Sheet2: {} },
+      },
+      utils: XLSX.utils,
+      sheetNames: ["Sheet1", "Sheet2"],
+      unavailableSheetNames: [],
+    };
+  }
+
+  it("sniffs a bounded window instead of scanning the whole grid", () => {
+    const parsed = bloatedParsedWorkbook();
+    const started = Date.now();
+    const cover = inspectWorkbookSheet(parsed, "Sheet1");
+    expect(Date.now() - started).toBeLessThan(5_000);
+
+    // Headers come only from the bounded sniff: the far junk column and the
+    // thousands of empty ones never reach the step-02 mapping screen.
+    expect(cover.headers.length).toBeLessThanOrEqual(SHAPE_SNIFF_COLS);
+    expect(cover.headers).not.toContain("FAR_JUNK");
+    // The count falls back to the sheet extent instead of scanning a million rows.
+    expect(cover.dataRowCount).toBe(1_048_575);
+    expect(cover.readError).toBeFalsy();
+    // Cover-sheet junk is never mistaken for the import table.
+    expect(cover.mapping.every((entry) => entry.field === null)).toBe(true);
+  });
+
+  it("runs the full import end to end when Sheet1 is bloated and Sheet2 holds the table", async () => {
+    // On-disk profile: Sheet1's dimension covers a million rows (row bloat),
+    // Sheet2 holds the Annex C table.
+    const wb = XLSX.utils.book_new();
+    const cover = XLSX.utils.aoa_to_sheet([["Annex C cover sheet"], ["generated 2026-10-31"]]);
+    cover["!ref"] = "A1:A1048576";
+    XLSX.utils.book_append_sheet(wb, cover, "Sheet1");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(DATA_ROWS), "Sheet2");
+    const bytes = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+    const file = new File([bytes], "Annex C - bloated cover.xlsx");
+
+    const { result, unmount } = renderHook(() => useImportWizard({ userId: "operator-1" }));
+
+    await act(async () => {
+      await result.current.chooseFile(file);
+    });
+
+    // 01 -> 02: opens on Sheet2; the bloated cover never blocks the flow.
+    await waitFor(() => expect(result.current.stage).toBe("shape"));
+    expect(result.current.sheet?.sheetName).toBe("Sheet2");
+    expect(result.current.sheet?.headers).toEqual(ANNEX_HEADERS);
+    expect(result.current.coverage.missing).toEqual([]);
+    expect(result.current.storeNotice?.title).toMatch(/selected automatically/i);
+
+    // 02 -> 03: process batches, then validate against the server preview.
+    await act(async () => {
+      await result.current.processRows();
+    });
+    expect(result.current.error).toBeNull();
+    expect(result.current.batchProgress?.completedBatches).toBe(1);
+
+    await act(async () => {
+      await result.current.validate();
+    });
+    expect(result.current.error).toBeNull();
+    expect(result.current.stage).toBe("preview");
+    expect(result.current.preview?.sheet_name).toBe("Sheet2");
+    expect(result.current.preview?.rows.length).toBe(2);
+
+    // 03 -> 04: commit.
+    await act(async () => {
+      await result.current.commit();
+    });
+    expect(result.current.error).toBeNull();
+    expect(result.current.stage).toBe("committed");
+    unmount();
+  }, 60_000);
 });

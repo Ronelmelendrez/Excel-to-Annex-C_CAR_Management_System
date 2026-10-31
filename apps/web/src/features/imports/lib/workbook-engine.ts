@@ -26,6 +26,15 @@ import { IMPORT_BATCH_SIZE } from "./import-limits";
  * map. The server re-reads and validates every row regardless.
  */
 export const SHAPE_SNIFF_ROWS = 200;
+/**
+ * Column cap for the mapping-preview sniff. A sheet whose used range covers
+ * the whole grid (stray formatting out to XFD — the same bloat that triggers
+ * the browser's "Too many properties to enumerate") would otherwise scan
+ * 16,384 columns and hand thousands of empty headers to the step-02 mapping
+ * screen, which stalls both the worker and the render. Real import tables sit
+ * far below this cap.
+ */
+export const SHAPE_SNIFF_COLS = 512;
 
 export type ParsedSheet = {
   workbook: any;
@@ -350,11 +359,14 @@ function safeSheetMatrix(
  * Build the column-map preview for a sheet without materializing a huge matrix.
  *
  * The mapping screen only needs the header row, a handful of sample rows, and a
- * row count. For a normal sheet we read everything and keep the exact,
+ * row count. For a normal sheet we read the top rows and keep the exact,
  * blank-filtered count. For a very large sheet (up to 1,000,000 rows) we only
  * sniff the top rows so the thread does not stall building a million-cell array;
  * the count then falls back to the sheet extent, which is cheap and accurate to
- * the last used cell. The server re-reads and validates every row regardless.
+ * the last used cell. The sniff is bounded in BOTH dimensions (SHAPE_SNIFF_ROWS
+ * x SHAPE_SNIFF_COLS): a bloated used range must never scan the whole grid or
+ * flood step 02 with thousands of empty headers. The server re-reads and
+ * validates every row regardless.
  */
 export function inspectWorkbookSheet(
   parsed: ParsedSheet,
@@ -371,19 +383,30 @@ export function inspectWorkbookSheet(
   const sniffRows = Math.max(SHAPE_SNIFF_ROWS, (requested ?? 0) + 6);
   const large = extentRows > sniffRows;
 
-  const options =
-    large && range
+  // Only pass an explicit range when it actually caps something: a small,
+  // narrow sheet keeps reading exactly its full extent (so exact counts and
+  // full samples are preserved), while a bloated one is bounded to the sniff
+  // window in both dimensions.
+  const capsRows = range ? range.e.r > range.s.r + sniffRows - 1 : false;
+  const capsCols = range ? range.e.c > range.s.c + SHAPE_SNIFF_COLS - 1 : false;
+  const sniffRange =
+    range && (capsRows || capsCols)
       ? {
-          header: 1,
-          raw: false,
-          defval: null,
-          blankrows: true,
-          range: {
-            s: range.s,
-            e: { r: Math.min(range.e.r, range.s.r + sniffRows - 1), c: range.e.c },
+          s: range.s,
+          e: {
+            r: Math.min(range.e.r, range.s.r + sniffRows - 1),
+            c: Math.min(range.e.c, range.s.c + SHAPE_SNIFF_COLS - 1),
           },
         }
-      : { header: 1, raw: false, defval: null, blankrows: true };
+      : undefined;
+
+  const options = {
+    header: 1 as const,
+    raw: false,
+    defval: null,
+    blankrows: true,
+    ...(sniffRange ? { range: sniffRange } : {}),
+  };
 
   const { matrix: rawMatrix, readError } = safeSheetMatrix(parsed, sheet, options);
   const matrix = Array.isArray(rawMatrix) ? rawMatrix : [];
