@@ -4,6 +4,11 @@ import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
   plugins: [react()],
+  // Emit ES-module workers so the parser worker can code-split its dynamic
+  // `import("xlsx")` instead of inlining everything into an IIFE bundle.
+  worker: {
+    format: 'es',
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
