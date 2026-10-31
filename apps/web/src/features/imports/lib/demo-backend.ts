@@ -4,7 +4,6 @@ import {
   DEFAULT_REQUIRED_COLUMNS,
   detectHeaderRow,
   headersFromRow,
-  MAX_IMPORT_ROWS,
   PREVIEW_HOUSEHOLD_LIMIT,
   PREVIEW_ISSUE_LIMIT,
   PREVIEW_ROW_LIMIT,
@@ -15,6 +14,7 @@ import {
 } from '@import-domain';
 import { ApiError } from '../../../shared/api';
 import { DEMO_DISPLAY_NAME, DEMO_USER_ID } from '../../../shared/demo';
+import { IMPORT_MAX_ROWS } from './import-limits';
 import type {
   CommitRequest,
   CommitResponse,
@@ -301,7 +301,7 @@ async function analyzeUpload(payload: PreviewRequest): Promise<LocalAnalysis> {
     rows: matrix.slice(headerRow + 1),
     mapping,
     requiredColumns: DEFAULT_REQUIRED_COLUMNS,
-    maxRows: MAX_IMPORT_ROWS,
+    maxRows: IMPORT_MAX_ROWS,
     firstDataRowNo: headerRow + 2,
   });
 

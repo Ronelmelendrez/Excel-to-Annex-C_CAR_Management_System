@@ -9,6 +9,7 @@ import type { ImportWizard as ImportWizardState } from "../hooks/useImportWizard
 import { fetchErrorReportCsv } from "../api";
 import { formatBytes, formatDateTime, issuesCsvFromPreview } from "../lib/analysis";
 import { downloadText, safeFilename } from "../lib/download";
+import { IMPORT_MAX_MB, IMPORT_MAX_ROWS } from "../lib/import-limits";
 import { FieldLabel, Notice, Stat, primaryButton, quietButton, secondaryButton } from "./primitives";
 
 const REQUIRED = new Set<CanonicalField>(DEFAULT_REQUIRED_COLUMNS);
@@ -107,7 +108,12 @@ function ChoosePanel({ wizard }: { wizard: ImportWizardState }) {
             >
               {wizard.busy === "reading" ? "Reading workbook…" : "Select workbook"}
             </button>
-            <span className="text-xs text-[#5b574e]">.xlsx or .xls, up to 25 MB</span>
+            {wizard.busy === "reading" && (
+              <button type="button" onClick={wizard.cancelRead} className={secondaryButton}>
+                Cancel
+              </button>
+            )}
+            <span className="text-xs text-[#5b574e]">.xlsx or .xls, up to {IMPORT_MAX_MB} MB</span>
           </div>
           <input
             ref={inputRef}
@@ -158,7 +164,9 @@ function ChoosePanel({ wizard }: { wizard: ImportWizardState }) {
           </div>
           <div>
             <dt className="font-semibold">Limit</dt>
-            <dd className="mt-1 text-[#5b574e]">20,000 data rows per sheet. Split larger files.</dd>
+            <dd className="mt-1 text-[#5b574e]">
+              {IMPORT_MAX_ROWS.toLocaleString()} data rows per sheet. Split larger files.
+            </dd>
           </div>
         </dl>
       </aside>
@@ -275,6 +283,7 @@ function MappingTable({ wizard }: { wizard: ImportWizardState }) {
                 <select
                   id={`mapping-${entry.index}`}
                   value={entry.field ?? ""}
+                  disabled={wizard.busy !== null}
                   onChange={(event) =>
                     wizard.setMappingField(
                       entry.index,
@@ -317,25 +326,80 @@ function ShapePanel({ wizard }: { wizard: ImportWizardState }) {
             </span>
           </p>
         </div>
-        <button type="button" className={quietButton} onClick={wizard.reset}>
+        <button type="button" className={quietButton} disabled={wizard.busy !== null} onClick={wizard.reset}>
           Replace file
         </button>
       </div>
 
+      {sheet && bundle.unavailableSheetNames.includes(sheet.sheetName) && (
+        <Notice tone="error" title="Import blocked: worksheet data is unavailable">
+          The worksheet "{sheet.sheetName}" had no readable data. Open the workbook in Excel, use
+          Move or Copy to copy that sheet into a new workbook, save it as .xlsx, and upload that
+          copy.
+        </Notice>
+      )}
+
+      {sheet && !bundle.unavailableSheetNames.includes(sheet.sheetName) &&
+        bundle.unavailableSheetNames.length > 0 && (
+          <Notice tone="warning" title="Some worksheets could not be read">
+            {bundle.unavailableSheetNames.map((name) => (
+              <p key={name}>
+                <span className="font-mono">{name}</span>
+                {bundle.sheetReadErrors?.[name]
+                  ? ` — ${bundle.sheetReadErrors[name]}`
+                  : " could not be read from this file, so it cannot be imported."}
+              </p>
+            ))}
+            <p className="mt-1">
+              If you need their data, open the workbook in Excel, use Move or Copy to put that
+              sheet into a new workbook, save it as .xlsx, and import that copy. Other worksheets
+              are unaffected.
+            </p>
+          </Notice>
+        )}
+
+      {sheet?.readError && (
+        <Notice tone="warning" title={`"${sheet.sheetName}" cannot be read`}>
+          {sheet.readError} The other worksheets in this workbook are unaffected.
+        </Notice>
+      )}
+
+      {sheet &&
+        sheet.dataRowCount === 0 &&
+        !sheet.readError &&
+        !bundle.unavailableSheetNames.includes(sheet.sheetName) && (
+          <Notice tone="warning" title="This worksheet has no data rows">
+            {bundle.sheetNames.length > 1
+              ? `Nothing can be imported from "${sheet.sheetName}". Choose the worksheet that holds the household rows in the Worksheet dropdown below — it is usually the sheet with the HH_ID and ENTRY_ID columns.`
+              : "This worksheet has no rows below its header, so there is nothing to import. The workbook appears to have no importable table."}
+          </Notice>
+        )}
+
       <div className="grid gap-6 sm:grid-cols-2">
         <div>
-          <FieldLabel htmlFor="sheet-name" hint="All worksheets in this workbook are listed by name.">
+          <FieldLabel htmlFor="sheet-name" hint="Worksheets with readable data are listed here.">
             Worksheet
           </FieldLabel>
           <select
             id="sheet-name"
             value={sheet.sheetName}
+            disabled={wizard.busy !== null}
             onChange={(event) => wizard.selectSheet(event.target.value)}
             className="min-h-[44px] w-full border border-[#8c877c] bg-[#f8f5ee] px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
           >
             {bundle.sheetNames.map((name) => (
               <option key={name} value={name}>
                 {name}
+              </option>
+            ))}
+            {bundle.unavailableSheetNames.map((name) => (
+              <option
+                key={name}
+                value={name}
+                disabled
+                title={bundle.sheetReadErrors?.[name] ?? "This worksheet could not be read."}
+              >
+                {name} (no readable data)
               </option>
             ))}
           </select>
@@ -358,6 +422,7 @@ function ShapePanel({ wizard }: { wizard: ImportWizardState }) {
             min={1}
             step={1}
             value={sheet.headerRow + 1}
+            disabled={wizard.busy !== null}
             onChange={(event) => {
               const next = Number(event.target.value);
               if (Number.isFinite(next)) wizard.setHeaderRow(Math.max(0, Math.floor(next) - 1));
@@ -407,6 +472,63 @@ function ShapePanel({ wizard }: { wizard: ImportWizardState }) {
           </div>
         )}
       </section>
+
+      {sheet.dataRowCount > 0 && (
+        <section aria-labelledby="batch-processing-heading" className="border-t border-[#c9c3b6] pt-5">
+          <h3 id="batch-processing-heading" className="font-serif text-xl">
+            Process worksheet batches
+          </h3>
+          <p className="mt-2 max-w-[72ch] text-sm leading-6 text-[#5b574e]">
+            The worker checks up to 20,000 worksheet rows at a time. Saved batch summaries and
+            checkpoints are kept in this browser; final cross-batch validation still runs on the
+            server before any records are committed.
+          </p>
+          {wizard.batchProgress && (
+            <p role="status" aria-live="polite" className="mt-3 font-mono text-xs text-[#5b574e]">
+              {wizard.batchProgress.completedBatches.toLocaleString()} of{" "}
+              {wizard.batchProgress.totalBatches.toLocaleString()} batches saved ·{" "}
+              {wizard.batchProgress.validRows.toLocaleString()} valid ·{" "}
+              {wizard.batchProgress.invalidRows.toLocaleString()} flagged
+              {wizard.batchProgress.failedBatchIndex !== null
+                ? ` · batch ${wizard.batchProgress.failedBatchIndex + 1} needs retry`
+                : ""}
+            </p>
+          )}
+          <div className="mt-4 flex flex-wrap items-center gap-4">
+            <button
+              type="button"
+              className={primaryButton}
+              onClick={() => void wizard.processRows()}
+              disabled={
+                wizard.busy !== null ||
+                (sheet && bundle.unavailableSheetNames.includes(sheet.sheetName)) ||
+                wizard.coverage.missing.length > 0 ||
+                (wizard.batchProgress !== null &&
+                  wizard.batchProgress.failedBatchIndex === null &&
+                  wizard.batchProgress.completedBatches >= wizard.batchProgress.totalBatches)
+              }
+            >
+              {wizard.busy === "processing"
+                ? "Processing batches…"
+                : wizard.batchProgress?.failedBatchIndex !== null &&
+                    wizard.batchProgress?.failedBatchIndex !== undefined
+                  ? "Retry batch"
+                  : (wizard.batchProgress?.completedBatches ?? 0) > 0
+                    ? "Resume processing"
+                    : "Process rows"}
+            </button>
+            {wizard.busy === "processing" && wizard.activeSessionId !== null && (
+              <button
+                type="button"
+                className={secondaryButton}
+                onClick={() => void wizard.pauseProcessing()}
+              >
+                Pause after this batch
+              </button>
+            )}
+          </div>
+        </section>
+      )}
 
       <div className="flex flex-wrap items-center gap-4 border-t border-[#c9c3b6] pt-5">
         <button
@@ -837,8 +959,16 @@ export function ImportWizard({ wizard }: { wizard: ImportWizardState }) {
       {wizard.busy && (
         <p role="status" aria-live="polite" className="mt-4 font-mono text-xs text-[#5b574e]">
           {wizard.busy === "reading"
-            ? "Reading workbook in the browser…"
-            : wizard.busy === "validating"
+            ? wizard.readStage === "hashing"
+              ? "Hashing workbook in the browser…"
+              : wizard.readStage === "parsing"
+                ? "Parsing workbook in a background thread…"
+                : wizard.readStage === "ready"
+                  ? "Workbook ready."
+                  : "Reading workbook in the browser…"
+            : wizard.busy === "processing"
+              ? "Validating worksheet batches in a background thread…"
+              : wizard.busy === "validating"
               ? "Uploading and validating on the server…"
               : "Writing the immutable import version…"}
         </p>

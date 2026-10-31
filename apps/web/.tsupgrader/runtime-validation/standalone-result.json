@@ -1,0 +1,130 @@
+{
+  "planHash": "cd58dfe11b9952ce6a9fc14aebbdee0e725b362cf59b44a739ed2cd6362f379d",
+  "phase": "standalone",
+  "recordedAtUtc": "2026-10-30T11:42:49.3940329Z",
+  "retryCount": 0,
+  "resetBaseline": false,
+  "complete": true,
+  "result": {
+    "setupSucceeded": true,
+    "setupDurationMs": 0,
+    "setupFailureOutput": null,
+    "assertions": [
+      {
+        "name": "tsc-no-emit",
+        "kind": "process",
+        "verificationMethod": "exit-code",
+        "passed": false,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 2,
+        "outputSample": "src/features/cars/hooks/useCarAuthoring.ts(12,56): error TS2550: Property \u0027at\u0027 does not exist on type \u0027string[]\u0027. Do you need to change your target library? Try changing the \u0027lib\u0027 compiler option to \u0027es2022\u0027 or later.\r\nsrc/features/households/components/HouseholdsPage.tsx(85,11): error TS2322: Type \u0027string | null\u0027 is not assignable to type \u0027HouseholdStatus | null\u0027.\r\n  Type \u0027string\u0027 is not assignable to type \u0027HouseholdStatus | null\u0027.\r\nsrc/lib/utils.ts(2,25): error TS7016: Could not find a declaration file for module \u0027tailwind-merge\u0027. \u0027C:/Users/ronel/OneDrive/Desktop/Excel-to-Annex-C_CAR_Management_System/node_modules/tailwind-merge/dist/bundle-mjs.mjs\u0027 implicitly has an \u0027any\u0027 type.\r\n  Try \u0060npm i --save-dev @types/tailwind-merge\u0060 if it exists or add a new declaration (.d.ts) file containing \u0060declare module \u0027tailwind-merge\u0027;\u0060\r\n",
+        "durationMs": 31411
+      },
+      {
+        "name": "production-build",
+        "kind": "process",
+        "verificationMethod": "exit-code",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "\r\n\u003E web@0.1.0 build\r\n\u003E vite build\r\n\r\n\u001B[36mvite v5.4.21 \u001B[32mbuilding for production...\u001B[36m\u001B[39m\r\ntransforming...\r\n\u001B[32m\u2713\u001B[39m 199 modules transformed.\r\nrendering chunks...\r\ncomputing gzip size...\r\n\u001B[2mdist/\u001B[22m\u001B[32mindex.html                      \u001B[39m\u001B[1m\u001B[2m  0.44 kB\u001B[22m\u001B[1m\u001B[22m\u001B[2m \u2502 gzip:   0.30 kB\u001B[22m\r\n\u001B[2mdist/\u001B[22m\u001B[32massets/xlsx.worker-BfMtf6aB.js  \u001B[39m\u001B[1m\u001B[2m 12.98 kB\u001B[22m\u001B[1m\u001B[22m\r\n\u001B[2mdist/\u001B[22m\u001B[35massets/index-CJL4CQS7.css       \u001B[39m\u001B[1m\u001B[2m 33.44 kB\u001B[22m\u001B[1m\u001B[22m\u001B[2m \u2502 gzip:   6.65 kB\u001B[22m\r\n\u001B[2mdist/\u001B[22m\u001B[36massets/xlsx-Cznzrv2E.js         \u001B[39m\u001B[1m\u001B[2m429.02 kB\u001B[22m\u001B[1m\u001B[22m\u001B[2m \u2502 gzip: 143.08 kB\u001B[22m\r\n\u001B[2mdist/\u001B[22m\u001B[36massets/index-Bzzzpi0L.js        \u001B[39m\u001B[1m\u001B[33m680.07 kB\u001B[39m\u001B[22m\u001B[2m \u2502 gzip: 182.78 kB\u001B[22m\r\n\u001B[33m\r\n(!) Some chunks are larger than 500 kB after minification. Consider:\r\n- Using dynamic import() to code-split the application\r\n- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks\r\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\u001B[39m\r\n\u001B[32m\u2713 built in 26.14s\u001B[39m\r\n",
+        "durationMs": 30346
+      },
+      {
+        "name": "tests-pass",
+        "kind": "process",
+        "verificationMethod": "test-results",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "\r\n\u003E web@0.1.0 test\r\n\u003E vitest run\r\n\r\n\u001B[?25l\r\n\u001B[1m\u001B[7m\u001B[36m RUN \u001B[39m\u001B[27m\u001B[22m \u001B[36mv3.0.0 \u001B[39m\u001B[90mC:/Users/ronel/OneDrive/Desktop/Excel-to-Annex-C_CAR_Management_System/apps/web\u001B[39m\r\n\r\n \u001B[32m\u2713\u001B[39m src/features/imports/__tests__/import-store.test.ts \u001B[2m(\u001B[22m\u001B[2m10 tests\u001B[22m\u001B[2m)\u001B[22m\u001B[33m 472\u001B[2mms\u001B[22m\u001B[39m\r\n \u001B[32m\u2713\u001B[39m src/features/imports/__tests__/large-file.test.ts \u001B[2m(\u001B[22m\u001B[2m11 tests\u001B[22m\u001B[2m)\u001B[22m\u001B[33m 1184\u001B[2mms\u001B[22m\u001B[39m\r\n   \u001B[33m\u001B[2m\u2713\u001B[22m\u001B[39m large-file mapping preview\u001B[2m \u003E \u001B[22mbounds the read instead of materializing a 1,000,000-row sheet \u001B[33m709\u001B[2mms\u001B[22m\u001B[39m\r\n \u001B[32m\u2713\u001B[39m src/features/imports/__tests__/imports.test.ts \u001B[2m(\u001B[22m\u001B[2m21 tests\u001B[22m\u001B[2m)\u001B[22m\u001B[33m 851\u001B[2mms\u001B[22m\u001B[39m\r\n \u001B[32m\u2713\u001B[39m src/features/auth/__tests__/auth.test.ts \u001B[2m(\u001B[22m\u001B[2m12 tests\u001B[22m\u001B[2m)\u001B[22m\u001B[33m 574\u001B[2mms\u001B[22m\u001B[39m\r\n \u001B[32m\u2713\u001B[39m src/features/imports/__tests__/import-recovery-ui.test.tsx \u001B[2m(\u001B[22m\u001B[2m5 tests\u001B[22m\u001B[2m)\u001B[22m\u001B[33m 1377\u001B[2mms\u001B[22m\u001B[39m\r\n   \u001B[33m\u001B[2m\u2713\u001B[22m\u001B[39m import recovery session controls\u001B[2m \u003E \u001B[22mshows loading and empty states \u001B[33m415\u001B[2mms\u001B[22m\u001B[39m\r\n   \u001B[33m\u001B[2m\u2713\u001B[22m\u001B[39m import recovery session controls\u001B[2m \u003E \u001B[22mshows session metadata and wires Resume, Cancel, and Delete actions \u001B[33m609\u001B[2mms\u001B[22m\u001B[39m\r\n \u001B[32m\u2713\u001B[39m src/features/templates/__tests__/templates.test.tsx \u001B[2m(\u001B[22m\u001B[2m5 tests\u001B[22m\u001B[2m)\u001B[22m\u001B[33m 6935\u001B[2mms\u001B[22m\u001B[39m\r\n   \u001B[33m\u001B[2m\u2713\u001B[22m\u001B[39m F7 template management\u001B[2m \u003E \u001B[22mshows versioned mock templates and blocks incomplete required mappings \u001B[33m2040\u001B[2mms\u001B[22m\u001B[39m\r\n   \u001B[33m\u001B[2m\u2713\u001B[22m\u001B[39m F7 template management\u001B[2m \u003E \u001B[22mvalidates, approves, activates, and retires the previous version after confirmation \u001B[33m2546\u001B[2mms\u001B[22m\u001B[39m\r\n   \u001B[33m\u001B[2m\u2713\u001B[22m\u001B[39m F7 template management\u001B[2m \u003E \u001B[22mshows a sample preview and independent mock DOCX and PDF output states \u001B[33m958\u001B[2mms\u001B[22m\u001B[39m\r\n   \u001B[33m\u001B[2m\u2713\u001B[22m\u001B[39m F7 template management\u001B[2m \u003E \u001B[22mvalidates DOCX selection and creates a new local draft without uploading file contents \u001B[33m1274\u001B[2mms\u001B[22m\u001B[39m\r\n \u001B[32m\u2713\u001B[39m src/features/review/__tests__/review.test.tsx \u001B[2m(\u001B[22m\u001B[2m5 tests\u001B[22m\u001B[2m)\u001B[22m\u001B[33m 2209\u001B[2mms\u001B[22m\u001B[39m\r\n   \u001B[33m\u001B[2m\u2713\u001B[22m\u001B[39m F6 CAR review queue\u001B[2m \u003E \u001B[22mshows submitted mock CARs with provenance and passing approval gates \u001B[33m975\u001B[2mms\u001B[22m\u001B[39m\r\n   \u001B[33m\u001B[2m\u2713\u001B[22m\u001B[39m F6 CAR review queue\u001B[2m \u003E \u001B[22mrequires a comment and records a local approval after all gates pass \u001B[33m427\u001B[2mms\u001B[22m\u001B[39m\r\n   \u001B[33m\u001B[2m\u2713\u001B[22m\u001B[39m F6 CAR review queue\u001B[2m \u003E \u001B[22mblocks approval on a failed gate unless an eligible mock exception has a reason \u001B[33m411\u001B[2mms\u001B[22m\u001B[39m\r\n \u001B[32m\u2713\u001B[39m src/features/documents/__tests__/documents.test.tsx \u001B[2m(\u001B[22m\u001B[2m6 tests\u001B[22m\u001B[2m)\u001B[22m\u001B[33m 4290\u001B[2mms\u001B[22m\u001B[39m\r\n   \u001B[33m\u001B[2m\u2713\u001B[22m\u001B[39m F8 document generation and downloads\u001B[2m \u003E \u001B[22mshows report provenance and independent mock DOCX and PDF status \u001B[33m1473\u001B[2mms\u001B[22m\u001B[39m\r\n   \u001B[33m\u001B[2m\u2713\u001B[22m\u001B[39m F8 document generation and downloads\u001B[2m \u003E \u001B[22mblocks generation for submitted and draft CAR revisions \u001B[33m548\u001B[2mms\u001B[22m\u001B[39m\r\n   \u001B[33m\u001B[2m\u2713\u001B[22m\u001B[39m F8 document generation and downloads\u001B[2m \u003E \u001B[22mretries a failed PDF job using the existing idempotency key and verifies only that output \u001B[33m1421\u001B[2mms\u001B[22m\u001B[39m\r\n   \u001B[33m\u001B[2m\u2713\u001B[22m\u001B[39m F8 document generation and downloads\u001B[2m \u003E \u001B[22mshows reports read-only to auditors and denies unrecognized roles \u001B[33m334\u001B[2mms\u001B[22m\u001B[39m\r\n\u001B[90mstderr\u001B[2m | src/features/audit/__tests__/audit.test.tsx\u001B[2m \u003E \u001B[22m\u001B[2mF10 audit log\u001B[2m \u003E \u001B[22m\u001B[2mshows a PII-minimized mock event list and selected event details\r\n\u001B[22m\u001B[39m\u26A0\uFE0F React Router Future Flag Warning: React Router will begin wrapping state updates in \u0060React.startTransition\u0060 in v7. You can use the \u0060v7_startTransition\u0060 future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.\r\n\u26A0\uFE0F React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the \u0060v7_relativeSplatPath\u0060 future flag to opt-in early. For more information, see https://reactrout\n\u2026[truncated]",
+        "durationMs": 54614,
+        "testResults": {
+          "testFramework": "vitest",
+          "runnerDetectedFrom": "package_json",
+          "testsTotal": 95,
+          "testsPassed": 95,
+          "testsFailed": 0,
+          "testsSkipped": 0,
+          "parseFailed": false
+        }
+      },
+      {
+        "name": "imports-route-serves",
+        "kind": "http-probe",
+        "verificationMethod": "http-status",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": null,
+        "outputSample": "HTTP 200\n\u003C!doctype html\u003E\r\n\u003Chtml lang=\u0022en\u0022\u003E\r\n  \u003Chead\u003E\n    \u003Cscript type=\u0022module\u0022\u003Eimport { injectIntoGlobalHook } from \u0022/@react-refresh\u0022;\ninjectIntoGlobalHook(window);\nwindow.$RefreshReg$ = () =\u003E {};\nwindow.$RefreshSig$ = () =\u003E (type) =\u003E type;\u003C/script\u003E\n\n    \u003Cscript type=\u0022module\u0022 src=\u0022/@vite/client\u0022\u003E\u003C/script\u003E\n\r\n    \u003Cmeta charset=\u0022UTF-8\u0022 /\u003E\r\n    \u003Cmeta name=\u0022viewport\u0022 content=\u0022width=device-width, initial-scale=1.0\u0022 /\u003E\r\n    \u003Ctitle\u003EExcel-to-Annex C CAR Management System\u003C/title\u003E\r\n  \u003C/head\u003E\r\n  \u003Cbody\u003E\r\n    \u003Cdiv id=\u0022root\u0022\u003E\u003C/div\u003E\r\n    \u003Cscript type=\u0022module\u0022 src=\u0022/src/main.tsx\u0022\u003E\u003C/script\u003E\r\n  \u003C/body\u003E\r\n\u003C/html\u003E\r\n\n--- server output ---\n\r\n\u003E web@0.1.0 dev\r\n\u003E vite --host 127.0.0.1 --port 5173 --strictPort\r\n\r\n\r\n  \u001B[32m\u001B[1mVITE\u001B[22m v5.4.21\u001B[39m  \u001B[2mready in \u001B[0m\u001B[1m1324\u001B[22m\u001B[2m\u001B[0m ms\u001B[22m\r\n\r\n  \u001B[32m\u279C\u001B[39m  \u001B[1mLocal\u001B[22m:   \u001B[36mhttp://127.0.0.1:\u001B[1m5173\u001B[22m/\u001B[39m\r\n",
+        "durationMs": 6141
+      }
+    ],
+    "executions": [
+      {
+        "source": "tsc-no-emit",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npx.CMD",
+        "args": [
+          "tsc",
+          "--noEmit"
+        ],
+        "cwd": "C:\\Users\\ronel\\OneDrive\\Desktop\\Excel-to-Annex-C_CAR_Management_System\\apps\\web",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "production-build",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "run",
+          "build"
+        ],
+        "cwd": "C:\\Users\\ronel\\OneDrive\\Desktop\\Excel-to-Annex-C_CAR_Management_System\\apps\\web",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "tests-pass",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "test"
+        ],
+        "cwd": "C:\\Users\\ronel\\OneDrive\\Desktop\\Excel-to-Annex-C_CAR_Management_System\\apps\\web",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "imports-route-serves",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "run",
+          "dev",
+          "--",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          "5173",
+          "--strictPort"
+        ],
+        "cwd": "C:\\Users\\ronel\\OneDrive\\Desktop\\Excel-to-Annex-C_CAR_Management_System\\apps\\web",
+        "env": {
+          "VITE_SUPABASE_URL": "",
+          "VITE_SUPABASE_ANON_KEY": ""
+        },
+        "prependPath": [],
+        "platform": "win32"
+      }
+    ]
+  }
+}

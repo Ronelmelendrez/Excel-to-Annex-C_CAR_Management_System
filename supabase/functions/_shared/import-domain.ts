@@ -66,8 +66,10 @@ export const DEFAULT_REQUIRED_COLUMNS: CanonicalField[] = [
 
 export const IDENTIFIER_FIELDS: CanonicalField[] = ["HH_ID", "ENTRY_ID", "LRN", "PCN"];
 
-export const MAX_IMPORT_BYTES = 25 * 1024 * 1024;
-export const MAX_IMPORT_ROWS = 20_000;
+export const MAX_IMPORT_BYTES = 100 * 1024 * 1024;
+export const MAX_IMPORT_ROWS = 1_000_000;
+/** Human-readable byte cap derived from MAX_IMPORT_BYTES so messages never drift. */
+export const MAX_IMPORT_MB = Math.round(MAX_IMPORT_BYTES / (1024 * 1024));
 export const PREVIEW_ROW_LIMIT = 100;
 export const PREVIEW_ISSUE_LIMIT = 200;
 export const PREVIEW_HOUSEHOLD_LIMIT = 50;

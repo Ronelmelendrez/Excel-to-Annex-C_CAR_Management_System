@@ -35,6 +35,19 @@ export type SheetInspection = {
   sampleRows: unknown[][];
   mapping: ColumnMapping;
   rowCount: number;
+  /** Worksheet row slots below the header, including blank rows. */
+  dataRowCount: number;
+  /** Set when this worksheet's cells could not be read (damaged sheet). */
+  readError?: string | null;
+};
+
+export type WorkbookBatchResult = {
+  batchIndex: number;
+  firstRowNumber: number;
+  sourceRowCount: number;
+  summary: ImportSummaryCounts;
+  structuralErrors: ImportIssue[];
+  warnings: string[];
 };
 
 export type DuplicateImport = {

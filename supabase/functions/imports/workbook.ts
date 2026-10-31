@@ -6,6 +6,7 @@ import {
   detectHeaderRow,
   headersFromRow,
   MAX_IMPORT_BYTES,
+  MAX_IMPORT_MB,
   MAX_IMPORT_ROWS,
   type CanonicalField,
   type ColumnMapping,
@@ -47,7 +48,7 @@ export async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
 export function readWorkbook(bytes: ArrayBuffer): any {
   if (bytes.byteLength > MAX_IMPORT_BYTES) {
     throw new HttpError(413, "file_too_large", {
-      guidance: `The file is ${(bytes.byteLength / 1024 / 1024).toFixed(1)} MB. The limit is 25 MB.`,
+      guidance: `The file is ${(bytes.byteLength / 1024 / 1024).toFixed(1)} MB. The limit is ${MAX_IMPORT_MB} MB.`,
     });
   }
   assertWorkbookMagic(new Uint8Array(bytes));
