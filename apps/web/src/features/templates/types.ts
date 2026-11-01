@@ -13,6 +13,7 @@ export type RepeatingTableConfig = {
   enabled: boolean;
   required: boolean;
   collectionKey: string;
+  sectionTag?: string;
 };
 
 export type TemplateVersion = {
@@ -21,6 +22,7 @@ export type TemplateVersion = {
   version: number;
   fileName: string;
   fileSizeBytes: number;
+  storagePath: string;
   status: TemplateStatus;
   uploadedAt: string;
   uploadedBy: string;

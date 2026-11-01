@@ -43,6 +43,20 @@
       "verificationMethod": "http-status",
       "expected": "200",
       "timeoutSeconds": 120
+    },
+    {
+      "name": "templates-route-serves",
+      "kind": "http-probe",
+      "startCommand": "npm",
+      "startArgs": ["run", "dev", "--", "--host", "127.0.0.1", "--port", "5173", "--strictPort"],
+      "env": {
+        "VITE_SUPABASE_URL": "",
+        "VITE_SUPABASE_ANON_KEY": ""
+      },
+      "url": "http://127.0.0.1:5173/templates",
+      "verificationMethod": "http-status",
+      "expected": "200",
+      "timeoutSeconds": 120
     }
   ]
 }

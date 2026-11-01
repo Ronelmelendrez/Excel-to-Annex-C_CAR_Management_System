@@ -5,10 +5,12 @@ import type { TemplateValidationIssue } from "../types";
 export function TemplateValidation({
   issues,
   status,
+  busy,
   onValidate,
 }: {
   issues: TemplateValidationIssue[];
   status: "draft" | "validated" | "active" | "retired";
+  busy: boolean;
   onValidate: () => void;
 }) {
   return (
@@ -42,11 +44,11 @@ export function TemplateValidation({
         <button
           type="button"
           onClick={onValidate}
-          disabled={issues.length > 0}
+          disabled={issues.length > 0 || busy}
           title={issues.length > 0 ? "Map required placeholders and repeating tables first." : undefined}
           className="mt-4 min-h-[44px] border border-[#161512] bg-[#161512] px-4 py-2 text-sm font-medium text-[#f4f1ea] hover:bg-[#7a1f1f] disabled:cursor-not-allowed disabled:border-[#b5afa2] disabled:bg-[#b5afa2] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
         >
-          Validate mock configuration
+          Validate template
         </button>
       )}
       {status !== "draft" && (

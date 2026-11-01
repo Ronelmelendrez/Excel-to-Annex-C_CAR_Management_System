@@ -5,12 +5,13 @@ import { TemplateDetail } from "./TemplateDetail";
 import { TemplateFilters } from "./TemplateFilters";
 import { TemplateUploadPanel } from "./TemplateUploadPanel";
 import { TemplateVersionList } from "./TemplateVersionList";
+import { isDemoMode } from "../../../shared/supabase";
 
 export function TemplatesPage() {
   const { profile, user, roles } = useAuth();
-  const actor = profile?.display_name || user?.email || "Template administrator (mock)";
-  const manager = useTemplateManager(actor);
+  const actor = profile?.display_name || user?.email || "Template administrator";
   const canManageTemplates = roles.includes("admin");
+  const manager = useTemplateManager(actor, user?.id ?? null, canManageTemplates);
 
   if (!canManageTemplates) {
     return (
@@ -42,7 +43,7 @@ export function TemplatesPage() {
             </p>
           </div>
           <span className="border border-[#8a5a00] bg-[#f3ead8] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[#704700]">
-            Mock versions · changes reset on reload
+            {isDemoMode ? "Supabase not configured" : "Private Supabase storage"}
           </span>
         </div>
       </header>
@@ -54,6 +55,23 @@ export function TemplatesPage() {
         >
           {manager.feedback}
         </p>
+      )}
+
+      {manager.loadError && (
+        <div
+          role="alert"
+          className="mt-4 flex flex-wrap items-center justify-between gap-3 border-l-4 border-[#7a1f1f] bg-[#f2e4e1] px-4 py-3 text-sm leading-6 text-[#3f3b34]"
+        >
+          <p>{manager.loadError}</p>
+          <button
+            type="button"
+            onClick={() => void manager.refresh()}
+            disabled={manager.loading}
+            className="min-h-[40px] border border-[#7a1f1f] px-3 py-2 text-xs font-semibold disabled:opacity-60"
+          >
+            {manager.loading ? "Loading…" : "Retry"}
+          </button>
+        </div>
       )}
 
       <TemplateFilters
@@ -68,12 +86,14 @@ export function TemplatesPage() {
           <TemplateUploadPanel
             fileError={manager.fileError}
             selectedFile={manager.selectedFile}
+            busy={manager.busy}
             onChooseFile={manager.chooseFile}
             onAddDraft={manager.addDraftVersion}
           />
           <TemplateVersionList
             versions={manager.visibleVersions}
             selectedId={manager.selectedTemplate?.id ?? null}
+            loading={manager.loading}
             onSelect={manager.selectTemplate}
           />
         </aside>
@@ -81,6 +101,7 @@ export function TemplatesPage() {
           template={manager.selectedTemplate}
           activeTemplate={manager.activeTemplate}
           validationIssues={manager.validationIssues}
+          busy={manager.busy}
           pendingAction={manager.pendingAction}
           samplePreviewOpen={manager.samplePreviewOpen}
           onUpdateMapping={manager.updateMapping}

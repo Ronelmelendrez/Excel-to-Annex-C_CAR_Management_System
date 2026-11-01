@@ -1,7 +1,7 @@
 import React from "react";
 import { SectionCard } from "../../../components/ui/section-card";
 import { templateFieldOptions } from "../lib/template-validation";
-import { mockTemplatePreviewData } from "../mock-data";
+import { templateSampleData } from "../mock-data";
 import type { TemplateVersion } from "../types";
 
 export function TemplateSamplePreview({
@@ -45,23 +45,22 @@ export function TemplateSamplePreview({
         </button>
         <button
           type="button"
-          onClick={() => onPrepare("pdf")}
-          disabled={!canGenerate}
-          title={!canGenerate ? "Resolve validation blockers before generating a sample." : undefined}
-          className="min-h-[44px] border border-[#161512] bg-[#161512] px-4 py-2 text-sm font-medium text-[#f4f1ea] hover:bg-[#7a1f1f] disabled:cursor-not-allowed disabled:border-[#b5afa2] disabled:bg-[#b5afa2] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+          disabled
+          title="PDF generation is not available in this browser workflow."
+          className="min-h-[44px] border border-[#8c877c] px-4 py-2 text-sm text-[#5b574e] disabled:cursor-not-allowed disabled:opacity-70"
         >
-          Generate sample PDF
+          PDF output unavailable
         </button>
       </div>
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#5b574e]" aria-live="polite">
-        <span>DOCX: {template.sampleOutputs?.docx === "ready" ? "Mock sample ready · no file created" : "Not generated"}</span>
-        <span>PDF: {template.sampleOutputs?.pdf === "ready" ? "Mock sample ready · no file created" : "Not generated"}</span>
+        <span>DOCX: {template.sampleOutputs?.docx === "ready" ? "Test sample downloaded" : "Not generated"}</span>
+        <span>PDF: Not available in this workflow</span>
       </div>
       {isOpen && (
         <div className="mt-4 border border-[#c9c3b6] bg-[#fbf9f4] p-4">
           <div className="border-b-2 border-[#8c877c] pb-3 text-center">
             <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#7a1f1f]">
-              Mock preview · not an official form
+              Sample preview · not an official form
             </p>
             <h3 className="mt-1 font-serif text-lg">Annex C — Sample layout</h3>
           </div>
@@ -81,7 +80,7 @@ export function TemplateSamplePreview({
                       {"}}"}
                     </dt>
                     <dd className="mt-1 break-words text-sm">
-                      {mockTemplatePreviewData[mapping.fieldKey] ?? "Sample value not configured"}
+                      {templateSampleData[mapping.fieldKey] ?? "Sample value not configured"}
                     </dd>
                   </div>
                 );

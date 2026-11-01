@@ -7,6 +7,7 @@ export function TemplateLifecycleActions({
   activeTemplate,
   issueCount,
   pendingAction,
+  busy,
   onRequestAction,
   onCancelAction,
   onConfirmAction,
@@ -15,6 +16,7 @@ export function TemplateLifecycleActions({
   activeTemplate: TemplateVersion | undefined;
   issueCount: number;
   pendingAction: "approve" | "activate" | null;
+  busy: boolean;
   onRequestAction: (action: "approve" | "activate") => void;
   onCancelAction: () => void;
   onConfirmAction: () => void;
@@ -87,21 +89,22 @@ export function TemplateLifecycleActions({
           <p className="mt-1 text-xs leading-5">
             {pendingAction === "activate"
               ? `Activation retires ${activeTemplate?.name ?? "the current"} v${activeTemplate?.version ?? "active"} and this version becomes immutable.`
-              : "Approval is a mock administrator action. No production authorization or audit record is created."}
-            {" "}This action only changes local demo state.
+              : "Approval is saved with the signed-in administrator account."}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
               onClick={onConfirmAction}
-              className="min-h-[40px] border border-[#704700] bg-[#704700] px-3 py-2 text-xs font-semibold text-white hover:bg-[#593900] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+              disabled={busy}
+              className="min-h-[40px] border border-[#704700] bg-[#704700] px-3 py-2 text-xs font-semibold text-white hover:bg-[#593900] disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
             >
-              Confirm {pendingAction === "activate" ? "activation" : "approval"}
+              {busy ? "Saving…" : `Confirm ${pendingAction === "activate" ? "activation" : "approval"}`}
             </button>
             <button
               type="button"
               onClick={onCancelAction}
-              className="min-h-[40px] border border-[#704700] px-3 py-2 text-xs font-semibold hover:bg-[#ead9b9] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+              disabled={busy}
+              className="min-h-[40px] border border-[#704700] px-3 py-2 text-xs font-semibold hover:bg-[#ead9b9] disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
             >
               Cancel
             </button>

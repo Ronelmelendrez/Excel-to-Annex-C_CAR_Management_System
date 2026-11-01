@@ -5,13 +5,15 @@ import { SectionCard } from "../../../components/ui/section-card";
 export function TemplateUploadPanel({
   fileError,
   selectedFile,
+  busy,
   onChooseFile,
   onAddDraft,
 }: {
   fileError: string;
   selectedFile: File | null;
+  busy: boolean;
   onChooseFile: (file: File | null) => void;
-  onAddDraft: () => void;
+  onAddDraft: () => Promise<void>;
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -32,6 +34,7 @@ export function TemplateUploadPanel({
         accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         onChange={(event) => onChooseFile(event.target.files?.[0] ?? null)}
         aria-describedby={fileError ? "template-file-error" : "template-upload-help"}
+        disabled={busy}
         className="mt-1 block min-h-[44px] w-full text-sm file:mr-3 file:min-h-[40px] file:border file:border-[#8c877c] file:bg-[#ece7dc] file:px-3 file:text-xs file:font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
       />
       {fileError ? (
@@ -40,7 +43,7 @@ export function TemplateUploadPanel({
         </p>
       ) : (
         <p id="template-upload-help" className="mt-2 text-xs leading-5 text-[#5b574e]">
-          Mock only: the file is not uploaded or stored. Placeholder detection uses sample data.
+          DOCX files are checked for readable placeholders, then stored in the private Supabase template bucket.
         </p>
       )}
       {selectedFile && (
@@ -51,13 +54,14 @@ export function TemplateUploadPanel({
       <button
         type="button"
         onClick={() => {
-          onAddDraft();
-          if (fileInput.current) fileInput.current.value = "";
+          void onAddDraft().then(() => {
+            if (fileInput.current) fileInput.current.value = "";
+          });
         }}
-        disabled={!selectedFile}
+        disabled={!selectedFile || busy}
         className="mt-3 min-h-[44px] w-full border border-[#161512] bg-[#161512] px-3 py-2 text-sm font-medium text-[#f4f1ea] hover:bg-[#7a1f1f] disabled:cursor-not-allowed disabled:border-[#b5afa2] disabled:bg-[#b5afa2] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
       >
-        Add mock draft version
+        {busy ? "Working…" : "Upload and inspect"}
       </button>
     </SectionCard>
   );

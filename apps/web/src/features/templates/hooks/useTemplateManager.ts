@@ -1,9 +1,19 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  mockDetectedPlaceholders,
-  mockInitialTemplateVersions,
-} from "../mock-data";
-import { getTemplateValidationIssues } from "../lib/template-validation";
+  activateTemplate,
+  approveTemplate,
+  createTemplateDraft,
+  downloadTemplateFile,
+  listTemplateVersions,
+  markTemplateValidated,
+  updateTemplateConfiguration,
+} from "../api";
+import { downloadDocxSample, inspectDocxTemplate, renderDocxSample } from "../lib/docx-template";
+import {
+  getTemplateValidationIssues,
+  repeatingCollectionOptions,
+} from "../lib/template-validation";
+import { templateSampleData } from "../mock-data";
 import type {
   RepeatingTableConfig,
   TemplateFieldMapping,
@@ -12,18 +22,68 @@ import type {
 } from "../types";
 
 const maxFileSizeBytes = 5 * 1024 * 1024;
-const initialSelectedId = mockInitialTemplateVersions[0]?.id ?? null;
+type PendingAction = "approve" | "activate" | null;
 
-export function useTemplateManager(actor: string) {
-  const [versions, setVersions] = useState(mockInitialTemplateVersions);
-  const [selectedId, setSelectedId] = useState(initialSelectedId);
+function messageOf(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+function preserveSampleOutputs(
+  updated: TemplateVersion,
+  current: TemplateVersion[],
+): TemplateVersion {
+  return {
+    ...updated,
+    sampleOutputs: current.find((item) => item.id === updated.id)?.sampleOutputs,
+  };
+}
+
+export function useTemplateManager(
+  actor: string,
+  userId: string | null,
+  enabled = true,
+) {
+  const [versions, setVersions] = useState<TemplateVersion[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<TemplateStatusFilter>("all");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState("");
   const [feedback, setFeedback] = useState("");
-  const [pendingAction, setPendingAction] = useState<"approve" | "activate" | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [samplePreviewOpen, setSamplePreviewOpen] = useState(false);
+  const mountedRef = useRef(true);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setLoadError("");
+    try {
+      const loaded = await listTemplateVersions();
+      if (!mountedRef.current) return;
+      setVersions(loaded);
+      setSelectedId((current) =>
+        current && loaded.some((item) => item.id === current) ? current : loaded[0]?.id ?? null,
+      );
+    } catch (error: unknown) {
+      if (mountedRef.current) {
+        setLoadError(messageOf(error, "Template versions could not be loaded."));
+      }
+    } finally {
+      if (mountedRef.current) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    if (enabled) void refresh();
+    else setLoading(false);
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [enabled, refresh]);
 
   const visibleVersions = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
@@ -48,6 +108,14 @@ export function useTemplateManager(actor: string) {
     (version) => version.status === "active" && version.name === selectedTemplate?.name,
   );
 
+  function replaceTemplate(updated: TemplateVersion) {
+    setVersions((current) =>
+      current.map((version) =>
+        version.id === updated.id ? preserveSampleOutputs(updated, current) : version,
+      ),
+    );
+  }
+
   function chooseFile(file: File | null) {
     setFileError("");
     setFeedback("");
@@ -68,50 +136,52 @@ export function useTemplateManager(actor: string) {
     setSelectedFile(file);
   }
 
-  function addDraftVersion() {
-    if (!selectedFile) return;
-    const nextVersion = Math.max(0, ...versions.map((version) => version.version)) + 1;
-    const id = `annex-c-v${nextVersion}-draft-${Date.now()}`;
-    const template: TemplateVersion = {
-      id,
-      name: "Annex C",
-      version: nextVersion,
-      fileName: selectedFile.name,
-      fileSizeBytes: selectedFile.size,
-      status: "draft",
-      uploadedAt: new Date().toISOString(),
-      uploadedBy: actor,
-      mappings: mockDetectedPlaceholders.map((item) => ({
-        id: `${id}-${item.id}`,
-        placeholder: item.placeholder,
+  async function addDraftVersion() {
+    const file = selectedFile;
+    if (!file || !userId || busy) return;
+    setBusy(true);
+    setFileError("");
+    setFeedback("");
+    try {
+      const inspected = await inspectDocxTemplate(file);
+      const mappings: TemplateFieldMapping[] = inspected.placeholders.map((placeholder, index) => ({
+        id: `placeholder-${index + 1}`,
+        placeholder,
         fieldKey: "",
-        required: item.required,
-      })),
-      repeatingTables: [
-        {
-          id: `${id}-family`,
-          label: "Family Composition",
-          enabled: false,
-          required: true,
-          collectionKey: "",
+        required: true,
+      }));
+      const repeatingTables: RepeatingTableConfig[] = inspected.repeatingSections.map(
+        (sectionTag) => {
+          const knownCollection = repeatingCollectionOptions.find(
+            (option) => option.value === sectionTag,
+          );
+          return {
+            id: `repeat-${sectionTag}`,
+            label: knownCollection?.label ?? `Repeating section: ${sectionTag}`,
+            enabled: true,
+            required: true,
+            collectionKey: knownCollection?.value ?? "",
+            sectionTag,
+          };
         },
-        {
-          id: `${id}-interventions`,
-          label: "Intervention Plan",
-          enabled: false,
-          required: true,
-          collectionKey: "",
-        },
-      ],
-    };
-    setVersions((current) => [template, ...current]);
-    setSelectedId(id);
-    setSelectedFile(null);
-    setFeedback(
-      `${selectedFile.name} was added as a mock draft. File contents were not uploaded or parsed.`,
-    );
-    setPendingAction(null);
-    setSamplePreviewOpen(false);
+      );
+      const created = await createTemplateDraft({ file, userId, mappings, repeatingTables });
+      if (!mountedRef.current) return;
+      setVersions((current) => [ { ...created, uploadedBy: actor }, ...current ]);
+      setSelectedId(created.id);
+      setSelectedFile(null);
+      setPendingAction(null);
+      setSamplePreviewOpen(false);
+      setFeedback(
+        `${file.name} was uploaded to private storage as Annex C v${created.version}. Review the detected placeholders and mappings.`,
+      );
+    } catch (error: unknown) {
+      if (mountedRef.current) {
+        setFeedback(messageOf(error, "The template draft could not be created."));
+      }
+    } finally {
+      if (mountedRef.current) setBusy(false);
+    }
   }
 
   function selectTemplate(id: string) {
@@ -121,61 +191,82 @@ export function useTemplateManager(actor: string) {
     setSamplePreviewOpen(false);
   }
 
-  function updateMapping(
+  async function updateMapping(
     mappingId: string,
     update: Partial<TemplateFieldMapping>,
   ) {
-    setVersions((current) =>
-      current.map((version) =>
-        version.id !== selectedTemplate?.id || version.status !== "draft"
-          ? version
-          : {
-              ...version,
-              mappings: version.mappings.map((mapping) =>
-                mapping.id === mappingId ? { ...mapping, ...update } : mapping,
-              ),
-            },
+    if (!selectedTemplate || selectedTemplate.status !== "draft" || busy) return;
+    const updated: TemplateVersion = {
+      ...selectedTemplate,
+      mappings: selectedTemplate.mappings.map((mapping) =>
+        mapping.id === mappingId ? { ...mapping, ...update } : mapping,
       ),
-    );
+    };
+    setBusy(true);
     setFeedback("");
+    try {
+      replaceTemplate(await updateTemplateConfiguration(updated));
+      setFeedback("Template mapping saved.");
+    } catch (error: unknown) {
+      setFeedback(messageOf(error, "The template mapping could not be saved."));
+    } finally {
+      setBusy(false);
+    }
   }
 
-  function updateRepeatingTable(
+  async function updateRepeatingTable(
     tableId: string,
     update: Partial<RepeatingTableConfig>,
   ) {
-    setVersions((current) =>
-      current.map((version) =>
-        version.id !== selectedTemplate?.id || version.status !== "draft"
-          ? version
-          : {
-              ...version,
-              repeatingTables: version.repeatingTables.map((table) =>
-                table.id === tableId ? { ...table, ...update } : table,
-              ),
-            },
+    if (!selectedTemplate || selectedTemplate.status !== "draft" || busy) return;
+    const updated: TemplateVersion = {
+      ...selectedTemplate,
+      repeatingTables: selectedTemplate.repeatingTables.map((table) =>
+        table.id === tableId ? { ...table, ...update } : table,
       ),
-    );
+    };
+    setBusy(true);
     setFeedback("");
+    try {
+      replaceTemplate(await updateTemplateConfiguration(updated));
+      setFeedback("Repeating-table configuration saved.");
+    } catch (error: unknown) {
+      setFeedback(messageOf(error, "The repeating-table configuration could not be saved."));
+    } finally {
+      setBusy(false);
+    }
   }
 
-  function validateDraft() {
-    if (!selectedTemplate || selectedTemplate.status !== "draft") return;
+  async function validateDraft() {
+    if (!selectedTemplate || selectedTemplate.status !== "draft" || busy) return;
     if (validationIssues.length > 0) {
       setFeedback(
         `Validation blocked: ${validationIssues.length} required mapping or repeating-table check${validationIssues.length === 1 ? "" : "s"} need attention.`,
       );
       return;
     }
-    setVersions((current) =>
-      current.map((version) =>
-        version.id === selectedTemplate.id ? { ...version, status: "validated" } : version,
-      ),
-    );
-    setFeedback(`${selectedTemplate.name} v${selectedTemplate.version} passed mock validation.`);
+
+    setBusy(true);
+    setFeedback("");
+    try {
+      const file = await downloadTemplateFile(selectedTemplate.storagePath);
+      await renderDocxSample(
+        await file.arrayBuffer(),
+        selectedTemplate.mappings,
+        selectedTemplate.repeatingTables,
+        templateSampleData,
+      );
+      const validated = await markTemplateValidated(selectedTemplate.id);
+      replaceTemplate(validated);
+      setFeedback(`${selectedTemplate.name} v${selectedTemplate.version} passed DOCX and mapping validation.`);
+    } catch (error: unknown) {
+      setFeedback(messageOf(error, "The Word template could not be validated."));
+    } finally {
+      setBusy(false);
+    }
   }
 
-  function requestAction(action: "approve" | "activate") {
+  function requestAction(action: Exclude<PendingAction, null>) {
     setPendingAction(action);
   }
 
@@ -183,71 +274,70 @@ export function useTemplateManager(actor: string) {
     setPendingAction(null);
   }
 
-  function confirmAction() {
-    if (!selectedTemplate) return;
-    if (pendingAction === "approve") {
-      if (selectedTemplate.status !== "validated" || validationIssues.length > 0) {
-        setFeedback("Only a validated template with passing checks can be approved.");
-        setPendingAction(null);
-        return;
+  async function confirmAction() {
+    if (!selectedTemplate || !pendingAction || !userId || busy) return;
+    const action = pendingAction;
+    setBusy(true);
+    setFeedback("");
+    try {
+      if (action === "approve") {
+        const approved = await approveTemplate(selectedTemplate.id, userId);
+        replaceTemplate(approved);
+        setFeedback(`${selectedTemplate.name} v${selectedTemplate.version} was approved.`);
+      } else {
+        const updated = await activateTemplate(selectedTemplate.id);
+        setVersions(updated.map((version) => preserveSampleOutputs(version, versions)));
+        setFeedback(
+          `${selectedTemplate.name} v${selectedTemplate.version} was activated. The previous active version is retired.`,
+        );
       }
-      const approvedAt = new Date().toISOString();
+    } catch (error: unknown) {
+      setFeedback(messageOf(error, `The template could not be ${action === "approve" ? "approved" : "activated"}.`));
+    } finally {
+      setPendingAction(null);
+      setBusy(false);
+    }
+  }
+
+  async function prepareSampleOutput(format: "docx" | "pdf") {
+    if (format === "pdf") {
+      setFeedback("PDF sample generation is not available in this browser workflow. Generate the DOCX sample instead.");
+      return;
+    }
+    if (!selectedTemplate || busy) return;
+    if (validationIssues.length > 0) {
+      setFeedback("Resolve required mappings and repeating-table checks before generating a sample.");
+      return;
+    }
+
+    setBusy(true);
+    setFeedback("");
+    try {
+      const file = await downloadTemplateFile(selectedTemplate.storagePath);
+      const blob = await renderDocxSample(
+        await file.arrayBuffer(),
+        selectedTemplate.mappings,
+        selectedTemplate.repeatingTables,
+        templateSampleData,
+      );
+      downloadDocxSample(blob, selectedTemplate.fileName);
       setVersions((current) =>
         current.map((version) =>
           version.id === selectedTemplate.id
-            ? { ...version, approvedBy: actor, approvedAt }
+            ? {
+                ...version,
+                sampleOutputs: { ...version.sampleOutputs, docx: "ready" },
+              }
             : version,
         ),
       );
-      setFeedback(`${selectedTemplate.name} v${selectedTemplate.version} was approved in this mock session.`);
+      setFeedback("A DOCX sample with fabricated test values was downloaded. It is not an official case report.");
+      setSamplePreviewOpen(true);
+    } catch (error: unknown) {
+      setFeedback(messageOf(error, "The DOCX sample could not be generated."));
+    } finally {
+      setBusy(false);
     }
-    if (pendingAction === "activate") {
-      if (
-        selectedTemplate.status !== "validated" ||
-        !selectedTemplate.approvedBy ||
-        validationIssues.length > 0
-      ) {
-        setFeedback("Activation requires a validated, approved template with all checks passing.");
-        setPendingAction(null);
-        return;
-      }
-      const activatedAt = new Date().toISOString();
-      setVersions((current) =>
-        current.map((version) => {
-          if (version.id === selectedTemplate.id) {
-            return { ...version, status: "active", activatedAt };
-          }
-          if (version.name === selectedTemplate.name && version.status === "active") {
-            return { ...version, status: "retired" };
-          }
-          return version;
-        }),
-      );
-      setFeedback(
-        `${selectedTemplate.name} v${selectedTemplate.version} was activated in this mock session. The previous active version is retired.`,
-      );
-    }
-    setPendingAction(null);
-  }
-
-  function prepareSampleOutput(format: "docx" | "pdf") {
-    if (!selectedTemplate) return;
-    if (validationIssues.length > 0) {
-      setFeedback("Resolve required mappings and repeating-table checks before preparing a sample.");
-      return;
-    }
-    setVersions((current) =>
-      current.map((version) =>
-        version.id === selectedTemplate.id
-          ? {
-              ...version,
-              sampleOutputs: { ...version.sampleOutputs, [format]: "ready" },
-            }
-          : version,
-      ),
-    );
-    setFeedback(`Mock ${format.toUpperCase()} sample prepared. No file was generated or downloaded.`);
-    setSamplePreviewOpen(true);
   }
 
   return {
@@ -261,6 +351,9 @@ export function useTemplateManager(actor: string) {
     selectedFile,
     fileError,
     feedback,
+    loadError,
+    loading,
+    busy,
     pendingAction,
     samplePreviewOpen,
     setSearch,
@@ -276,5 +369,6 @@ export function useTemplateManager(actor: string) {
     confirmAction,
     prepareSampleOutput,
     setSamplePreviewOpen,
+    refresh,
   };
 }

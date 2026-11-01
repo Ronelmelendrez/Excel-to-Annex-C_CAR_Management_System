@@ -11,6 +11,7 @@ export function TemplateDetail({
   template,
   activeTemplate,
   validationIssues,
+  busy,
   pendingAction,
   samplePreviewOpen,
   onUpdateMapping,
@@ -25,6 +26,7 @@ export function TemplateDetail({
   template: TemplateVersion | null;
   activeTemplate: TemplateVersion | undefined;
   validationIssues: TemplateValidationIssue[];
+  busy: boolean;
   pendingAction: "approve" | "activate" | null;
   samplePreviewOpen: boolean;
   onUpdateMapping: (
@@ -52,7 +54,7 @@ export function TemplateDetail({
     );
   }
 
-  const editable = template.status === "draft";
+  const editable = template.status === "draft" && !busy;
   return (
     <div className="min-w-0 space-y-4">
       <SectionCard
@@ -70,7 +72,7 @@ export function TemplateDetail({
         <dl className="grid gap-3 sm:grid-cols-2">
           <div className="border-t border-[#e2ddd1] pt-2">
             <dt className="text-xs text-[#5b574e]">File size</dt>
-            <dd className="mt-1 text-sm">{(template.fileSizeBytes / 1024).toFixed(0)} KB · mock metadata</dd>
+            <dd className="mt-1 text-sm">{(template.fileSizeBytes / 1024).toFixed(0)} KB · private DOCX</dd>
           </div>
           <div className="border-t border-[#e2ddd1] pt-2">
             <dt className="text-xs text-[#5b574e]">Current active version</dt>
@@ -79,8 +81,8 @@ export function TemplateDetail({
             </dd>
           </div>
         </dl>
-        <p className="mt-4 border-l-4 border-[#8a5a00] bg-[#f3ead8] px-3 py-2 text-xs leading-5 text-[#704700]">
-          This version is a UI mock. It has not been uploaded, parsed, legally approved, or activated on a server.
+        <p className="mt-4 border-l-4 border-[#2f5b3a] bg-[#e6ecdf] px-3 py-2 text-xs leading-5 text-[#244b2e]">
+          This immutable version is stored in private Supabase storage. Samples use fabricated values only.
         </p>
       </SectionCard>
 
@@ -97,12 +99,13 @@ export function TemplateDetail({
       <TemplateValidation
         issues={validationIssues}
         status={template.status}
+        busy={busy}
         onValidate={onValidate}
       />
       <TemplateSamplePreview
         template={template}
         isOpen={samplePreviewOpen}
-        canGenerate={validationIssues.length === 0}
+        canGenerate={validationIssues.length === 0 && !busy}
         onToggle={onToggleSamplePreview}
         onPrepare={onPrepareSampleOutput}
       />
@@ -111,6 +114,7 @@ export function TemplateDetail({
         activeTemplate={activeTemplate}
         issueCount={validationIssues.length}
         pendingAction={pendingAction}
+        busy={busy}
         onRequestAction={onRequestAction}
         onCancelAction={onCancelAction}
         onConfirmAction={onConfirmAction}

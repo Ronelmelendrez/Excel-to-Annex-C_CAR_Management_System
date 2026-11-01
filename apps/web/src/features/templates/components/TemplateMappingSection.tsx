@@ -16,7 +16,7 @@ export function TemplateMappingSection({
   return (
     <SectionCard
       id="template-mappings-heading"
-      eyebrow="Detected placeholders · mock list"
+      eyebrow="Detected placeholders"
       title="Field mapping"
       description="Map each detected placeholder to a CAR field. Required placeholders without a mapping block validation."
       cardClassName="overflow-hidden"

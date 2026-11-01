@@ -18,10 +18,12 @@ function statusStyle(status: TemplateVersion["status"]) {
 export function TemplateVersionList({
   versions,
   selectedId,
+  loading,
   onSelect,
 }: {
   versions: TemplateVersion[];
   selectedId: string | null;
+  loading: boolean;
   onSelect: (id: string) => void;
 }) {
   return (
@@ -33,7 +35,11 @@ export function TemplateVersionList({
       contentClassName="p-0"
       action={<span className="font-mono text-[10px] text-[#5b574e]">{versions.length} shown</span>}
     >
-      {versions.length === 0 ? (
+      {loading ? (
+        <p role="status" className="px-4 py-8 text-sm leading-6 text-[#5b574e]">
+          Loading template versions…
+        </p>
+      ) : versions.length === 0 ? (
         <p className="px-4 py-8 text-sm leading-6 text-[#5b574e]">
           No template versions match these filters. Add a DOCX draft or change the search.
         </p>
