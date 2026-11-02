@@ -10,8 +10,9 @@ import { workbookClient } from "../lib/workbook-client";
 import {
   explainSheetReadError,
   inspectWorkbookSheet,
-  parseWorkbookBuffer,
-  readWorkbookWithSheetRecovery,
+  parseWorkbookSheet,
+  readWorkbookSheetNames,
+  readSheetWithRecovery,
   SHAPE_SNIFF_COLS,
   type ParsedSheet,
 } from "../lib/workbook-engine";
@@ -201,7 +202,7 @@ afterEach(() => {
 describe("damaged or unreadable worksheets", () => {
   it("degrades a sheet whose cells throw during read instead of failing the import", async () => {
     const bytes = buildWorkbookBytes({ Sheet1: DATA_ROWS, Sheet2: DATA_ROWS });
-    const parsed = await parseWorkbookBuffer(bytes);
+    const parsed = await parseWorkbookSheet(bytes, "Sheet1");
 
     // Poison Sheet1 so every sheet_to_json call on it throws, simulating the
     // malformed cells SheetJS rejects inside the formatter.
@@ -222,8 +223,9 @@ describe("damaged or unreadable worksheets", () => {
     expect(broken.readError).toBeTruthy();
     expect(broken.headers).toEqual([]);
 
-    // The readable sheet in the same workbook still works.
-    const healthy = inspectWorkbookSheet(poisoned, "Sheet2");
+    // The other worksheet is parsed on its own — Sheet1's damage cannot
+    // reach it.
+    const healthy = inspectWorkbookSheet(await parseWorkbookSheet(bytes, "Sheet2"), "Sheet2");
     expect(healthy.readError).toBeFalsy();
     expect(healthy.headers).toEqual(ANNEX_HEADERS);
   });
@@ -253,19 +255,25 @@ describe("damaged or unreadable worksheets", () => {
 
   it("surfaces the real reason a worksheet part cannot be read (missing part)", async () => {
     // Simulate a workbook that DECLARES Sheet1 but has no worksheet part for
-    // it: rename the zip entry to a name nothing references. The app must
-    // report Sheet1 as unavailable AND carry the specific cause, not a
-    // generic dead-end message.
+    // it: rename the zip entry to a name nothing references.
     const bytes = renameSheetEntry(
       buildWorkbookBytes({ Sheet1: DATA_ROWS, Sheet2: DATA_ROWS }),
       "sheet1.xml",
     );
 
-    const parsed = await parseWorkbookBuffer(bytes);
+    // Sheet names are read without parsing any worksheet, so BOTH are listed
+    // even though Sheet1's part is gone — the damage only surfaces when that
+    // specific sheet is chosen.
+    expect(await readWorkbookSheetNames(bytes)).toEqual(["Sheet1", "Sheet2"]);
 
-    expect(parsed.sheetNames).toEqual(["Sheet2"]);
-    expect(parsed.unavailableSheetNames).toEqual(["Sheet1"]);
-    expect(parsed.sheetReadErrors?.Sheet1).toContain("sheet1.xml");
+    // Choosing the broken sheet fails with the specific cause, not a generic
+    // dead end.
+    await expect(parseWorkbookSheet(bytes, "Sheet1")).rejects.toThrow(/sheet1\.xml/);
+
+    // The sibling sheet parses normally — a broken sheet never blocks it.
+    const good = await parseWorkbookSheet(bytes, "Sheet2");
+    expect(good.sheetNames).toEqual(["Sheet2"]);
+    expect(inspectWorkbookSheet(good, "Sheet2").headers).toEqual(ANNEX_HEADERS);
   });
 
   it("rescues a sheet rejected by the browser's property limit via dense mode", async () => {
@@ -279,42 +287,42 @@ describe("damaged or unreadable worksheets", () => {
     ).Sheet1;
     expect(Array.isArray(denseSheet)).toBe(true);
 
-    // Fake SheetJS: baseline pass leaves Sheet1 missing; every restricted read
-    // of it throws the browser size error unless dense mode is requested.
+    // Fake SheetJS: every focused read of Sheet1 throws the browser size
+    // error unless dense mode is requested, and any read that is NOT
+    // restricted to a worksheet fails outright — the engine must never fall
+    // back to parsing the whole workbook.
     const attempts: Array<{ sheets?: string[]; dense?: boolean }> = [];
     const fakeXlsx: any = {
+      utils: XLSX.utils,
       read: (buf: ArrayBuffer, opts: any = {}) => {
         attempts.push({ sheets: opts.sheets, dense: opts.dense });
-        if (!opts.sheets) {
-          const wb = XLSX.read(buf, { type: "array" });
-          delete (wb.Sheets as any).Sheet1;
-          return wb;
-        }
-        if (opts.sheets != null) {
-          // The engine passes an array for the batch pass and a string for the
-          // per-sheet variants.
-          const names: string[] = Array.isArray(opts.sheets) ? opts.sheets : [opts.sheets];
-          if (names.includes("Sheet1")) {
-            if (!opts.dense) throw new Error("Too many properties to enumerate");
-            return { SheetNames: ["Sheet1"], Sheets: { Sheet1: denseSheet } };
-          }
+        const names: string[] | undefined = Array.isArray(opts.sheets)
+          ? opts.sheets
+          : opts.sheets
+            ? [opts.sheets]
+            : undefined;
+        if (!names) throw new Error("expected a worksheet-focused read");
+        if (names.includes("Sheet1")) {
+          if (!opts.dense) throw new Error("Too many properties to enumerate");
+          return { SheetNames: ["Sheet1"], Sheets: { Sheet1: denseSheet } };
         }
         return XLSX.read(buf, opts);
       },
     };
 
-    const parsed = readWorkbookWithSheetRecovery(fakeXlsx, bytes);
+    const parsed = readSheetWithRecovery(fakeXlsx, bytes, "Sheet1");
 
     // Sheet1 came back — fully readable, not truncated.
-    expect(parsed.sheetNames).toContain("Sheet1");
-    expect(parsed.unavailableSheetNames).toEqual([]);
+    expect(parsed.sheetNames).toEqual(["Sheet1"]);
     // Dense mode was actually used, and the slow plain variants were skipped
     // once the size error was seen.
     expect(attempts.some((a) => a.dense)).toBe(true);
     expect(attempts.some((a) => !a.dense && a.sheets?.includes("Sheet1"))).toBe(true);
+    // Every single read was restricted to the chosen worksheet.
+    expect(attempts.every((a) => Array.isArray(a.sheets))).toBe(true);
 
     // The dense sheet is interchangeable with a normal one for inspection.
-    const inspection = inspectWorkbookSheet({ ...parsed, utils: XLSX.utils } as ParsedSheet, "Sheet1");
+    const inspection = inspectWorkbookSheet(parsed, "Sheet1");
     expect(inspection.readError).toBeFalsy();
     expect(inspection.headers).toEqual(ANNEX_HEADERS);
     expect(inspection.dataRowCount).toBe(2);
@@ -362,8 +370,7 @@ describe("workbook with a bloated Sheet1 (huge used range)", () => {
         Sheets: { Sheet1: sheet1, Sheet2: {} },
       },
       utils: XLSX.utils,
-      sheetNames: ["Sheet1", "Sheet2"],
-      unavailableSheetNames: [],
+      sheetNames: ["Sheet1"],
     };
   }
 

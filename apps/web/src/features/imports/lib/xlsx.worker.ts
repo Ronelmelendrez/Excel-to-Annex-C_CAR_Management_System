@@ -1,35 +1,42 @@
 /// <reference lib="webworker" />
 import {
   inspectWorkbookSheet,
-  parseWorkbookBuffer,
+  parseWorkbookSheet,
+  readWorkbookSheetNames,
   sha256Hex,
   type ParsedSheet,
 } from "./workbook-engine";
 
 /**
- * Background workbook parser.
+ * Background workbook reader.
  *
- * The parsed SheetJS workbook lives ONLY inside this worker for the lifetime of
- * the import session. The main thread never receives it — it would be pointless
- * (and expensive) to structured-clone a 1,000,000-row workbook across the
- * thread boundary, which would simply move the freeze back onto the UI. Instead
- * the main thread asks this worker to inspect a sheet and gets back a small
+ * Opening a workbook here reads ONLY its worksheet names (plus the file hash)
+ * — no worksheet data is parsed until the main thread asks for one specific
+ * sheet. When it does, this worker parses just that worksheet: the parsed
+ * worksheet lives ONLY inside this worker for the lifetime of the import
+ * session. The main thread never receives it — it would be pointless (and
+ * expensive) to structured-clone a 1,000,000-row worksheet across the thread
+ * boundary, which would simply move the freeze back onto the UI. Instead the
+ * main thread asks this worker to inspect a sheet and gets back a small
  * plain-data SheetInspection.
  *
+ * The raw bytes are retained so switching worksheets re-parses only the newly
+ * chosen sheet; the previously parsed sheet is dropped to free memory.
+ *
  * Protocol (main -> worker):
- *   { type: "parse",    id, buffer, fileName, size, maxBytes }
- *   { type: "inspect",  id, sheetName, headerRow? }
- *   { type: "release" }            drop the parsed workbook and free memory
+ *   { type: "open",    id, buffer, fileName, size, maxBytes }   // names only
+ *   { type: "inspect", id, sheetName, headerRow? }              // focused parse + inspect
+ *   { type: "release" }            drop bytes and parsed sheet, free memory
  *
  * Protocol (worker -> main):
  *   { type: "progress", id, stage }
- *   { type: "parsed",   id, fileHash, size, sheetNames }
+ *   { type: "opened",   id, fileHash, size, sheetNames }
  *   { type: "inspected",id, inspection }
  *   { type: "error",    id, message, retryable }
  */
 
-type ParseRequest = {
-  type: "parse";
+type OpenRequest = {
+  type: "open";
   id: number;
   buffer: ArrayBuffer;
   fileName: string;
@@ -46,26 +53,26 @@ type InspectRequest = {
 
 type ReleaseRequest = { type: "release" };
 
-type WorkerRequest = ParseRequest | InspectRequest | ReleaseRequest;
+type WorkerRequest = OpenRequest | InspectRequest | ReleaseRequest;
 
 type WorkerResponse =
-  | { type: "progress"; id: number; stage: "hashing" | "parsing" | "ready" }
+  | { type: "progress"; id: number; stage: "hashing" | "parsing" | "sheet" | "ready" }
   | {
-      type: "parsed";
+      type: "opened";
       id: number;
       fileHash: string;
       size: number;
       sheetNames: string[];
-      unavailableSheetNames: string[];
-      sheetReadErrors?: Record<string, string>;
     }
   | { type: "inspected"; id: number; inspection: ReturnType<typeof inspectWorkbookSheet> }
   | { type: "error"; id: number; message: string; retryable: boolean };
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
 
-/** The single parsed workbook owned by this worker, if any. */
-let parsed: ParsedSheet | null = null;
+/** Raw bytes of the open workbook, kept so each chosen sheet can be parsed on demand. */
+let buffer: ArrayBuffer | null = null;
+/** The single worksheet parsed so far, if any. Switching sheets drops the previous one. */
+let focused: { sheetName: string; parsed: ParsedSheet } | null = null;
 
 function post(message: WorkerResponse, transfer: Transferable[] = []) {
   ctx.postMessage(message, transfer);
@@ -79,17 +86,19 @@ function fail(id: number, error: unknown, retryable: boolean) {
   post({ type: "error", id, message, retryable });
 }
 
-function isBlankBuffer(buffer: ArrayBuffer): boolean {
-  return buffer.byteLength < 8;
+function isBlankBuffer(bytes: ArrayBuffer): boolean {
+  return bytes.byteLength < 8;
 }
 
-async function handleParse(request: ParseRequest): Promise<void> {
-  const { id, buffer, size, maxBytes } = request;
+async function handleOpen(request: OpenRequest): Promise<void> {
+  const { id, size, maxBytes } = request;
+  const bytes = request.buffer;
 
-  // Release any workbook from a previous session before parsing a new one.
-  parsed = null;
+  // Release any workbook from a previous session before opening a new one.
+  buffer = null;
+  focused = null;
 
-  if (isBlankBuffer(buffer)) {
+  if (isBlankBuffer(bytes)) {
     fail(id, new Error("This file is empty or too small to be a valid Excel workbook."), false);
     return;
   }
@@ -106,58 +115,61 @@ async function handleParse(request: ParseRequest): Promise<void> {
 
   try {
     post({ type: "progress", id, stage: "hashing" });
-    const fileHash = await sha256Hex(buffer);
+    const fileHash = await sha256Hex(bytes);
 
+    // Names only: no worksheet data is parsed until a sheet is chosen.
     post({ type: "progress", id, stage: "parsing" });
-    const next = await parseWorkbookBuffer(buffer);
-    parsed = next;
+    const sheetNames = await readWorkbookSheetNames(bytes);
 
+    buffer = bytes;
     post({ type: "progress", id, stage: "ready" });
-    post({
-      type: "parsed",
-      id,
-      fileHash,
-      size,
-      sheetNames: next.sheetNames,
-      unavailableSheetNames: next.unavailableSheetNames,
-      sheetReadErrors: next.sheetReadErrors ?? {},
-    });
+    post({ type: "opened", id, fileHash, size, sheetNames });
   } catch (error) {
-    parsed = null;
-    // A parse failure on a well-formed-size file is usually a corrupt/unsupported
-    // workbook; retrying the same file rarely helps, so mark non-retryable.
+    buffer = null;
+    focused = null;
+    // An open failure on a well-formed-size file is usually a corrupt or
+    // unsupported workbook; retrying the same file rarely helps.
     fail(id, error, false);
-  } finally {
-    // The worker keeps no reference to the raw buffer after parsing.
   }
 }
 
-function handleInspect(request: InspectRequest): void {
+async function handleInspect(request: InspectRequest): Promise<void> {
   const { id, sheetName, headerRow } = request;
-  if (!parsed) {
+  if (!buffer) {
     fail(id, new Error("No workbook is loaded. Choose a file first."), true);
     return;
   }
   try {
+    let parsed = focused?.sheetName === sheetName ? focused.parsed : null;
+    if (!parsed) {
+      // Parse just this worksheet. Sibling sheets — even broken ones — are
+      // never read, and the previously parsed sheet is dropped below.
+      post({ type: "progress", id, stage: "sheet" });
+      parsed = await parseWorkbookSheet(buffer, sheetName);
+      focused = { sheetName, parsed };
+    }
     const inspection = inspectWorkbookSheet(parsed, sheetName, headerRow);
     post({ type: "inspected", id, inspection });
   } catch (error) {
-    fail(id, error, true);
+    // A sheet-level failure is specific to the chosen worksheet; the message
+    // already carries the real cause, so mark it non-retryable.
+    fail(id, error, false);
   }
 }
 
 function release() {
-  parsed = null;
+  buffer = null;
+  focused = null;
 }
 
 ctx.addEventListener("message", (event: MessageEvent<WorkerRequest>) => {
   const request = event.data;
   switch (request.type) {
-    case "parse":
-      void handleParse(request);
+    case "open":
+      void handleOpen(request);
       return;
     case "inspect":
-      handleInspect(request);
+      void handleInspect(request);
       return;
     case "release":
       release();

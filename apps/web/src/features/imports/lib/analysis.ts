@@ -13,9 +13,10 @@ export type { WorkbookBundle };
 
 /**
  * Read a workbook in the background (Web Worker) and return only its
- * lightweight metadata. The parsed workbook never enters the main thread —
- * see workbook-client.ts / xlsx.worker.ts. Throws a user-facing message when
- * the file is the wrong type, too large, or cannot be parsed.
+ * lightweight metadata — file hash and worksheet names, no worksheet data.
+ * The worksheet the operator picks is parsed later, on demand (see
+ * workbook-client.ts / xlsx.worker.ts). Throws a user-facing message when the
+ * file is the wrong type, too large, or cannot be opened.
  */
 export async function readWorkbookFile(
   file: File,
@@ -25,21 +26,20 @@ export async function readWorkbookFile(
     throw new Error("Choose an .xlsx or .xls workbook. Other file types are not read.");
   }
 
-  let opened = await workbookClient.open(file, IMPORT_MAX_BYTES, buffer);
-  if (opened.unavailableSheetNames.length > 0) {
-    // A worker can occasionally return stale/incomplete worksheet state during
-    // replacement or recovery. Recreate it once and verify against the same
-    // original bytes before allowing a partial workbook into the wizard.
-    opened = await workbookClient.open(file, IMPORT_MAX_BYTES, buffer);
-  }
-  const { fileHash, size, sheetNames, unavailableSheetNames, sheetReadErrors } = opened;
-  return { file, fileHash, size, sheetNames, unavailableSheetNames, sheetReadErrors };
+  const { fileHash, size, sheetNames } = await workbookClient.open(
+    file,
+    IMPORT_MAX_BYTES,
+    buffer,
+  );
+  return { file, fileHash, size, sheetNames };
 }
 
 /**
  * Inspect a sheet of the currently open workbook (async: the work happens in
- * the parser thread). Returns the small plain-data preview the mapping screen
- * needs — headers, a few sample rows, and the row count.
+ * the parser thread). The chosen worksheet is parsed here if it has not been
+ * parsed yet — a focused read of that sheet only. Returns the small plain-data
+ * preview the mapping screen needs — headers, a few sample rows, and the row
+ * count.
  */
 export function inspectSheet(
   sheetName: string,
@@ -85,10 +85,11 @@ function hasTableShape(sheet: SheetInspection): boolean {
  * required columns), and the caller is told it auto-switched so the UI can
  * explain the choice.
  *
- * A worksheet that fails inspection (damaged cells, unreadable data) is
- * SKIPPED, never fatal: one bad sheet must not block importing the readable
- * ones. Only when every worksheet fails does this throw, with the original
- * first failure preserved as the message.
+ * A worksheet that fails inspection (missing part, damaged cells, unreadable
+ * data) is SKIPPED, never fatal: each attempt parses only that one worksheet,
+ * so one bad sheet must not block importing the readable ones. Only when
+ * every worksheet fails does this throw, with the original first failure
+ * preserved as the message.
  */
 export async function inspectInitialSheet(sheetNames: string[]): Promise<InitialSheetChoice> {
   if (!sheetNames.length) {

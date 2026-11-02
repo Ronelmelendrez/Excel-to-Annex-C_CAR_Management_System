@@ -3,10 +3,10 @@ import { analyzeRows, autoMapping, MAX_IMPORT_ROWS, type ColumnMapping } from "@
 import { IMPORT_MAX_BYTES, IMPORT_MAX_MB, IMPORT_MAX_ROWS } from "../lib/import-limits";
 import { readWorkbookFile } from "../lib/analysis";
 import {
-  getWorkbookWorksheetNames,
   inspectWorkbookSheet,
-  parseWorkbookBuffer,
-  readWorkbookWithSheetRecovery,
+  parseWorkbookSheet,
+  readWorkbookSheetNames,
+  readSheetWithRecovery,
   type ParsedSheet,
 } from "../lib/workbook-engine";
 import { workbookClient } from "../lib/workbook-client";
@@ -65,49 +65,49 @@ function sheetWithExtent(rows: unknown[][], extentRows: number, utils: any): Par
     workbook: { SheetNames: ["Data"], Sheets: { Data: sheet } },
     utils,
     sheetNames: ["Data"],
-    unavailableSheetNames: [],
   };
 }
 
 describe("large-file mapping preview", () => {
-  it("uses readable worksheets and reports worksheets missing parsed data", () => {
-    expect(
-      getWorkbookWorksheetNames({
-        SheetNames: ["Sheet1", "Sheet2"],
-        Sheets: { Sheet2: { "!ref": "A1:A2" } },
-      }),
-    ).toEqual({
-      sheetNames: ["Sheet2"],
-      unavailableSheetNames: ["Sheet1"],
-    });
+  it("reads only the worksheet names, listing every declared sheet", async () => {
+    // Names-first: choosing a file parses NO worksheet data, so both sheets
+    // are listed before any of them is picked.
+    const XLSX = await import("xlsx");
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([["HH_ID"], ["1"]]), "Sheet1");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([["HH_ID"], ["2"]]), "Sheet2");
+    const bytes = XLSX.write(workbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+
+    expect(await readWorkbookSheetNames(bytes)).toEqual(["Sheet1", "Sheet2"]);
   });
 
-  it("recovers unavailable worksheets in a single batch pass", () => {
-    const sheet1 = { "!ref": "A1:A2" };
-    const sheet2 = { "!ref": "A1:A2" };
-    const read = vi.fn(
-      (_buffer: ArrayBuffer, options: { sheets?: string | string[] }) => {
-        const requested =
-          Array.isArray(options.sheets) ? options.sheets : options.sheets ? [options.sheets] : [];
-        if (requested.includes("Sheet1")) {
-          return { SheetNames: ["Sheet1", "Sheet2"], Sheets: { Sheet1: sheet1 } };
-        }
-        return { SheetNames: ["Sheet1", "Sheet2"], Sheets: { Sheet2: sheet2 } };
+  it("parses only the chosen worksheet and never touches its siblings", async () => {
+    const XLSX = await import("xlsx");
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([["HH_ID"], ["1"]]), "Sheet1");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([["HH_ID"], ["2"]]), "Sheet2");
+    const bytes = XLSX.write(workbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+
+    const attempts: Array<string[] | undefined> = [];
+    const fakeXlsx: any = {
+      utils: XLSX.utils,
+      read: (buf: ArrayBuffer, opts: any = {}) => {
+        attempts.push(opts.sheets);
+        return XLSX.read(buf, opts);
       },
-    );
+    };
 
-    const result = readWorkbookWithSheetRecovery(
-      { read } as unknown as typeof import("xlsx"),
-      new ArrayBuffer(8),
-    );
+    const parsed = readSheetWithRecovery(fakeXlsx, bytes, "Sheet2");
 
-    expect(read).toHaveBeenCalledTimes(2);
-    // Batch recovery passes all unavailable sheet names at once.
-    expect(read.mock.calls[1]?.[1]?.sheets).toEqual(["Sheet1"]);
-    expect(result.sheetNames).toEqual(["Sheet1", "Sheet2"]);
-    expect(result.unavailableSheetNames).toEqual([]);
-    expect(result.workbook.Sheets.Sheet1).toBe(sheet1);
-    expect(result.workbook.Sheets.Sheet2).toBe(sheet2);
+    expect(parsed.sheetNames).toEqual(["Sheet2"]);
+    // Every read was restricted to the chosen sheet: no full-workbook pass,
+    // Sheet1's cells were never parsed.
+    expect(attempts.length).toBeGreaterThan(0);
+    expect(
+      attempts.every(
+        (sheets) => Array.isArray(sheets) && sheets.length === 1 && sheets[0] === "Sheet2",
+      ),
+    ).toBe(true);
   });
 
   it("explains when a workbook lists a sheet but has no parsed sheet data", async () => {
@@ -115,8 +115,7 @@ describe("large-file mapping preview", () => {
     const parsed: ParsedSheet = {
       workbook: { SheetNames: ["Data"], Sheets: {} },
       utils: XLSX.utils,
-      sheetNames: ["Data"],
-      unavailableSheetNames: [],
+      sheetNames: [],
     };
 
     expect(() => inspectWorkbookSheet(parsed, "Data")).toThrow(
@@ -177,7 +176,6 @@ describe("large-file mapping preview", () => {
       workbook: { SheetNames: ["Data"], Sheets: { Data: utils.aoa_to_sheet(rows) } },
       utils,
       sheetNames: ["Data"],
-      unavailableSheetNames: [],
     };
     const inspection = inspectWorkbookSheet(parsed, "Data");
 
@@ -275,7 +273,7 @@ describe("invalid workbooks", () => {
   it("fails with a clear message on corrupt bytes instead of crashing", async () => {
     // Not a valid zip (xlsx) or OLE (xls) container.
     const corrupt = new Uint8Array(16).fill(0x01);
-    await expect(parseWorkbookBuffer(corrupt.buffer as ArrayBuffer)).rejects.toThrow(
+    await expect(readWorkbookSheetNames(corrupt.buffer as ArrayBuffer)).rejects.toThrow(
       /not a valid Excel workbook|could not be opened|no worksheets/i,
     );
   });
@@ -303,28 +301,25 @@ describe("invalid workbooks", () => {
     expect(inspection.rowCount).toBe(2);
   });
 
-  it("restarts the parser once when a worksheet is missing from the first parse", async () => {
+  it("wraps a single names-only open into a lightweight bundle", async () => {
     const file = new File(["workbook"], "households.xlsx");
-    const open = vi.spyOn(workbookClient, "open");
-    open
-      .mockResolvedValueOnce({
-        fileHash: "a".repeat(64),
-        size: file.size,
-        sheetNames: ["Sheet2"],
-        unavailableSheetNames: ["Sheet1"],
-      })
-      .mockResolvedValueOnce({
-        fileHash: "a".repeat(64),
-        size: file.size,
-        sheetNames: ["Sheet1", "Sheet2"],
-        unavailableSheetNames: [],
-      });
+    const open = vi.spyOn(workbookClient, "open").mockResolvedValue({
+      fileHash: "a".repeat(64),
+      size: file.size,
+      sheetNames: ["Sheet1", "Sheet2"],
+    });
 
     const result = await readWorkbookFile(file);
 
-    expect(open).toHaveBeenCalledTimes(2);
-    expect(result.sheetNames).toEqual(["Sheet1", "Sheet2"]);
-    expect(result.unavailableSheetNames).toEqual([]);
+    // Names-only reads report nothing to retry: exactly one open, no restart
+    // loop, and no per-sheet parse state on the bundle.
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      file,
+      fileHash: "a".repeat(64),
+      sheetNames: ["Sheet1", "Sheet2"],
+    });
+    expect(result).not.toHaveProperty("unavailableSheetNames");
   });
 
   it("keeps the newest workbook when file reads finish out of order", async () => {

@@ -128,8 +128,8 @@ function ChoosePanel({ wizard }: { wizard: ImportWizardState }) {
             }}
           />
           <p id="workbook-help" className="sr-only">
-            Choose an Excel workbook. If it contains several worksheets, you pick which one to
-            parse before anything is read.
+            Choose an Excel workbook. Its worksheet names are read first; if it contains several
+            worksheets, you pick which one to parse before any worksheet data is read.
           </p>
         </div>
       </div>
@@ -237,18 +237,20 @@ function SheetPickPanel({ wizard }: { wizard: ImportWizardState }) {
         ))}
       </ul>
 
-      {bundle.unavailableSheetNames.length > 0 && (
+      {Object.keys(wizard.sheetFailures).length > 0 && (
         <Notice tone="warning" title="Some worksheets could not be read">
           <ul className="list-disc space-y-1 pl-5">
-            {bundle.unavailableSheetNames.map((name) => (
+            {Object.entries(wizard.sheetFailures).map(([name, reason]) => (
               <li key={name}>
-                <span className="font-mono">{name}</span>
-                {bundle.sheetReadErrors?.[name]
-                  ? ` — ${bundle.sheetReadErrors[name]}`
-                  : " could not be read from this file, so it cannot be imported."}
+                <span className="font-mono">{name}</span> — {reason}
               </li>
             ))}
           </ul>
+          <p className="mt-1">
+            Every other worksheet in this workbook can still be imported. If you need one of these,
+            open the workbook in Excel, use Move or Copy to put that sheet into a new workbook,
+            save it as .xlsx, and import that copy.
+          </p>
         </Notice>
       )}
     </div>
@@ -412,32 +414,20 @@ function ShapePanel({ wizard }: { wizard: ImportWizardState }) {
         </button>
       </div>
 
-      {sheet && bundle.unavailableSheetNames.includes(sheet.sheetName) && (
-        <Notice tone="error" title="Import blocked: worksheet data is unavailable">
-          The worksheet "{sheet.sheetName}" had no readable data. Open the workbook in Excel, use
-          Move or Copy to copy that sheet into a new workbook, save it as .xlsx, and upload that
-          copy.
+      {Object.keys(wizard.sheetFailures).length > 0 && (
+        <Notice tone="warning" title="Some worksheets could not be read">
+          {Object.entries(wizard.sheetFailures).map(([name, reason]) => (
+            <p key={name}>
+              <span className="font-mono">{name}</span> — {reason}
+            </p>
+          ))}
+          <p className="mt-1">
+            If you need their data, open the workbook in Excel, use Move or Copy to put that
+            sheet into a new workbook, save it as .xlsx, and import that copy. Other worksheets
+            are unaffected.
+          </p>
         </Notice>
       )}
-
-      {sheet && !bundle.unavailableSheetNames.includes(sheet.sheetName) &&
-        bundle.unavailableSheetNames.length > 0 && (
-          <Notice tone="warning" title="Some worksheets could not be read">
-            {bundle.unavailableSheetNames.map((name) => (
-              <p key={name}>
-                <span className="font-mono">{name}</span>
-                {bundle.sheetReadErrors?.[name]
-                  ? ` — ${bundle.sheetReadErrors[name]}`
-                  : " could not be read from this file, so it cannot be imported."}
-              </p>
-            ))}
-            <p className="mt-1">
-              If you need their data, open the workbook in Excel, use Move or Copy to put that
-              sheet into a new workbook, save it as .xlsx, and import that copy. Other worksheets
-              are unaffected.
-            </p>
-          </Notice>
-        )}
 
       {sheet?.readError && (
         <Notice tone="warning" title={`"${sheet.sheetName}" cannot be read`}>
@@ -445,10 +435,7 @@ function ShapePanel({ wizard }: { wizard: ImportWizardState }) {
         </Notice>
       )}
 
-      {sheet &&
-        sheet.dataRowCount === 0 &&
-        !sheet.readError &&
-        !bundle.unavailableSheetNames.includes(sheet.sheetName) && (
+      {sheet && sheet.dataRowCount === 0 && !sheet.readError && (
           <Notice tone="warning" title="This worksheet has no data rows">
             {bundle.sheetNames.length > 1
               ? `Nothing can be imported from "${sheet.sheetName}". Choose the worksheet that holds the household rows in the Worksheet dropdown below — it is usually the sheet with the HH_ID and ENTRY_ID columns.`
@@ -471,16 +458,6 @@ function ShapePanel({ wizard }: { wizard: ImportWizardState }) {
             {bundle.sheetNames.map((name) => (
               <option key={name} value={name}>
                 {name}
-              </option>
-            ))}
-            {bundle.unavailableSheetNames.map((name) => (
-              <option
-                key={name}
-                value={name}
-                disabled
-                title={bundle.sheetReadErrors?.[name] ?? "This worksheet could not be read."}
-              >
-                {name} (no readable data)
               </option>
             ))}
           </select>
@@ -965,10 +942,12 @@ export function ImportWizard({ wizard }: { wizard: ImportWizardState }) {
       ? wizard.readStage === "hashing"
         ? "Hashing workbook in the browser…"
         : wizard.readStage === "parsing"
-          ? "Parsing workbook in a background thread…"
-          : wizard.readStage === "ready"
-            ? "Workbook ready."
-            : "Reading workbook in the browser…"
+          ? "Reading worksheet names in a background thread…"
+          : wizard.readStage === "sheet"
+            ? "Reading the selected worksheet in a background thread…"
+            : wizard.readStage === "ready"
+              ? "Workbook ready."
+              : "Reading workbook in the browser…"
       : wizard.busy === "validating"
         ? "Uploading the workbook and validating on the server…"
         : "Saving the import to Supabase…";

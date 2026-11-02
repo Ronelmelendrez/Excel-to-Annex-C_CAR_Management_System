@@ -36,39 +36,17 @@ export const SHAPE_SNIFF_COLS = 512;
 export type ParsedSheet = {
   workbook: any;
   utils: typeof import("xlsx").utils;
-  sheetNames: string[];
-  unavailableSheetNames: string[];
   /**
-   * Why each unavailable worksheet failed, captured with SheetJS's WTF mode
-   * (normal mode swallows per-sheet errors). Keyed by sheet name; shown in the
-   * UI so "could not be read" is never a dead end.
+   * The worksheets this parse materialized. Parsing is focused on ONE chosen
+   * worksheet, so this is always exactly that sheet — the rest of the workbook
+   * (including any sibling sheet with a missing or corrupt part) is never read.
    */
-  sheetReadErrors?: Record<string, string>;
+  sheetNames: string[];
 };
 
 // File signatures for the only two accepted containers (.xlsx = zip, .xls = OLE).
 const ZIP_MAGIC = [0x50, 0x4b, 0x03, 0x04];
 const OLE_MAGIC = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1];
-
-export function getWorkbookWorksheetNames(workbook: {
-  SheetNames?: unknown;
-  Sheets?: Record<string, unknown>;
-}): { sheetNames: string[]; unavailableSheetNames: string[] } {
-  const declaredNames = Array.isArray(workbook.SheetNames)
-    ? workbook.SheetNames.filter((name): name is string => typeof name === "string")
-    : [];
-  const sheets = workbook.Sheets ?? {};
-  const sheetNames = declaredNames.filter(
-    (name) =>
-      Object.prototype.hasOwnProperty.call(sheets, name) &&
-      sheets[name] !== null &&
-      typeof sheets[name] === "object",
-  );
-  return {
-    sheetNames,
-    unavailableSheetNames: declaredNames.filter((name) => !sheetNames.includes(name)),
-  };
-}
 
 /**
  * Browsers refuse to build or enumerate objects holding an extreme number of
@@ -100,20 +78,28 @@ export function explainSheetReadError(error: unknown): string {
   return message;
 }
 
-export function readWorkbookWithSheetRecovery(
+/**
+ * Read ONLY the worksheet names of a workbook — no worksheet data is parsed.
+ *
+ * This is what "choose a file" does now: a multi-sheet workbook can show its
+ * picker (and a single-sheet workbook can proceed) without paying for a parse
+ * the operator may never need, and a sibling worksheet with a missing or
+ * corrupt part can never block reading the names. `bookSheets` works for both
+ * .xlsx and .xls containers.
+ */
+export function readSheetNamesWith(
   XLSX: typeof import("xlsx"),
   buffer: ArrayBuffer,
-) {
-  const options = { type: "array" as const, cellDates: false, cellNF: false };
-
-  // Try to read the workbook. If Sheet1 is corrupt, SheetJS may throw during
-  // the full-workbook parse. Fall back to raw mode (bypasses some XML
-  // validation) and then cellText mode so we can still recover readable
-  // sheets like Sheet2.
+): string[] {
+  const options = { type: "array" as const, bookSheets: true };
   let workbook: any;
   try {
     workbook = XLSX.read(buffer, options);
   } catch {
+    // Same rescue ladder as the old full read: raw mode bypasses some XML
+    // validation and cellText mode rescues sheets whose typed values break
+    // the normal pass (for names-only reads this rarely triggers, but it
+    // costs nothing when the first attempt fails).
     try {
       workbook = XLSX.read(buffer, { ...options, raw: true });
     } catch {
@@ -127,121 +113,97 @@ export function readWorkbookWithSheetRecovery(
     }
   }
 
-  const initial = getWorkbookWorksheetNames(workbook);
-
-  // Recover any sheets that SheetJS could not materialize in the first pass.
-  // Read all unavailable sheets in a single pass (SheetJS accepts an array of
-  // sheet names) instead of re-reading the entire buffer once per sheet, which
-  // is the dominant cost for multi-sheet, million-row workbooks.
-  if (initial.unavailableSheetNames.length > 0) {
-    try {
-      const recovery = XLSX.read(buffer, {
-        ...options,
-        sheets: initial.unavailableSheetNames,
-      });
-      for (const sheetName of initial.unavailableSheetNames) {
-        const sheet = recovery.Sheets?.[sheetName];
-        if (sheet && typeof sheet === "object") {
-          workbook.Sheets ??= {};
-          workbook.Sheets[sheetName] = sheet;
-        }
-      }
-    } catch {
-      // Batch recovery failed; fall through to per-sheet attempts below.
-    }
-
-    // If some sheets are still unavailable, try reading each one individually
-    // with alternative option combinations. SheetJS can sometimes read a sheet
-    // with `sheets: ["Name"]` that it could not read in the full-workbook pass,
-    // or vice versa.
-    const stillUnavailable = initial.unavailableSheetNames.filter(
-      (name) =>
-        !workbook.Sheets?.[name] ||
-        typeof workbook.Sheets[name] !== "object",
-    );
-    for (const sheetName of stillUnavailable) {
-      let recovered = false;
-      let sawSizeLimit = false;
-      // `dense` stores each row as its own small array instead of ONE object
-      // holding every cell. Browsers (Safari, Firefox) refuse to build objects
-      // with an extreme number of properties — they throw "Too many properties
-      // to enumerate" on sheets whose formatting stretches across a million
-      // empty rows, no matter how the sheet is read. Dense mode sidesteps the
-      // limit entirely and keeps the full data, so it is tried as soon as a
-      // size-limit error is seen (and each earlier attempt on such a sheet is
-      // slow, so the remaining plain modes are skipped past that point).
-      // Every utility call (sheet_to_json, our batch reader) auto-detects dense
-      // sheets via Array.isArray, so the rest of the pipeline needs no changes.
-      for (const variant of [
-        { ...options, sheets: sheetName },
-        { ...options, sheets: sheetName, cellDates: true },
-        { ...options, sheets: sheetName, cellNF: true },
-        { ...options, sheets: sheetName, raw: true },
-        // cellText mode parses every cell as text, which rescues sheets whose
-        // typed values (dates, error cells, broken number formats) break the
-        // normal or raw passes — a common cause of one unreadable first sheet.
-        { ...options, sheets: sheetName, cellText: true },
-        { ...options, sheets: sheetName, cellText: true, raw: true },
-        { ...options, sheets: sheetName, dense: true },
-        { ...options, sheets: sheetName, dense: true, cellText: true },
-        { ...options, sheets: sheetName, dense: true, raw: true },
-      ]) {
-        if (sawSizeLimit && !("dense" in variant)) continue;
-        try {
-          const individual = XLSX.read(buffer, variant);
-          const sheet = individual.Sheets?.[sheetName];
-          if (sheet && typeof sheet === "object") {
-            workbook.Sheets ??= {};
-            workbook.Sheets[sheetName] = sheet;
-            recovered = true;
-            break;
-          }
-        } catch (error) {
-          if (isSheetSizeLimitError(error)) sawSizeLimit = true;
-          // Try the next option variant.
-        }
-      }
-      if (!recovered && !sawSizeLimit) {
-        // Last resort: try without the `sheets` restriction but with raw mode,
-        // which can bypass certain XML parsing issues SheetJS hits on formatted
-        // or merged-cell worksheets. Skipped after a size-limit error: it would
-        // parse the whole giant workbook again just to fail the same way.
-        try {
-          const individual = XLSX.read(buffer, {
-            ...options,
-            raw: true,
-          });
-          const sheet = individual.Sheets?.[sheetName];
-          if (sheet && typeof sheet === "object") {
-            workbook.Sheets ??= {};
-            workbook.Sheets[sheetName] = sheet;
-          }
-        } catch {
-          // Sheet genuinely cannot be read; leave it unavailable.
-        }
-      }
-    }
+  const names = Array.isArray(workbook?.SheetNames)
+    ? workbook.SheetNames.filter((name: unknown): name is string => typeof name === "string")
+    : [];
+  if (!names.length) {
+    throw new Error("This workbook has no worksheets. Nothing was uploaded.");
   }
+  return names;
+}
 
-  const names = getWorkbookWorksheetNames(workbook);
+/**
+ * The REAL reason a chosen worksheet could not be parsed. SheetJS swallows
+ * per-sheet errors unless WTF is set, so one strict focused read is what
+ * turns a dead-end "could not be read" into a specific cause ("part missing
+ * from the file", a rels error, …). Only runs after every normal attempt
+ * failed, never for a readable sheet.
+ */
+function focusedSheetFailureReason(
+  XLSX: typeof import("xlsx"),
+  buffer: ArrayBuffer,
+  sheetName: string,
+): string {
+  try {
+    XLSX.read(buffer, { type: "array", WTF: true, sheets: [sheetName] });
+    return "the file lists this worksheet but contains no worksheet data for it (it may be a chart, form, or macro sheet, or its worksheet part is missing from the file).";
+  } catch (error) {
+    return explainSheetReadError(error);
+  }
+}
 
-  // Capture the REAL reason each still-unavailable sheet failed. SheetJS
-  // swallows per-sheet errors unless WTF is set, so this final strict read is
-  // the only way to surface a specific cause ("part missing from the file",
-  // a rels error, …) instead of a generic dead-end notice. One strict read per
-  // failed sheet, never per good sheet.
-  const sheetReadErrors: Record<string, string> = {};
-  for (const sheetName of names.unavailableSheetNames) {
+/**
+ * Parse ONE worksheet — the one the operator chose — and nothing else.
+ *
+ * Every attempt is restricted with SheetJS's `sheets` option, so a workbook
+ * with a million-row sibling (or a sibling whose part is missing or corrupt)
+ * costs nothing here: only the chosen sheet's cells are read. The attempts
+ * ladder through the same option variants as the old full-workbook recovery
+ * (cellDates, cellNF, raw, cellText, and dense for the browser's property
+ * limit), and a sheet the parser never materializes fails with the specific
+ * cause from a WTF read instead of a generic dead end.
+ */
+export function readSheetWithRecovery(
+  XLSX: typeof import("xlsx"),
+  buffer: ArrayBuffer,
+  sheetName: string,
+): ParsedSheet {
+  const base = { type: "array" as const, cellDates: false, cellNF: false, sheets: [sheetName] };
+  let sawSizeLimit = false;
+  for (const variant of [
+    base,
+    { ...base, cellDates: true },
+    { ...base, cellNF: true },
+    { ...base, raw: true },
+    // cellText mode parses every cell as text, which rescues sheets whose
+    // typed values (dates, error cells, broken number formats) break the
+    // normal or raw passes — a common cause of one unreadable sheet.
+    { ...base, cellText: true },
+    { ...base, cellText: true, raw: true },
+    // `dense` stores each row as its own small array instead of ONE object
+    // holding every cell. Browsers (Safari, Firefox) refuse to build objects
+    // with an extreme number of properties — they throw "Too many properties
+    // to enumerate" on sheets whose formatting stretches across a million
+    // empty rows, no matter how the sheet is read. Dense mode sidesteps the
+    // limit entirely and keeps the full data, so it is tried as soon as a
+    // size-limit error is seen (each earlier attempt on such a sheet is slow,
+    // so the remaining plain modes are skipped past that point).
+    // Every utility call (sheet_to_json) auto-detects dense sheets via
+    // Array.isArray, so the rest of the pipeline needs no changes.
+    { ...base, dense: true },
+    { ...base, dense: true, cellText: true },
+    { ...base, dense: true, raw: true },
+  ]) {
+    if (sawSizeLimit && !("dense" in variant)) continue;
     try {
-      XLSX.read(buffer, { ...options, WTF: true, sheets: [sheetName] });
-      sheetReadErrors[sheetName] =
-        "the file lists this worksheet but contains no worksheet data for it (it may be a chart, form, or macro sheet, or its worksheet part is missing from the file).";
+      const workbook = XLSX.read(buffer, variant);
+      const sheet = workbook?.Sheets?.[sheetName];
+      if (sheet && typeof sheet === "object") {
+        return { workbook, utils: XLSX.utils, sheetNames: [sheetName] };
+      }
+      // A successful read with no worksheet for the chosen name means the
+      // part is genuinely absent (a chart/form sheet, or a broken file): no
+      // option variant can conjure data that is not there.
+      break;
     } catch (error) {
-      sheetReadErrors[sheetName] = explainSheetReadError(error);
+      if (isSheetSizeLimitError(error)) sawSizeLimit = true;
+      // Try the next option variant.
     }
   }
-
-  return { workbook, ...names, sheetReadErrors };
+  const reason = focusedSheetFailureReason(XLSX, buffer, sheetName);
+  throw new Error(
+    `The worksheet "${sheetName}" could not be read: ${reason} Copy the data into a new sheet in Excel, save the workbook as .xlsx, and import that copy.`,
+  );
 }
 
 /**
@@ -268,38 +230,33 @@ export async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
 }
 
 /**
- * Parse workbook bytes into a SheetJS workbook. Throws a user-facing message on
- * failure. Callers own the returned workbook's lifetime (and should release it
- * when the import session ends).
+ * Read only the worksheet names of a workbook — no worksheet data is parsed.
+ * Throws a user-facing message when the file is not an Excel container or the
+ * workbook cannot be opened at all.
  */
-export async function parseWorkbookBuffer(buffer: ArrayBuffer): Promise<ParsedSheet> {
+export async function readWorkbookSheetNames(buffer: ArrayBuffer): Promise<string[]> {
   assertWorkbookMagic(new Uint8Array(buffer));
 
   // Load the spreadsheet parser only when a workbook is actually chosen.
   const XLSX = await import("xlsx");
+  return readSheetNamesWith(XLSX, buffer);
+}
 
-  let workbook: any;
-  let sheetNames: string[];
-  let unavailableSheetNames: string[];
-  let sheetReadErrors: Record<string, string> | undefined;
-  try {
-    ({ workbook, sheetNames, unavailableSheetNames, sheetReadErrors } =
-      readWorkbookWithSheetRecovery(XLSX, buffer));
-  } catch {
-    throw new Error("The workbook could not be opened. Re-save it as .xlsx and try again.");
-  }
+/**
+ * Parse the chosen worksheet only (see readSheetWithRecovery). Throws a
+ * user-facing message — including the specific cause — when that worksheet
+ * cannot be read; the other worksheets are never touched, so a broken sibling
+ * sheet can never block importing this one. Callers own the returned
+ * workbook's lifetime (and should release it when the import session ends).
+ */
+export async function parseWorkbookSheet(
+  buffer: ArrayBuffer,
+  sheetName: string,
+): Promise<ParsedSheet> {
+  assertWorkbookMagic(new Uint8Array(buffer));
 
-  if (!sheetNames.length) {
-    if (unavailableSheetNames.length) {
-      const reason = sheetReadErrors?.[unavailableSheetNames[0]];
-      throw new Error(
-        `This workbook lists worksheets (${unavailableSheetNames.join(", ")}) but none contained readable worksheet data.${reason ? ` Detail: ${reason}` : ""}`,
-      );
-    }
-    throw new Error("This workbook has no worksheets. Nothing was uploaded.");
-  }
-
-  return { workbook, utils: XLSX.utils, sheetNames, unavailableSheetNames, sheetReadErrors };
+  const XLSX = await import("xlsx");
+  return readSheetWithRecovery(XLSX, buffer, sheetName);
 }
 
 function sheetRefRange(parsed: ParsedSheet, sheetName: string) {

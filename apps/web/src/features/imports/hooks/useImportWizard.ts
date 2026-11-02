@@ -79,8 +79,14 @@ export type ImportWizard = {
   preview: ImportPreview | null;
   result: CommitResponse | null;
   busy: "reading" | "validating" | "committing" | null;
-  /** Parse progress while reading: hashing -> parsing -> ready. */
+  /** Parse progress while reading: hashing -> parsing -> sheet -> ready. */
   readStage: OpenProgress | null;
+  /**
+   * Worksheets whose focused parse failed, keyed by sheet name with the real
+   * cause. Shown in the sheet picker and the worksheet dropdown so a broken
+   * sheet is never a dead end — every other worksheet stays importable.
+   */
+  sheetFailures: Record<string, string>;
   error: (WizardError & { duplicate?: DuplicateImport }) | null;
   duplicateConfirmed: boolean;
   coverage: ReturnType<typeof mappingCoverage>;
@@ -137,6 +143,7 @@ export function useImportWizard(params: {
   const [result, setResult] = useState<CommitResponse | null>(null);
   const [busy, setBusy] = useState<ImportWizard["busy"]>(null);
   const [readStage, setReadStage] = useState<OpenProgress | null>(null);
+  const [sheetFailures, setSheetFailures] = useState<Record<string, string>>({});
   const [error, setError] = useState<ImportWizard["error"]>(null);
   const [duplicateConfirmed, setDuplicateConfirmed] = useState(false);
   const [storagePath, setStoragePath] = useState<string | null>(null);
@@ -341,11 +348,15 @@ export function useImportWizard(params: {
 
   const chooseFile = useCallback(
     async (file: File) => {
+      // Invalidate any inspection still in flight from a previous workbook so
+      // its result (or its failure) can never land on this one.
+      inspectSeqRef.current += 1;
       setError(null);
       setPreview(null);
       setResult(null);
       setStoragePath(null);
       setReadStage(null);
+      setSheetFailures({});
       setStoreNotice(null);
       setBusy("reading");
 
@@ -383,7 +394,7 @@ export function useImportWizard(params: {
           return;
         }
 
-        // A single-worksheet workbook needs no choice: inspect it directly.
+        // A single-worksheet workbook needs no choice: parse its only sheet.
         const choice = await inspectInitialSheet(nextBundle.sheetNames);
         const inspection = choice.inspection;
         if (!mountedRef.current) return;
@@ -421,6 +432,13 @@ export function useImportWizard(params: {
     [persistSession, startSession, stopHeartbeat],
   );
 
+  /**
+   * Focus the parse on ONE worksheet: the first inspect for a sheet parses
+   * only that sheet (sibling worksheets are never read), and the non-dismissable
+   * "reading" overlay stays up for exactly as long as that takes. A failed
+   * parse keeps the operator where they are with the real cause recorded in
+   * sheetFailures, so every other worksheet stays importable.
+   */
   const selectSheet = useCallback(
     (sheetName: string) => {
       if (!bundle) return;
@@ -430,6 +448,8 @@ export function useImportWizard(params: {
       const previousHeaders = sheet?.headers ?? null;
       const previousMapping = sheet?.mapping ?? null;
       const seq = ++inspectSeqRef.current;
+      setBusy("reading");
+      setReadStage(null);
       void (async () => {
         try {
           const next = await inspectSheet(sheetName);
@@ -440,6 +460,13 @@ export function useImportWizard(params: {
           }
           setSheet(next);
           setStage("shape");
+          // A worksheet that parses now clears any earlier failure for it.
+          setSheetFailures((current) => {
+            if (!(sheetName in current)) return current;
+            const remaining = { ...current };
+            delete remaining[sheetName];
+            return remaining;
+          });
           // Changing the sheet invalidates any earlier preview or upload.
           persistSession({
             sheetName: next.sheetName,
@@ -458,11 +485,20 @@ export function useImportWizard(params: {
           });
         } catch (e: any) {
           if (!mountedRef.current || seq !== inspectSeqRef.current) return;
+          // Superseded by a new file read or a reset: not a sheet failure.
+          if (e?.message === "Cancelled.") return;
+          const reason = e?.message ?? "This worksheet could not be parsed from the file.";
+          setSheetFailures((current) => ({ ...current, [sheetName]: reason }));
           setError({
             title: "That worksheet could not be read",
-            detail: e?.message ?? "Pick another sheet.",
+            detail: `${reason} Pick another worksheet — the rest of this workbook is unaffected.`,
             retryable: true,
           });
+        } finally {
+          if (mountedRef.current && seq === inspectSeqRef.current) {
+            setBusy(null);
+            setReadStage(null);
+          }
         }
       })();
     },
@@ -544,15 +580,8 @@ export function useImportWizard(params: {
    */
   const runValidate = useCallback(async (): Promise<{ preview: ImportPreview; path: string } | null> => {
     if (!userId || !bundle || !sheet) return null;
-    // Only block if the sheet the operator actually selected is unreadable.
-    if (bundle.unavailableSheetNames.includes(sheet.sheetName)) {
-      setError({
-        title: "Import blocked: worksheet data is unavailable",
-        detail: `The worksheet "${sheet.sheetName}" had no readable data. Open the workbook in Excel, use Move or Copy to copy that sheet into a new workbook, save it as .xlsx, and upload that copy.`,
-        retryable: false,
-      });
-      return null;
-    }
+    // A worksheet that cannot be parsed never reaches this point: it fails in
+    // selectSheet() with the real cause and the operator picks another sheet.
     if (sheet.dataRowCount > IMPORT_MAX_ROWS) {
       setError({
         title: "Worksheet exceeds the import row limit",
@@ -730,6 +759,7 @@ export function useImportWizard(params: {
       if (busy) return;
       setStoreNotice(null);
       setError(null);
+      setSheetFailures({});
 
       const record = await getSession(id);
       if (!record) {
@@ -830,9 +860,54 @@ export function useImportWizard(params: {
           return;
         }
 
-        const inspection = sheetChosen
-          ? await inspectSheet(record.sheetName as string, record.headerRow ?? undefined)
-          : (await inspectInitialSheet(nextBundle.sheetNames)).inspection;
+        let inspection: SheetInspection;
+        try {
+          inspection = sheetChosen
+            ? await inspectSheet(record.sheetName as string, record.headerRow ?? undefined)
+            : (await inspectInitialSheet(nextBundle.sheetNames)).inspection;
+        } catch (e: any) {
+          if (!mountedRef.current) return;
+          // The saved worksheet cannot be parsed (the file may have changed or
+          // been damaged since the session was written). With more than one
+          // worksheet, return to the picker with the cause recorded instead of
+          // failing the whole resume — every other sheet stays importable.
+          if (sheetChosen && nextBundle.sheetNames.length > 1) {
+            const reason = e?.message ?? "This worksheet could not be parsed from the file.";
+            setBundle(nextBundle);
+            setSheet(null);
+            setSheetFailures({ [record.sheetName as string]: reason });
+            setPreview(null);
+            setResult(null);
+            setDuplicateConfirmed(false);
+            setReadStage(null);
+            setStoragePath(restoredPath);
+            sessionRef.current = {
+              ...record,
+              fileHash: nextBundle.fileHash,
+              sheetNames: nextBundle.sheetNames,
+              sheetName: null,
+              headerRow: null,
+              headers: [],
+              mapping: null,
+              rowCount: null,
+              dataRowCount: null,
+              checkpoint: record.checkpoint === "file_saved" ? "file_saved" : "parsed",
+              preview: null,
+              result: null,
+              storagePath: restoredPath,
+              status: "in_progress",
+            };
+            await persistSession({});
+            startHeartbeat(id);
+            setStoreNotice({
+              title: "The saved worksheet could not be read",
+              detail: `${reason} Pick a different worksheet to continue this import.`,
+            });
+            setStage("sheets");
+            return;
+          }
+          throw e;
+        }
         if (!mountedRef.current) return;
 
         const headersMatch =
@@ -975,6 +1050,7 @@ export function useImportWizard(params: {
     setStoragePath(null);
     setError(null);
     setReadStage(null);
+    setSheetFailures({});
     setDuplicateConfirmed(false);
     setBusy(null);
     void refreshSessions();
@@ -1076,6 +1152,7 @@ export function useImportWizard(params: {
     result,
     busy,
     readStage,
+    sheetFailures,
     error,
     duplicateConfirmed,
     coverage,

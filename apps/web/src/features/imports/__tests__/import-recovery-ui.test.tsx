@@ -65,6 +65,7 @@ function makeWizard(overrides: Partial<ImportWizard> = {}): ImportWizard {
     result: null,
     busy: null,
     readStage: null,
+    sheetFailures: {},
     error: null,
     duplicateConfirmed: false,
     coverage: { missing: [], mappedCount: 0, totalCount: 0 },
