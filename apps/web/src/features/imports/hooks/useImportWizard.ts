@@ -28,7 +28,6 @@ import {
   releaseLease,
   renewLease,
   isLeaseHeldByOther,
-  saveBatchCheckpoint,
   saveSession,
   saveWorkbook,
   type StoredImportSession,
@@ -79,14 +78,7 @@ export type ImportWizard = {
   sheet: SheetInspection | null;
   preview: ImportPreview | null;
   result: CommitResponse | null;
-  busy: "reading" | "processing" | "validating" | "committing" | null;
-  batchProgress: {
-    completedBatches: number;
-    totalBatches: number;
-    failedBatchIndex: number | null;
-    validRows: number;
-    invalidRows: number;
-  } | null;
+  busy: "reading" | "validating" | "committing" | null;
   /** Parse progress while reading: hashing -> parsing -> ready. */
   readStage: OpenProgress | null;
   error: (WizardError & { duplicate?: DuplicateImport }) | null;
@@ -96,9 +88,9 @@ export type ImportWizard = {
   selectSheet: (sheetName: string) => void;
   setHeaderRow: (row: number) => void;
   setMappingField: (index: number, field: CanonicalField | null) => void;
-  processRows: () => Promise<void>;
-  pauseProcessing: () => Promise<void>;
   validate: () => Promise<void>;
+  /** One click: server validation, then save to Supabase. */
+  saveToSupabase: () => Promise<void>;
   commit: () => Promise<void>;
   setDuplicateConfirmed: (value: boolean) => void;
   cancelRead: () => void;
@@ -153,7 +145,6 @@ export function useImportWizard(params: {
   const [sessionsError, setSessionsError] = useState(false);
   const [storeNotice, setStoreNotice] = useState<StoreNotice | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [batchProgress, setBatchProgress] = useState<ImportWizard["batchProgress"]>(null);
 
   // Guards async parse results so a superseded sheet/header inspection never
   // overwrites a newer one, and so unmounting mid-read does not setState.
@@ -167,8 +158,9 @@ export function useImportWizard(params: {
   const persistChainRef = useRef<Promise<void>>(Promise.resolve());
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoValidateRef = useRef(false);
-  const processingPromiseRef = useRef<Promise<void> | null>(null);
-  const processingControlRef = useRef<"pause" | "cancel" | null>(null);
+  /** Re-entrancy guard so a double-click on "Save to Supabase" cannot run two
+   * concurrent validate/commit cycles (the second would risk a duplicate write). */
+  const saveRunRef = useRef(false);
 
   const reportStoreError = useCallback((error: unknown) => {
     const mapped = mapStoreError(error);
@@ -353,7 +345,6 @@ export function useImportWizard(params: {
       setPreview(null);
       setResult(null);
       setStoragePath(null);
-      setBatchProgress(null);
       setReadStage(null);
       setStoreNotice(null);
       setBusy("reading");
@@ -374,28 +365,30 @@ export function useImportWizard(params: {
 
       try {
         const nextBundle = await readWorkbookFile(file, fileBytes);
-        // Default to the worksheet that actually holds the table: many workbooks
-        // start with an empty or cover sheet ("Sheet1") while the data sits on
-        // the second one, and opening the wrong sheet left the import stuck with
-        // no columns mapped and both action buttons disabled.
-        const choice = await inspectInitialSheet(nextBundle.sheetNames);
-        const inspection = choice.inspection;
         if (!mountedRef.current) return;
         setBundle(nextBundle);
-        setSheet(inspection);
-        setStage("shape");
-        if (choice.autoSwitched) {
-          setStoreNotice({
-            title: "Worksheet with data selected automatically",
-            detail: `"${nextBundle.sheetNames[0]}" does not contain a readable import table, so "${inspection.sheetName}" was opened instead. Use the Worksheet dropdown on the next screen to change it.`,
-          });
-        }
         // Each checkpoint is written only after its underlying step succeeded.
         persistSession({
           fileHash: nextBundle.fileHash,
           sheetNames: nextBundle.sheetNames,
           checkpoint: "parsed",
         });
+
+        // Read the worksheet names FIRST. A workbook with more than one
+        // worksheet stops here so the operator picks which sheet to parse —
+        // nothing is inspected or processed until that choice is made.
+        if (nextBundle.sheetNames.length > 1) {
+          setSheet(null);
+          setStage("sheets");
+          return;
+        }
+
+        // A single-worksheet workbook needs no choice: inspect it directly.
+        const choice = await inspectInitialSheet(nextBundle.sheetNames);
+        const inspection = choice.inspection;
+        if (!mountedRef.current) return;
+        setSheet(inspection);
+        setStage("shape");
         persistSession({
           sheetName: inspection.sheetName,
           headerRow: inspection.headerRow,
@@ -434,7 +427,6 @@ export function useImportWizard(params: {
       setError(null);
       setPreview(null);
       setStoragePath(null);
-      setBatchProgress(null);
       const previousHeaders = sheet?.headers ?? null;
       const previousMapping = sheet?.mapping ?? null;
       const seq = ++inspectSeqRef.current;
@@ -483,7 +475,6 @@ export function useImportWizard(params: {
       setError(null);
       setPreview(null);
       setStoragePath(null);
-      setBatchProgress(null);
       const seq = ++inspectSeqRef.current;
       void (async () => {
         try {
@@ -525,7 +516,6 @@ export function useImportWizard(params: {
       setError(null);
       setPreview(null);
       setStoragePath(null);
-      setBatchProgress(null);
       setSheet((current) =>
         current ? { ...current, mapping: setField(current.mapping, index, field) } : current,
       );
@@ -546,193 +536,30 @@ export function useImportWizard(params: {
     [persistSession],
   );
 
-  const processRows = useCallback(async () => {
-    if (!bundle || !sheet || busy || processingPromiseRef.current || coverage.missing.length > 0) return;
+  /**
+   * Upload + server validation. Returns the preview together with the storage
+   * path it was validated against, or null when a guard or the server stopped
+   * the flow (the error is already surfaced). The busy state belongs to the
+   * caller — saveToSupabase keeps it up across validate + commit.
+   */
+  const runValidate = useCallback(async (): Promise<{ preview: ImportPreview; path: string } | null> => {
+    if (!userId || !bundle || !sheet) return null;
     // Only block if the sheet the operator actually selected is unreadable.
-    // Other unavailable sheets in the same workbook do not block importing a
-    // readable sheet.
-    if (sheet && bundle.unavailableSheetNames.includes(sheet.sheetName)) {
+    if (bundle.unavailableSheetNames.includes(sheet.sheetName)) {
       setError({
         title: "Import blocked: worksheet data is unavailable",
         detail: `The worksheet "${sheet.sheetName}" had no readable data. Open the workbook in Excel, use Move or Copy to copy that sheet into a new workbook, save it as .xlsx, and upload that copy.`,
         retryable: false,
       });
-      return;
+      return null;
     }
-    if (sheet.dataRowCount > IMPORT_MAX_ROWS) {
-      setError({
-        title: "Worksheet exceeds the import row limit",
-        detail: `This worksheet has approximately ${sheet.dataRowCount.toLocaleString()} rows, above the configured limit of ${IMPORT_MAX_ROWS.toLocaleString()}. Split it into smaller workbooks before processing.`,
-        retryable: false,
-      });
-      return;
-    }
-    setBusy("processing");
-    const active = sessionRef.current;
-    const batchSize = active?.batchSize ?? IMPORT_BATCH_SIZE;
-    const dataRowCount = sheet.dataRowCount;
-    const totalBatches = Math.ceil(dataRowCount / batchSize);
-
-    if (active && !(await acquireLease(active.id, TAB_OWNER))) {
-      setBusy(null);
-      setStoreNotice({
-        title: "Session is active in another tab",
-        detail: "Switch to the tab holding this import session before processing more rows.",
-      });
-      return;
-    }
-
-    processingControlRef.current = null;
-    setError(null);
-    setBatchProgress({
-      completedBatches: Math.max(0, (active?.lastCompletedBatchIndex ?? -1) + 1),
-      totalBatches,
-      failedBatchIndex: active?.failedBatchIndex ?? null,
-      validRows: active?.batchResults.reduce((sum, item) => sum + item.summary.valid_rows, 0) ?? 0,
-      invalidRows: active?.batchResults.reduce((sum, item) => sum + item.summary.invalid_rows, 0) ?? 0,
-    });
-
-    const run = async () => {
-      let failedBatchIndex: number | null = null;
-      try {
-        await persistChainRef.current;
-        const latest = sessionRef.current;
-        let lastCompleted = latest?.lastCompletedBatchIndex ?? -1;
-        if (totalBatches === 0 && latest) {
-          await persistSession({
-            dataRowCount,
-            checkpoint: "processed",
-            lastCompletedBatchIndex: -1,
-            failedBatchIndex: null,
-            status: "in_progress",
-          });
-        }
-
-        for (let batchIndex = lastCompleted + 1; batchIndex < totalBatches; batchIndex += 1) {
-          if (processingControlRef.current) break;
-          failedBatchIndex = batchIndex;
-          const result = await workbookClient.processBatch({
-            sheetName: sheet.sheetName,
-            headerRow: sheet.headerRow,
-            headers: sheet.headers,
-            mapping: sheet.mapping,
-            batchIndex,
-            batchSize,
-          });
-
-          const session = sessionRef.current;
-          if (session) {
-            const write = persistChainRef.current.then(() =>
-              saveBatchCheckpoint(session.id, result, totalBatches),
-            );
-            persistChainRef.current = write.then(() => undefined, () => undefined);
-            const saved = await write;
-            sessionRef.current = saved;
-            if (mountedRef.current) {
-              setSessions((list) => list.map((item) => (item.id === saved.id ? saved : item)));
-            }
-            lastCompleted = saved.lastCompletedBatchIndex;
-          } else {
-            lastCompleted = batchIndex;
-          }
-
-          const savedResults = sessionRef.current?.batchResults ?? [];
-          const currentResults = sessionRef.current ? savedResults : [];
-          setBatchProgress({
-            completedBatches: lastCompleted + 1,
-            totalBatches,
-            failedBatchIndex: null,
-            validRows: sessionRef.current
-              ? currentResults.reduce((sum, item) => sum + item.summary.valid_rows, 0)
-              : result.summary.valid_rows,
-            invalidRows: sessionRef.current
-              ? currentResults.reduce((sum, item) => sum + item.summary.invalid_rows, 0)
-              : result.summary.invalid_rows,
-          });
-        }
-
-        if (failedBatchIndex !== null && lastCompleted < failedBatchIndex) {
-          const message =
-            processingControlRef.current === "pause"
-              ? "Processing paused after the last saved batch."
-              : "Processing was cancelled after the last saved batch.";
-          setStoreNotice({ title: "Batch processing stopped", detail: message });
-          return;
-        }
-        await refreshSessions();
-      } catch (cause) {
-        const message = cause instanceof Error ? cause.message : "The current batch could not be processed.";
-        const session = sessionRef.current;
-        if (session && failedBatchIndex !== null) {
-          const failed = {
-            ...session,
-            failedBatchIndex,
-            lastError: message,
-            status: "paused" as const,
-            updatedAt: Date.now(),
-          };
-          try {
-            await saveSession(failed);
-            sessionRef.current = failed;
-            setSessions((list) => list.map((item) => (item.id === failed.id ? failed : item)));
-          } catch (storeError) {
-            reportStoreError(storeError);
-          }
-        }
-        setBatchProgress((current) =>
-          current ? { ...current, failedBatchIndex } : current,
-        );
-        setError({
-          title: "Batch processing stopped",
-          detail: `${message} Successfully saved batches are kept. Retry to continue from the first unsaved batch.`,
-          retryable: true,
-        });
-        if (cause instanceof Error && "code" in cause) reportStoreError(cause);
-      } finally {
-        if (mountedRef.current) setBusy(null);
-        processingControlRef.current = null;
-      }
-    };
-
-    const operation = run();
-    processingPromiseRef.current = operation;
-    try {
-      await operation;
-    } finally {
-      if (processingPromiseRef.current === operation) processingPromiseRef.current = null;
-    }
-  }, [
-    bundle,
-    busy,
-    batchProgress,
-    coverage.missing.length,
-    persistSession,
-    refreshSessions,
-    reportStoreError,
-    sheet,
-  ]);
-
-  const validate = useCallback(async () => {
-    if (!userId || !bundle || !sheet) return;
     if (sheet.dataRowCount > IMPORT_MAX_ROWS) {
       setError({
         title: "Worksheet exceeds the import row limit",
         detail: `This worksheet has approximately ${sheet.dataRowCount.toLocaleString()} rows, above the configured limit of ${IMPORT_MAX_ROWS.toLocaleString()}. Split it into smaller workbooks before validation.`,
         retryable: false,
       });
-      return;
-    }
-    const active = sessionRef.current;
-    const totalBatches = Math.ceil(
-      sheet.dataRowCount / (active?.batchSize ?? IMPORT_BATCH_SIZE),
-    );
-    if (active && active.lastCompletedBatchIndex + 1 < totalBatches) {
-      setError({
-        title: "Process all rows before validation",
-        detail: "Run the worker batch checks through the entire worksheet. You can resume from the last saved batch after a refresh.",
-        retryable: false,
-      });
-      return;
+      return null;
     }
     if (coverage.missing.length) {
       setError({
@@ -740,11 +567,9 @@ export function useImportWizard(params: {
         detail: `Map ${coverage.missing.join(", ")} before validating.`,
         retryable: false,
       });
-      return;
+      return null;
     }
 
-    setBusy("validating");
-    setError(null);
     try {
       let path = storagePath;
       if (!path) {
@@ -768,82 +593,130 @@ export function useImportWizard(params: {
       setStage("preview");
       // Server returned a full preview -> safe to persist it as the checkpoint.
       persistSession({ preview: nextPreview, checkpoint: "validated", lastError: null });
+      return { preview: nextPreview, path };
     } catch (e: any) {
       setError(toWizardError(e, "Validation could not run"));
       persistSession({ lastError: e?.message ?? "validation_failed" });
-    } finally {
-      setBusy(null);
+      return null;
     }
   }, [bundle, coverage.missing, persistSession, sheet, storagePath, userId]);
 
-  const commit = useCallback(async () => {
-    if (!userId || !bundle || !sheet || !preview) return;
-    if (preview.duplicate && !duplicateConfirmed) {
-      setError({
-        title: "Duplicate import not confirmed",
-        detail: "This file and sheet were imported before. Confirm the duplicate policy to store a new version.",
-        retryable: false,
-      });
-      return;
-    }
+  /**
+   * Write a validated preview to Supabase. The busy state belongs to the
+   * caller, and `pathOverride` lets saveToSupabase reuse the path the
+   * validation run just uploaded instead of uploading the file twice.
+   */
+  const runCommit = useCallback(
+    async (activePreview: ImportPreview, pathOverride?: string): Promise<void> => {
+      if (!userId || !bundle || !sheet) return;
+      if (activePreview.duplicate && !duplicateConfirmed) {
+        setError({
+          title: "Duplicate import not confirmed",
+          detail: "This file and sheet were imported before. Confirm the duplicate policy to store a new version.",
+          retryable: false,
+        });
+        return;
+      }
 
-    setBusy("committing");
+      setError(null);
+      try {
+        let path = pathOverride ?? storagePath;
+        if (!path) {
+          const uploaded = await uploadWorkbook({ userId, file: bundle.file, fileHash: bundle.fileHash });
+          path = uploaded.path;
+          setStoragePath(path);
+          persistSession({ storagePath: path, checkpoint: "uploaded" });
+        }
+        // Marker written BEFORE the commit request: if the tab dies mid-commit,
+        // resume finds "committing" and re-validates instead of blindly re-running
+        // the commit (the server's duplicate check then reports what landed).
+        await persistSession({ checkpoint: "committing", lastError: null });
+        const committed = await commitImport({
+          storage_path: path,
+          sheet_name: sheet.sheetName,
+          header_row: sheet.headerRow,
+          column_mapping: sheet.mapping as ColumnMapping,
+          file_hash: bundle.fileHash,
+          file_name: bundle.file.name,
+          confirm_duplicate: duplicateConfirmed,
+        });
+        setResult(committed);
+        setStage("committed");
+        // Server confirmed the commit -> this checkpoint is now authoritative.
+        persistSession({
+          result: committed,
+          checkpoint: "committed",
+          status: "completed",
+          lastError: null,
+        });
+        onCommitted?.();
+      } catch (e: any) {
+        // The outcome is known (the request returned), so step back to the last
+        // safe checkpoint and remember why. Only a tab crash leaves "committing".
+        persistSession({
+          checkpoint: "validated",
+          lastError: e?.message ?? "commit_failed",
+        });
+        if (isDuplicateConflict(e)) {
+          const duplicate = e.payload?.duplicate ?? activePreview.duplicate;
+          setPreview((current) => (current ? { ...current, duplicate, can_commit: true } : current));
+          setError({
+            title: "This workbook was already imported",
+            detail:
+              "A previous committed version has the same fingerprint and sheet. Confirm the duplicate policy to store a new version.",
+            retryable: false,
+            duplicate: duplicate ?? undefined,
+          });
+        } else {
+          setError(toWizardError(e, "The import could not be committed"));
+        }
+      }
+    },
+    [bundle, duplicateConfirmed, onCommitted, persistSession, sheet, storagePath, userId],
+  );
+
+  const validate = useCallback(async () => {
+    setBusy("validating");
     setError(null);
     try {
-      let path = storagePath;
-      if (!path) {
-        const uploaded = await uploadWorkbook({ userId, file: bundle.file, fileHash: bundle.fileHash });
-        path = uploaded.path;
-        setStoragePath(path);
-        persistSession({ storagePath: path, checkpoint: "uploaded" });
-      }
-      // Marker written BEFORE the commit request: if the tab dies mid-commit,
-      // resume finds "committing" and re-validates instead of blindly re-running
-      // the commit (the server's duplicate check then reports what landed).
-      await persistSession({ checkpoint: "committing", lastError: null });
-      const committed = await commitImport({
-        storage_path: path,
-        sheet_name: sheet.sheetName,
-        header_row: sheet.headerRow,
-        column_mapping: sheet.mapping as ColumnMapping,
-        file_hash: bundle.fileHash,
-        file_name: bundle.file.name,
-        confirm_duplicate: duplicateConfirmed,
-      });
-      setResult(committed);
-      setStage("committed");
-      // Server confirmed the commit -> this checkpoint is now authoritative.
-      persistSession({
-        result: committed,
-        checkpoint: "committed",
-        status: "completed",
-        lastError: null,
-      });
-      onCommitted?.();
-    } catch (e: any) {
-      // The outcome is known (the request returned), so step back to the last
-      // safe checkpoint and remember why. Only a tab crash leaves "committing".
-      persistSession({
-        checkpoint: "validated",
-        lastError: e?.message ?? "commit_failed",
-      });
-      if (isDuplicateConflict(e)) {
-        const duplicate = e.payload?.duplicate ?? preview.duplicate;
-        setPreview((current) => (current ? { ...current, duplicate, can_commit: true } : current));
-        setError({
-          title: "This workbook was already imported",
-          detail:
-            "A previous committed version has the same fingerprint and sheet. Confirm the duplicate policy to store a new version.",
-          retryable: false,
-          duplicate: duplicate ?? undefined,
-        });
-      } else {
-        setError(toWizardError(e, "The import could not be committed"));
-      }
+      await runValidate();
     } finally {
       setBusy(null);
     }
-  }, [bundle, duplicateConfirmed, onCommitted, persistSession, preview, sheet, storagePath, userId]);
+  }, [runValidate]);
+
+  const commit = useCallback(async () => {
+    if (!preview) return;
+    setBusy("committing");
+    try {
+      await runCommit(preview);
+    } finally {
+      setBusy(null);
+    }
+  }, [preview, runCommit]);
+
+  /**
+   * The single "Save to Supabase" action: validate on the server, then commit
+   * in one click. It stops on the preview screen only when the server blocks
+   * the write (structural errors) or reports a duplicate fingerprint that
+   * needs the operator's explicit confirmation — nothing is ever written
+   * twice, and a failed validation writes no rows at all.
+   */
+  const saveToSupabase = useCallback(async () => {
+    if (busy || saveRunRef.current) return;
+    saveRunRef.current = true;
+    setError(null);
+    setBusy("validating");
+    try {
+      const result = await runValidate();
+      if (!result || !result.preview.can_commit || result.preview.duplicate) return;
+      setBusy("committing");
+      await runCommit(result.preview, result.path);
+    } finally {
+      saveRunRef.current = false;
+      setBusy(null);
+    }
+  }, [busy, runCommit, runValidate]);
 
   /**
    * Restore a persisted session: reinit the worker by re-reading the stored
@@ -916,10 +789,50 @@ export function useImportWizard(params: {
         // Re-parse through the worker: this reinitializes it with the workbook.
         // Pass the stored bytes so the file is not read a second time.
         const nextBundle = await readWorkbookFile(file, stored.bytes);
-        const inspection =
-          record.sheetName && nextBundle.sheetNames.includes(record.sheetName)
-            ? await inspectSheet(record.sheetName, record.headerRow ?? undefined)
-            : (await inspectInitialSheet(nextBundle.sheetNames)).inspection;
+        if (!mountedRef.current) return;
+
+        // Demo uploads live in an in-memory bucket that a refresh clears, so a
+        // resumed demo session must re-upload before validating again.
+        const restoredPath = isDemoMode ? null : record.storagePath;
+
+        // The operator never picked a worksheet (the session was saved while
+        // the sheet-name picker was open): return to the picker instead of
+        // guessing which sheet they meant to parse.
+        const sheetChosen =
+          record.sheetName !== null && nextBundle.sheetNames.includes(record.sheetName);
+        if (!sheetChosen && nextBundle.sheetNames.length > 1) {
+          setBundle(nextBundle);
+          setSheet(null);
+          setPreview(null);
+          setResult(null);
+          setDuplicateConfirmed(false);
+          setReadStage(null);
+          setStoragePath(restoredPath);
+          sessionRef.current = {
+            ...record,
+            fileHash: nextBundle.fileHash,
+            sheetNames: nextBundle.sheetNames,
+            sheetName: null,
+            headerRow: null,
+            headers: [],
+            mapping: null,
+            rowCount: null,
+            dataRowCount: null,
+            checkpoint: record.checkpoint === "file_saved" ? "file_saved" : "parsed",
+            preview: null,
+            result: null,
+            storagePath: restoredPath,
+            status: "in_progress",
+          };
+          await persistSession({});
+          startHeartbeat(id);
+          setStage("sheets");
+          return;
+        }
+
+        const inspection = sheetChosen
+          ? await inspectSheet(record.sheetName as string, record.headerRow ?? undefined)
+          : (await inspectInitialSheet(nextBundle.sheetNames)).inspection;
         if (!mountedRef.current) return;
 
         const headersMatch =
@@ -935,10 +848,6 @@ export function useImportWizard(params: {
           record.checkpoint === "validated" ||
           record.checkpoint === "committing" ||
           record.checkpoint === "committed";
-
-        // Demo uploads live in an in-memory bucket that a refresh clears, so a
-        // resumed demo session must re-upload before validating again.
-        const restoredPath = isDemoMode ? null : record.storagePath;
 
         setBundle(nextBundle);
         setSheet(nextSheet);
@@ -957,22 +866,13 @@ export function useImportWizard(params: {
           mapping: nextSheet.mapping,
           rowCount: nextSheet.rowCount,
           dataRowCount: nextSheet.dataRowCount,
-          lastCompletedBatchIndex: headersMatch ? record.lastCompletedBatchIndex : -1,
-          failedBatchIndex: headersMatch ? record.failedBatchIndex : null,
-          batchResults: headersMatch ? record.batchResults : [],
-          checkpoint:
-            !headersMatch && record.lastCompletedBatchIndex >= 0 ? "shaped" : record.checkpoint,
+          lastCompletedBatchIndex: record.lastCompletedBatchIndex,
+          failedBatchIndex: record.failedBatchIndex,
+          batchResults: record.batchResults,
+          checkpoint: record.checkpoint,
           storagePath: restoredPath,
           status: record.status === "completed" ? "completed" : "in_progress",
         };
-        const restoredResults = headersMatch ? record.batchResults : [];
-        setBatchProgress({
-          completedBatches: headersMatch ? record.lastCompletedBatchIndex + 1 : 0,
-          totalBatches: Math.ceil(nextSheet.dataRowCount / record.batchSize),
-          failedBatchIndex: headersMatch ? record.failedBatchIndex : null,
-          validRows: restoredResults.reduce((sum, item) => sum + item.summary.valid_rows, 0),
-          invalidRows: restoredResults.reduce((sum, item) => sum + item.summary.invalid_rows, 0),
-        });
         await persistSession({});
         startHeartbeat(id);
 
@@ -1077,22 +977,8 @@ export function useImportWizard(params: {
     setReadStage(null);
     setDuplicateConfirmed(false);
     setBusy(null);
-    setBatchProgress(null);
     void refreshSessions();
   }, [refreshSessions, stopHeartbeat]);
-
-  const pauseProcessing = useCallback(async () => {
-    const active = sessionRef.current;
-    if (active && processingPromiseRef.current) {
-      processingControlRef.current = "pause";
-      await processingPromiseRef.current;
-      await updateSession(active.id, { status: "paused" });
-      stopHeartbeat();
-      await releaseLease(active.id, TAB_OWNER);
-      reset();
-      await refreshSessions();
-    }
-  }, [refreshSessions, reset, stopHeartbeat, updateSession]);
 
   const pauseSession = useCallback(
     async (id: string) => {
@@ -1103,10 +989,6 @@ export function useImportWizard(params: {
           detail: "Switch to that tab to pause or cancel this import.",
         });
         return;
-      }
-      if (isActive && processingPromiseRef.current) {
-        processingControlRef.current = "pause";
-        await processingPromiseRef.current;
       }
       if (isActive) stopHeartbeat();
       await releaseLease(id, TAB_OWNER);
@@ -1125,10 +1007,6 @@ export function useImportWizard(params: {
           detail: "Switch to that tab to pause or cancel this import.",
         });
         return;
-      }
-      if (sessionRef.current?.id === id && processingPromiseRef.current) {
-        processingControlRef.current = "cancel";
-        await processingPromiseRef.current;
       }
       // Status first (while the record is still "active" so the write goes
       // through the serialized chain), then drop the wizard's hold on it.
@@ -1197,7 +1075,6 @@ export function useImportWizard(params: {
     preview,
     result,
     busy,
-    batchProgress,
     readStage,
     error,
     duplicateConfirmed,
@@ -1206,9 +1083,8 @@ export function useImportWizard(params: {
     selectSheet,
     setHeaderRow,
     setMappingField,
-    processRows,
-    pauseProcessing,
     validate,
+    saveToSupabase,
     commit,
     setDuplicateConfirmed: setDuplicateConfirmedValue,
     cancelRead,

@@ -6,10 +6,10 @@ import { IMPORT_BATCH_SIZE } from "./import-limits";
  * Local import-recovery store (IndexedDB).
  *
  * IndexedDB holds TEMPORARY recovery data only: the uploaded workbook bytes,
- * the session metadata (sheet, header row, column mapping), compact batch
- * validation results, and the last successfully persisted checkpoint.
- * Final business records always live in Supabase — nothing here is
- * authoritative, and losing this database never loses committed data.
+ * the session metadata (sheet, header row, column mapping), and the last
+ * successfully persisted checkpoint. Final business records always live in
+ * Supabase — nothing here is authoritative, and losing this database never
+ * loses committed data.
  *
  * Design notes:
  * - The workbook is stored as raw bytes + name/type rather than a File object,
@@ -20,8 +20,8 @@ import { IMPORT_BATCH_SIZE } from "./import-limits";
  *   missing local data gracefully).
  * - Cross-tab exclusion uses a lease (owner + expiry) renewed by a heartbeat:
  *   a crashed or closed tab simply stops renewing, and the lease expires.
- * - Storage failures surface as StoreError("quota") or "unavailable". Batch
- *   checkpoints never advance when their IndexedDB write fails.
+ * - Storage failures surface as StoreError("quota") or "unavailable".
+ *   Checkpoints never advance when their IndexedDB write fails.
  */
 
 export const IMPORT_STORE_DB = "car_import_sessions";
@@ -61,8 +61,9 @@ export type StoredImportSession = {
   /** SHA-256 of the workbook; set once parsing succeeds. */
   fileHash: string | null;
   /**
-   * Batch results and their cursor are saved together. Later checkpoints only
-   * advance after their underlying upload, validation, or commit succeeds.
+   * Checkpoints only ever advance after their underlying upload, validation,
+   * or commit succeeds. (The batch cursor fields are legacy: kept so older
+   * recovery records still validate, no longer written by the wizard.)
    */
   checkpoint: SessionCheckpoint;
   status: SessionStatus;
@@ -181,7 +182,7 @@ export function mapStoreError(error: unknown): StoreError {
   if (name === "QuotaExceededError" || /quota/i.test(message)) {
     return new StoreError(
       "quota",
-      "This browser's local storage quota is full. Earlier checkpoints are preserved, but the current batch will not advance until it is saved. Delete old sessions or free up browser storage, then retry.",
+      "This browser's local storage quota is full. Earlier checkpoints are preserved, but the current step was not saved. Delete old sessions or free up browser storage, then retry.",
     );
   }
   if (name === "InvalidStateError" || name === "SecurityError" || typeof indexedDB === "undefined") {
@@ -405,61 +406,6 @@ export async function saveSession(session: StoredImportSession): Promise<void> {
     const tx = db.transaction("sessions", "readwrite");
     tx.objectStore("sessions").put(session);
     await promisifyTransaction(tx);
-  } catch (error) {
-    throw mapStoreError(error);
-  }
-}
-
-/**
- * Persist one batch result and its checkpoint in the same transaction. The
- * checkpoint therefore can never advance past a batch that was not saved.
- */
-export async function saveBatchCheckpoint(
-  id: string,
-  result: WorkbookBatchResult,
-  totalBatches: number,
-): Promise<StoredImportSession> {
-  try {
-    const db = await openDb();
-    const tx = db.transaction("sessions", "readwrite");
-    const store = tx.objectStore("sessions");
-    const stored = await promisifyRequest(store.get(id));
-    if (!stored || !isValidSession(stored)) {
-      tx.abort();
-      throw new StoreError("corrupted", "The saved import session is missing or damaged.");
-    }
-    const current = normalizeSession(stored);
-    if (result.batchIndex < current.lastCompletedBatchIndex) {
-      tx.abort();
-      throw new StoreError("corrupted", "A previously checkpointed batch cannot be processed again.");
-    }
-    if (
-      result.batchIndex === current.lastCompletedBatchIndex &&
-      current.batchResults.some((item) => item.batchIndex === result.batchIndex)
-    ) {
-      await promisifyTransaction(tx);
-      return current;
-    }
-    if (result.batchIndex > current.lastCompletedBatchIndex + 1) {
-      tx.abort();
-      throw new StoreError("corrupted", "The import checkpoint is not sequential.");
-    }
-    const batchResults = current.batchResults.filter((item) => item.batchIndex !== result.batchIndex);
-    batchResults.push(result);
-    batchResults.sort((left, right) => left.batchIndex - right.batchIndex);
-    const next: StoredImportSession = {
-      ...current,
-      batchResults,
-      lastCompletedBatchIndex: Math.max(current.lastCompletedBatchIndex, result.batchIndex),
-      failedBatchIndex: null,
-      checkpoint: result.batchIndex + 1 >= totalBatches ? "processed" : "processing",
-      status: "in_progress",
-      lastError: null,
-      updatedAt: Date.now(),
-    };
-    store.put(next);
-    await promisifyTransaction(tx);
-    return next;
   } catch (error) {
     throw mapStoreError(error);
   }

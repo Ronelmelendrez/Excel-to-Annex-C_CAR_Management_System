@@ -129,9 +129,6 @@ function RecoverySessions({ wizard }: { wizard: ReturnType<typeof useImportWizar
                         {session.rowCount !== null
                           ? ` · ${session.rowCount.toLocaleString()} source rows`
                           : ""}
-                        {Math.ceil((session.dataRowCount ?? 0) / session.batchSize) > 0
-                          ? ` · ${Math.max(0, session.lastCompletedBatchIndex + 1).toLocaleString()}/${Math.ceil((session.dataRowCount ?? 0) / session.batchSize).toLocaleString()} batches`
-                          : ""}
                       </dd>
                     </div>
                     <div>
@@ -159,7 +156,7 @@ function RecoverySessions({ wizard }: { wizard: ReturnType<typeof useImportWizar
                     <button
                       type="button"
                       className={secondaryButton}
-                      disabled={(processing && wizard.busy !== "processing") || actionId !== null}
+                      disabled={processing || actionId !== null}
                       onClick={() => void runAction(session.id, () => wizard.pauseSession(session.id))}
                     >
                       Pause
@@ -169,7 +166,7 @@ function RecoverySessions({ wizard }: { wizard: ReturnType<typeof useImportWizar
                     <button
                       type="button"
                       className={quietButton}
-                      disabled={(processing && wizard.busy !== "processing") || actionId !== null}
+                      disabled={processing || actionId !== null}
                       onClick={() => void runAction(session.id, () => wizard.cancelSession(session.id))}
                     >
                       Cancel import

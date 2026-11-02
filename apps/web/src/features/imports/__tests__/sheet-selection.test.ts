@@ -102,7 +102,7 @@ const DATA_ROWS = [
 ];
 
 describe("workbook whose data sheet is Sheet2, not Sheet1", () => {
-  it("auto-opens the sheet with data and imports it end to end", async () => {
+  it("reads sheet names first, then imports the chosen sheet end to end", async () => {
     const bytes = buildWorkbookBytes({ Sheet1: [], Sheet2: DATA_ROWS });
     const file = new File([bytes], "Annex C - October 2026.xlsx");
 
@@ -112,36 +112,31 @@ describe("workbook whose data sheet is Sheet2, not Sheet1", () => {
       await result.current.chooseFile(file);
     });
 
+    // Multiple worksheets -> the wizard stops at the sheet-name picker and
+    // parses nothing until the operator chooses a worksheet.
+    await waitFor(() => expect(result.current.stage).toBe("sheets"));
+    expect(result.current.bundle?.sheetNames).toEqual(["Sheet1", "Sheet2"]);
+    expect(result.current.sheet).toBeNull();
+
+    // The operator picks Sheet2, the sheet that actually holds the table.
+    await act(async () => {
+      result.current.selectSheet("Sheet2");
+    });
     await waitFor(() => expect(result.current.stage).toBe("shape"));
-    // Sheet1 is empty -> the wizard must open Sheet2 on its own.
     expect(result.current.sheet?.sheetName).toBe("Sheet2");
     expect(result.current.sheet?.headers).toEqual(ANNEX_HEADERS);
     expect(result.current.coverage.missing).toEqual([]);
-    // The auto-switch is explained to the operator.
-    expect(result.current.storeNotice?.title).toMatch(/selected automatically/i);
-    expect(result.current.storeNotice?.detail).toContain("Sheet2");
 
-    // Process worker batches (required before validation).
+    // One click on Save to Supabase: server validation + commit in a single
+    // action (stops on the preview only if the server blocks or finds a
+    // duplicate).
     await act(async () => {
-      await result.current.processRows();
-    });
-    expect(result.current.error).toBeNull();
-    expect(result.current.batchProgress?.completedBatches).toBe(1);
-
-    // Validate -> the server preview must analyze Sheet2.
-    await act(async () => {
-      await result.current.validate();
-    });
-    expect(result.current.error).toBeNull();
-    expect(result.current.stage).toBe("preview");
-    expect(result.current.preview?.sheet_name).toBe("Sheet2");
-    expect(result.current.preview?.rows.length).toBe(2);
-
-    await act(async () => {
-      await result.current.commit();
+      await result.current.saveToSupabase();
     });
     expect(result.current.error).toBeNull();
     expect(result.current.stage).toBe("committed");
+    expect(result.current.preview?.sheet_name).toBe("Sheet2");
+    expect(result.current.result).not.toBeNull();
     unmount();
   }, 60_000);
 
@@ -153,13 +148,17 @@ describe("workbook whose data sheet is Sheet2, not Sheet1", () => {
     await act(async () => {
       await result.current.chooseFile(file);
     });
+    await waitFor(() => expect(result.current.stage).toBe("sheets"));
+    await act(async () => {
+      result.current.selectSheet("Sheet1");
+    });
     await waitFor(() => expect(result.current.stage).toBe("shape"));
     expect(result.current.sheet?.sheetName).toBe("Sheet1");
     expect(result.current.storeNotice).toBeNull();
     unmount();
   }, 60_000);
 
-  it("skips a title-only cover sheet when picking the default worksheet", async () => {
+  it("skips a title-only cover sheet when the operator picks the data worksheet", async () => {
     const bytes = buildWorkbookBytes({
       Sheet1: [["Annex C — Household Listing"], ["generated 2026-10-31"]],
       Sheet2: DATA_ROWS,
@@ -170,8 +169,27 @@ describe("workbook whose data sheet is Sheet2, not Sheet1", () => {
     await act(async () => {
       await result.current.chooseFile(file);
     });
+    await waitFor(() => expect(result.current.stage).toBe("sheets"));
+    await act(async () => {
+      result.current.selectSheet("Sheet2");
+    });
     await waitFor(() => expect(result.current.stage).toBe("shape"));
     expect(result.current.sheet?.sheetName).toBe("Sheet2");
+    unmount();
+  }, 60_000);
+
+  it("parses a single-worksheet workbook straight away without asking", async () => {
+    const bytes = buildWorkbookBytes({ Sheet1: DATA_ROWS });
+    const file = new File([bytes], "single-sheet.xlsx");
+
+    const { result, unmount } = renderHook(() => useImportWizard({ userId: "operator-1" }));
+    await act(async () => {
+      await result.current.chooseFile(file);
+    });
+    // No picker for a workbook with exactly one worksheet.
+    await waitFor(() => expect(result.current.stage).toBe("shape"));
+    expect(result.current.sheet?.sheetName).toBe("Sheet1");
+    expect(result.current.sheet?.headers).toEqual(ANNEX_HEADERS);
     unmount();
   }, 60_000);
 });
@@ -383,20 +401,17 @@ describe("workbook with a bloated Sheet1 (huge used range)", () => {
       await result.current.chooseFile(file);
     });
 
-    // 01 -> 02: opens on Sheet2; the bloated cover never blocks the flow.
+    // 01 -> 02: the sheet picker appears; the bloated cover never blocks it.
+    await waitFor(() => expect(result.current.stage).toBe("sheets"));
+    await act(async () => {
+      result.current.selectSheet("Sheet2");
+    });
     await waitFor(() => expect(result.current.stage).toBe("shape"));
     expect(result.current.sheet?.sheetName).toBe("Sheet2");
     expect(result.current.sheet?.headers).toEqual(ANNEX_HEADERS);
     expect(result.current.coverage.missing).toEqual([]);
-    expect(result.current.storeNotice?.title).toMatch(/selected automatically/i);
 
-    // 02 -> 03: process batches, then validate against the server preview.
-    await act(async () => {
-      await result.current.processRows();
-    });
-    expect(result.current.error).toBeNull();
-    expect(result.current.batchProgress?.completedBatches).toBe(1);
-
+    // 02 -> 03: validate the chosen sheet against the server preview.
     await act(async () => {
       await result.current.validate();
     });

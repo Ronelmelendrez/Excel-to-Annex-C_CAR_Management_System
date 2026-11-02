@@ -1,10 +1,8 @@
-import type { SheetInspection, WorkbookBatchResult } from "../types";
-import type { ColumnMapping } from "@import-domain";
+import type { SheetInspection } from "../types";
 import { IMPORT_MAX_BYTES } from "./import-limits";
 import {
   inspectWorkbookSheet,
   parseWorkbookBuffer,
-  processWorkbookBatch,
   sha256Hex,
   type ParsedSheet,
 } from "./workbook-engine";
@@ -51,8 +49,7 @@ function readPositiveInt(raw: string | undefined, fallback: number): number {
 
 type Pending =
   | { kind: "open"; resolve: (value: OpenResult) => void; reject: (error: Error) => void }
-  | { kind: "inspect"; resolve: (value: SheetInspection) => void; reject: (error: Error) => void }
-  | { kind: "batch"; resolve: (value: WorkbookBatchResult) => void; reject: (error: Error) => void };
+  | { kind: "inspect"; resolve: (value: SheetInspection) => void; reject: (error: Error) => void };
 
 /** A parse that runs longer than this is considered hung and is torn down.
  * 1,000,000-row workbooks can take 10+ minutes for SheetJS to fully parse,
@@ -134,14 +131,6 @@ class WorkbookClient {
           entry.resolve(data.inspection as SheetInspection);
         } else {
           entry.reject(new Error("Received a sheet inspection response for a workbook parse."));
-        }
-        return;
-      case "batch-processed":
-        this.pending.delete(data.id);
-        if (entry.kind === "batch") {
-          entry.resolve(data.result as WorkbookBatchResult);
-        } else {
-          entry.reject(new Error("Received a batch response for another workbook operation."));
         }
         return;
       case "error":
@@ -273,29 +262,6 @@ class WorkbookClient {
       this.pending.set(id, { kind: "inspect", resolve, reject });
     });
     worker.postMessage({ type: "inspect", id, sheetName, headerRow });
-    return promise;
-  }
-
-  /** Process one bounded batch without returning workbook rows to React. */
-  async processBatch(params: {
-    sheetName: string;
-    headerRow: number;
-    headers: string[];
-    mapping: ColumnMapping;
-    batchIndex: number;
-    batchSize: number;
-  }): Promise<WorkbookBatchResult> {
-    if (!supportsWorker) {
-      if (!this.fallbackParsed) throw new Error("No workbook is loaded. Choose a file first.");
-      return processWorkbookBatch(this.fallbackParsed, params);
-    }
-
-    const id = this.nextId++;
-    const worker = this.ensureWorker();
-    const promise = new Promise<WorkbookBatchResult>((resolve, reject) => {
-      this.pending.set(id, { kind: "batch", resolve, reject });
-    });
-    worker.postMessage({ type: "batch", id, ...params });
     return promise;
   }
 

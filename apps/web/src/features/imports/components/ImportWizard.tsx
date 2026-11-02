@@ -17,7 +17,7 @@ const REQUIRED = new Set<CanonicalField>(DEFAULT_REQUIRED_COLUMNS);
 const STEPS = [
   { key: "choose", label: "Choose" },
   { key: "shape", label: "Shape" },
-  { key: "preview", label: "Validate" },
+  { key: "preview", label: "Save" },
   { key: "committed", label: "Commit" },
 ] as const;
 
@@ -30,7 +30,9 @@ const GRANTEE_STATUS_LABEL: Record<string, string> = {
 };
 
 function StepRail({ stage }: { stage: ImportWizardState["stage"] }) {
-  const activeIndex = STEPS.findIndex((step) => step.key === stage);
+  // The sheet-name picker belongs to the Choose step.
+  const railStage = stage === "sheets" ? "choose" : stage;
+  const activeIndex = STEPS.findIndex((step) => step.key === railStage);
   return (
     <ol className="flex flex-wrap items-baseline gap-x-6 gap-y-2 border-b border-[#c9c3b6] pb-3">
       {STEPS.map((step, index) => {
@@ -95,8 +97,9 @@ function ChoosePanel({ wizard }: { wizard: ImportWizardState }) {
             Drop a workbook here, or pick one from disk.
           </h2>
           <p className="mt-3 max-w-[48ch] text-sm leading-6 text-[#3f3b34]">
-            The browser reads sheet names and headers for the preview. The file is not uploaded until
-            you run validation, and nothing is written until you press Commit.
+            The browser reads the worksheet names first — if the workbook has several, you choose
+            which one to parse. Nothing is uploaded or saved until you press{" "}
+            <span className="font-semibold">Save to Supabase</span>.
           </p>
 
           <div className="mt-6 flex flex-wrap items-center gap-4">
@@ -108,11 +111,6 @@ function ChoosePanel({ wizard }: { wizard: ImportWizardState }) {
             >
               {wizard.busy === "reading" ? "Reading workbook…" : "Select workbook"}
             </button>
-            {wizard.busy === "reading" && (
-              <button type="button" onClick={wizard.cancelRead} className={secondaryButton}>
-                Cancel
-              </button>
-            )}
             <span className="text-xs text-[#5b574e]">.xlsx or .xls, up to {IMPORT_MAX_MB} MB</span>
           </div>
           <input
@@ -130,7 +128,8 @@ function ChoosePanel({ wizard }: { wizard: ImportWizardState }) {
             }}
           />
           <p id="workbook-help" className="sr-only">
-            Choose an Excel workbook. Only the first sheet is inspected until you choose another.
+            Choose an Excel workbook. If it contains several worksheets, you pick which one to
+            parse before anything is read.
           </p>
         </div>
       </div>
@@ -147,12 +146,14 @@ function ChoosePanel({ wizard }: { wizard: ImportWizardState }) {
             Required targets must be explicit; nothing is guessed.
           </li>
           <li>
-            <span className="font-mono text-xs text-[#7a1f1f]">03</span> The server re-reads the
-            workbook, validates every row, and previews row-level issues.
+            <span className="font-mono text-xs text-[#7a1f1f]">03</span> One click on Save to
+            Supabase uploads the file, re-runs every rule on the server, and writes the rows to the
+            register.
           </li>
           <li>
-            <span className="font-mono text-xs text-[#7a1f1f]">04</span> Commit one immutable
-            version. A duplicate fingerprint needs a second, explicit confirmation.
+            <span className="font-mono text-xs text-[#7a1f1f]">04</span> The same file and worksheet
+            imported before always stops for a second, explicit confirmation — nothing is ever
+            written twice.
           </li>
         </ol>
         <dl className="mt-6 space-y-3 border-t border-[#c9c3b6] pt-4 text-xs leading-5">
@@ -170,6 +171,86 @@ function ChoosePanel({ wizard }: { wizard: ImportWizardState }) {
           </div>
         </dl>
       </aside>
+    </div>
+  );
+}
+
+/**
+ * Shown right after the workbook is read when it holds more than one
+ * worksheet. The operator picks the sheet to parse; nothing is inspected,
+ * uploaded, or saved until that choice is made.
+ */
+function SheetPickPanel({ wizard }: { wizard: ImportWizardState }) {
+  const bundle = wizard.bundle;
+  if (!bundle) return null;
+
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-wrap items-end justify-between gap-4 border-t border-[#161512] pt-3">
+        <div>
+          <p className="font-mono text-sm break-all">{bundle.file.name}</p>
+          <p className="mt-1 text-xs text-[#5b574e]">
+            {formatBytes(bundle.size)} · SHA-256{" "}
+            <span className="font-mono" title={bundle.fileHash}>
+              {bundle.fileHash.slice(0, 16)}…
+            </span>
+          </p>
+        </div>
+        <button
+          type="button"
+          className={quietButton}
+          disabled={wizard.busy !== null}
+          onClick={wizard.reset}
+        >
+          Replace file
+        </button>
+      </div>
+
+      <div>
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#5b574e]">
+          Step 01 / worksheet
+        </p>
+        <h2 className="mt-3 font-serif text-2xl leading-tight tracking-tight sm:text-3xl">
+          This workbook has {bundle.sheetNames.length} worksheets — choose the one to parse.
+        </h2>
+        <p className="mt-3 max-w-[66ch] text-sm leading-6 text-[#3f3b34]">
+          Only the worksheet you pick is read, validated, and saved to the register. Nothing has
+          been uploaded yet.
+        </p>
+      </div>
+
+      <ul className="grid gap-3 sm:grid-cols-2">
+        {bundle.sheetNames.map((name) => (
+          <li key={name}>
+            <button
+              type="button"
+              className="min-h-[44px] w-full border border-[#8c877c] bg-[#f8f5ee] px-4 py-3 text-left text-sm hover:border-[#7a1f1f] hover:bg-[#f2e4e1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f] disabled:opacity-60"
+              disabled={wizard.busy !== null}
+              onClick={() => wizard.selectSheet(name)}
+            >
+              <span className="block font-mono text-[10px] uppercase tracking-[0.12em] text-[#5b574e]">
+                Worksheet
+              </span>
+              <span className="mt-1 block font-medium">{name}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      {bundle.unavailableSheetNames.length > 0 && (
+        <Notice tone="warning" title="Some worksheets could not be read">
+          <ul className="list-disc space-y-1 pl-5">
+            {bundle.unavailableSheetNames.map((name) => (
+              <li key={name}>
+                <span className="font-mono">{name}</span>
+                {bundle.sheetReadErrors?.[name]
+                  ? ` — ${bundle.sheetReadErrors[name]}`
+                  : " could not be read from this file, so it cannot be imported."}
+              </li>
+            ))}
+          </ul>
+        </Notice>
+      )}
     </div>
   );
 }
@@ -473,75 +554,23 @@ function ShapePanel({ wizard }: { wizard: ImportWizardState }) {
         )}
       </section>
 
-      {sheet.dataRowCount > 0 && (
-        <section aria-labelledby="batch-processing-heading" className="border-t border-[#c9c3b6] pt-5">
-          <h3 id="batch-processing-heading" className="font-serif text-xl">
-            Process worksheet batches
-          </h3>
-          <p className="mt-2 max-w-[72ch] text-sm leading-6 text-[#5b574e]">
-            The worker checks up to 20,000 worksheet rows at a time. Saved batch summaries and
-            checkpoints are kept in this browser; final cross-batch validation still runs on the
-            server before any records are committed.
-          </p>
-          {wizard.batchProgress && (
-            <p role="status" aria-live="polite" className="mt-3 font-mono text-xs text-[#5b574e]">
-              {wizard.batchProgress.completedBatches.toLocaleString()} of{" "}
-              {wizard.batchProgress.totalBatches.toLocaleString()} batches saved ·{" "}
-              {wizard.batchProgress.validRows.toLocaleString()} valid ·{" "}
-              {wizard.batchProgress.invalidRows.toLocaleString()} flagged
-              {wizard.batchProgress.failedBatchIndex !== null
-                ? ` · batch ${wizard.batchProgress.failedBatchIndex + 1} needs retry`
-                : ""}
-            </p>
-          )}
-          <div className="mt-4 flex flex-wrap items-center gap-4">
-            <button
-              type="button"
-              className={primaryButton}
-              onClick={() => void wizard.processRows()}
-              disabled={
-                wizard.busy !== null ||
-                (sheet && bundle.unavailableSheetNames.includes(sheet.sheetName)) ||
-                wizard.coverage.missing.length > 0 ||
-                (wizard.batchProgress !== null &&
-                  wizard.batchProgress.failedBatchIndex === null &&
-                  wizard.batchProgress.completedBatches >= wizard.batchProgress.totalBatches)
-              }
-            >
-              {wizard.busy === "processing"
-                ? "Processing batches…"
-                : wizard.batchProgress?.failedBatchIndex !== null &&
-                    wizard.batchProgress?.failedBatchIndex !== undefined
-                  ? "Retry batch"
-                  : (wizard.batchProgress?.completedBatches ?? 0) > 0
-                    ? "Resume processing"
-                    : "Process rows"}
-            </button>
-            {wizard.busy === "processing" && wizard.activeSessionId !== null && (
-              <button
-                type="button"
-                className={secondaryButton}
-                onClick={() => void wizard.pauseProcessing()}
-              >
-                Pause after this batch
-              </button>
-            )}
-          </div>
-        </section>
-      )}
-
       <div className="flex flex-wrap items-center gap-4 border-t border-[#c9c3b6] pt-5">
         <button
           type="button"
           className={primaryButton}
-          onClick={() => void wizard.validate()}
+          onClick={() => void wizard.saveToSupabase()}
           disabled={wizard.busy !== null || wizard.coverage.missing.length > 0}
         >
-          {wizard.busy === "validating" ? "Validating workbook…" : "Validate workbook"}
+          {wizard.busy === "validating"
+            ? "Validating on the server…"
+            : wizard.busy === "committing"
+              ? "Saving to Supabase…"
+              : "Save to Supabase"}
         </button>
         <p className="max-w-[52ch] text-xs leading-5 text-[#5b574e]">
-          This uploads the workbook to private storage and re-runs every rule on the server. A failed
-          validation writes no import rows.
+          One click: the workbook is uploaded, every rule re-runs on the server, and valid rows are
+          saved to Supabase. If the server blocks the write (structural errors) or finds a duplicate
+          fingerprint, you stop on the review screen instead — nothing is written twice.
         </p>
       </div>
     </div>
@@ -813,11 +842,12 @@ function PreviewPanel({ wizard }: { wizard: ImportWizardState }) {
             (Boolean(preview.duplicate) && !wizard.duplicateConfirmed)
           }
         >
-          {wizard.busy === "committing" ? "Committing import…" : "Commit import"}
+          {wizard.busy === "committing" ? "Saving to Supabase…" : "Save to Supabase"}
         </button>
         <p className="max-w-[52ch] text-xs leading-5 text-[#5b574e]">
-          Commit freezes the raw rows, normalized values, and review flags as one immutable version.
-          To correct data later, import a corrected workbook; the source of this version stays intact.
+          Saving freezes the raw rows, normalized values, and review flags as one immutable version
+          in Supabase. To correct data later, import a corrected workbook; the source of this
+          version stays intact.
         </p>
       </div>
     </div>
@@ -905,14 +935,14 @@ export function ImportWizard({ wizard }: { wizard: ImportWizardState }) {
     if (wizard.stage === "preview") {
       return (
         <button type="button" className={secondaryButton} onClick={() => void wizard.commit()}>
-          Try commit again
+          Try saving again
         </button>
       );
     }
     if (wizard.stage === "shape") {
       return (
-        <button type="button" className={secondaryButton} onClick={() => void wizard.validate()}>
-          Try validation again
+        <button type="button" className={secondaryButton} onClick={() => void wizard.saveToSupabase()}>
+          Try saving again
         </button>
       );
     }
@@ -922,11 +952,26 @@ export function ImportWizard({ wizard }: { wizard: ImportWizardState }) {
   const heading =
     wizard.stage === "choose"
       ? "Import a household workbook"
-      : wizard.stage === "shape"
+      : wizard.stage === "sheets"
+        ? "Choose which worksheet to import"
+        : wizard.stage === "shape"
         ? "Choose the sheet, header, and columns"
         : wizard.stage === "preview"
           ? "What the server found"
           : "Import complete";
+
+  const busyText =
+    wizard.busy === "reading"
+      ? wizard.readStage === "hashing"
+        ? "Hashing workbook in the browser…"
+        : wizard.readStage === "parsing"
+          ? "Parsing workbook in a background thread…"
+          : wizard.readStage === "ready"
+            ? "Workbook ready."
+            : "Reading workbook in the browser…"
+      : wizard.busy === "validating"
+        ? "Uploading the workbook and validating on the server…"
+        : "Saving the import to Supabase…";
 
   return (
     <section aria-labelledby="wizard-heading" className="border border-[#161512] bg-[#f8f5ee] p-5 sm:p-7">
@@ -957,25 +1002,26 @@ export function ImportWizard({ wizard }: { wizard: ImportWizardState }) {
       )}
 
       {wizard.busy && (
-        <p role="status" aria-live="polite" className="mt-4 font-mono text-xs text-[#5b574e]">
-          {wizard.busy === "reading"
-            ? wizard.readStage === "hashing"
-              ? "Hashing workbook in the browser…"
-              : wizard.readStage === "parsing"
-                ? "Parsing workbook in a background thread…"
-                : wizard.readStage === "ready"
-                  ? "Workbook ready."
-                  : "Reading workbook in the browser…"
-            : wizard.busy === "processing"
-              ? "Validating worksheet batches in a background thread…"
-              : wizard.busy === "validating"
-              ? "Uploading and validating on the server…"
-              : "Writing the immutable import version…"}
-        </p>
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#161512]/60 px-4"
+        >
+          <div className="w-full max-w-md border border-[#161512] bg-[#f8f5ee] p-6 shadow-2xl">
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#5b574e]">
+              Working — this screen stays up until the step finishes
+            </p>
+            <p className="mt-3 text-sm leading-6 text-[#161512]">{busyText}</p>
+            <div className="mt-4 h-1.5 w-full overflow-hidden bg-[#e2ddd1]" aria-hidden="true">
+              <div className="h-full w-1/3 animate-pulse bg-[#7a1f1f]" />
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="mt-6">
         {wizard.stage === "choose" && <ChoosePanel wizard={wizard} />}
+        {wizard.stage === "sheets" && <SheetPickPanel wizard={wizard} />}
         {wizard.stage === "shape" && <ShapePanel wizard={wizard} />}
         {wizard.stage === "preview" && <PreviewPanel wizard={wizard} />}
         {wizard.stage === "committed" && <CommittedPanel wizard={wizard} />}

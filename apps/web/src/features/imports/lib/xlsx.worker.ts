@@ -2,12 +2,9 @@
 import {
   inspectWorkbookSheet,
   parseWorkbookBuffer,
-  processWorkbookBatch,
   sha256Hex,
   type ParsedSheet,
 } from "./workbook-engine";
-import type { ColumnMapping } from "@import-domain";
-import type { WorkbookBatchResult } from "../types";
 
 /**
  * Background workbook parser.
@@ -47,20 +44,9 @@ type InspectRequest = {
   headerRow?: number;
 };
 
-type BatchRequest = {
-  type: "batch";
-  id: number;
-  sheetName: string;
-  headerRow: number;
-  headers: string[];
-  mapping: ColumnMapping;
-  batchIndex: number;
-  batchSize: number;
-};
-
 type ReleaseRequest = { type: "release" };
 
-type WorkerRequest = ParseRequest | InspectRequest | BatchRequest | ReleaseRequest;
+type WorkerRequest = ParseRequest | InspectRequest | ReleaseRequest;
 
 type WorkerResponse =
   | { type: "progress"; id: number; stage: "hashing" | "parsing" | "ready" }
@@ -74,7 +60,6 @@ type WorkerResponse =
       sheetReadErrors?: Record<string, string>;
     }
   | { type: "inspected"; id: number; inspection: ReturnType<typeof inspectWorkbookSheet> }
-  | { type: "batch-processed"; id: number; result: WorkbookBatchResult }
   | { type: "error"; id: number; message: string; retryable: boolean };
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
@@ -161,19 +146,6 @@ function handleInspect(request: InspectRequest): void {
   }
 }
 
-function handleBatch(request: BatchRequest): void {
-  if (!parsed) {
-    fail(request.id, new Error("No workbook is loaded. Choose a file first."), true);
-    return;
-  }
-  try {
-    const result = processWorkbookBatch(parsed, request);
-    post({ type: "batch-processed", id: request.id, result });
-  } catch (error) {
-    fail(request.id, error, true);
-  }
-}
-
 function release() {
   parsed = null;
 }
@@ -186,9 +158,6 @@ ctx.addEventListener("message", (event: MessageEvent<WorkerRequest>) => {
       return;
     case "inspect":
       handleInspect(request);
-      return;
-    case "batch":
-      handleBatch(request);
       return;
     case "release":
       release();

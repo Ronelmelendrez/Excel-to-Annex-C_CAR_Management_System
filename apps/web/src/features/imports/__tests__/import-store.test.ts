@@ -17,7 +17,6 @@ import {
   releaseLease,
   renewLease,
   saveSession,
-  saveBatchCheckpoint,
   saveWorkbook,
   StoreError,
   type StoredImportSession,
@@ -125,77 +124,21 @@ describe("IndexedDB import recovery store", () => {
     expect((await loadWorkbook(id))?.name).toBe(session.fileName);
   });
 
-  it("persists batch results and checkpoints atomically and resumes sequentially", async () => {
-    const id = newId("batches");
-    await saveSession(makeSession(id, "operator-1"));
-    const result = (batchIndex: number) => ({
-      batchIndex,
-      firstRowNumber: batchIndex * 20_000 + 2,
-      sourceRowCount: 20_000,
-      summary: {
-        total_rows: 20_000,
-        valid_rows: 19_000,
-        invalid_rows: 1_000,
-        skipped_blank_rows: 0,
-        household_count: 100,
-        member_count: 20_000,
-        rows_without_household: 0,
-        issues_by_code: {},
-      },
-      structuralErrors: [],
-      warnings: [],
-    });
-
-    const first = await saveBatchCheckpoint(id, result(0), 3);
-    expect(first.lastCompletedBatchIndex).toBe(0);
-    expect(first.checkpoint).toBe("processing");
-    expect(first.batchResults).toHaveLength(1);
-
-    await expect(saveBatchCheckpoint(id, result(2), 3)).rejects.toThrow(/checkpoint is not sequential/i);
-    expect((await getSession(id))?.lastCompletedBatchIndex).toBe(0);
-    const retriedFirst = await saveBatchCheckpoint(id, result(0), 3);
-    expect(retriedFirst.batchResults).toHaveLength(1);
-
-    const second = await saveBatchCheckpoint(id, result(1), 3);
-    expect(second.lastCompletedBatchIndex).toBe(1);
-    expect(second.batchResults.map((item) => item.batchIndex)).toEqual([0, 1]);
-    expect((await getSession(id))?.lastCompletedBatchIndex).toBe(1);
-    await expect(saveBatchCheckpoint(id, result(0), 3)).rejects.toThrow(/cannot be processed again/i);
-  });
-
-  it("does not advance a checkpoint when IndexedDB reports a quota failure", async () => {
-    const id = newId("quota-batch");
-    await saveSession(makeSession(id, "operator-1"));
-    const result = {
-      batchIndex: 0,
-      firstRowNumber: 2,
-      sourceRowCount: 2,
-      summary: {
-        total_rows: 2,
-        valid_rows: 2,
-        invalid_rows: 0,
-        skipped_blank_rows: 0,
-        household_count: 2,
-        member_count: 2,
-        rows_without_household: 0,
-        issues_by_code: {},
-      },
-      structuralErrors: [],
-      warnings: [],
-    };
+  it("does not persist a session when IndexedDB reports a quota failure", async () => {
+    const id = newId("quota");
     const put = vi.spyOn(IDBObjectStore.prototype, "put").mockImplementation(() => {
       throw new DOMException("quota exceeded", "QuotaExceededError");
     });
 
     try {
-      await expect(saveBatchCheckpoint(id, result, 1)).rejects.toMatchObject({ code: "quota" });
+      await expect(saveSession(makeSession(id, "operator-1"))).rejects.toMatchObject({
+        code: "quota",
+      });
     } finally {
       put.mockRestore();
     }
 
-    const persisted = await getSession(id);
-    expect(persisted?.lastCompletedBatchIndex).toBe(-1);
-    expect(persisted?.batchResults).toEqual([]);
+    expect(await getSession(id)).toBeNull();
   });
 
   it("prevents a second live tab from taking a lease and preserves the new owner", async () => {

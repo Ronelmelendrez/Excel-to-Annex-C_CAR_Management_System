@@ -6,7 +6,6 @@ import {
   getWorkbookWorksheetNames,
   inspectWorkbookSheet,
   parseWorkbookBuffer,
-  processWorkbookBatch,
   readWorkbookWithSheetRecovery,
   type ParsedSheet,
 } from "../lib/workbook-engine";
@@ -203,49 +202,6 @@ describe("large-file mapping preview", () => {
     // Bounded sniff keeps this effectively instant; a full materialization of a
     // million rows would blow well past this generous guard.
     expect(elapsed).toBeLessThan(2000);
-  });
-
-  it("processes bounded batches with stable worksheet row numbers", async () => {
-    const XLSX = await import("xlsx");
-    const rows = [
-      HEADERS,
-      ["A", "A1", "Ana", "Cruz", "Yes"],
-      [null, null, null, null, null],
-      ["B", "B1", "Ben", "Reyes", "No"],
-      ["C", "C1", "Cia", "Santos", "No"],
-    ];
-    const parsed: ParsedSheet = {
-      workbook: { SheetNames: ["Data"], Sheets: { Data: XLSX.utils.aoa_to_sheet(rows) } },
-      utils: XLSX.utils,
-      sheetNames: ["Data"],
-      unavailableSheetNames: [],
-    };
-    const inspection = inspectWorkbookSheet(parsed, "Data");
-
-    const first = processWorkbookBatch(parsed, {
-      sheetName: "Data",
-      headerRow: 0,
-      headers: inspection.headers,
-      mapping: inspection.mapping,
-      batchIndex: 0,
-      batchSize: 2,
-    });
-    const second = processWorkbookBatch(parsed, {
-      sheetName: "Data",
-      headerRow: 0,
-      headers: inspection.headers,
-      mapping: inspection.mapping,
-      batchIndex: 1,
-      batchSize: 2,
-    });
-
-    expect(first.firstRowNumber).toBe(2);
-    expect(first.sourceRowCount).toBe(2);
-    expect(first.summary.total_rows).toBe(1);
-    expect(first.summary.skipped_blank_rows).toBe(1);
-    expect(second.firstRowNumber).toBe(4);
-    expect(second.sourceRowCount).toBe(2);
-    expect(second.summary.total_rows).toBe(2);
   });
 });
 

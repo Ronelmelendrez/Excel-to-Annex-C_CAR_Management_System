@@ -3,11 +3,8 @@ import {
   detectHeaderRow,
   DEFAULT_REQUIRED_COLUMNS,
   headersFromRow,
-  analyzeRows,
 } from "@import-domain";
-import type { SheetInspection, WorkbookBatchResult } from "../types";
-import type { ColumnMapping } from "@import-domain";
-import { IMPORT_BATCH_SIZE } from "./import-limits";
+import type { SheetInspection } from "../types";
 
 /**
  * Shared workbook engine.
@@ -431,57 +428,5 @@ export function inspectWorkbookSheet(
     rowCount,
     dataRowCount,
     readError,
-  };
-}
-
-/** Convert and validate one bounded worksheet batch inside the worker. */
-export function processWorkbookBatch(
-  parsed: ParsedSheet,
-  params: {
-    sheetName: string;
-    headerRow: number;
-    headers: string[];
-    mapping: ColumnMapping;
-    batchIndex: number;
-    batchSize: number;
-  },
-): WorkbookBatchResult {
-  const { sheet, range } = sheetRefRange(parsed, params.sheetName);
-  if (!range) throw new Error("The selected worksheet is empty.");
-  if (!Number.isInteger(params.batchIndex) || params.batchIndex < 0) {
-    throw new Error("The requested import batch is invalid.");
-  }
-  if (!Number.isInteger(params.batchSize) || params.batchSize < 1 || params.batchSize > IMPORT_BATCH_SIZE) {
-    throw new Error("The requested import batch size is invalid.");
-  }
-
-  const firstDataRow = range.s.r + params.headerRow + 1;
-  const startRow = firstDataRow + params.batchIndex * params.batchSize;
-  if (startRow > range.e.r) throw new Error("The requested import batch is past the end of the worksheet.");
-  const endRow = Math.min(range.e.r, startRow + params.batchSize - 1);
-  const rows = parsed.utils.sheet_to_json(sheet, {
-    header: 1,
-    raw: false,
-    defval: null,
-    blankrows: true,
-    range: {
-      s: { r: startRow, c: range.s.c },
-      e: { r: endRow, c: range.e.c },
-    },
-  }) as unknown[][];
-  const analysis = analyzeRows({
-    headers: params.headers,
-    rows: Array.isArray(rows) ? rows : [],
-    mapping: params.mapping,
-    firstDataRowNo: startRow + 1,
-  });
-
-  return {
-    batchIndex: params.batchIndex,
-    firstRowNumber: startRow + 1,
-    sourceRowCount: endRow - startRow + 1,
-    summary: analysis.summary,
-    structuralErrors: analysis.structural_errors,
-    warnings: analysis.warnings,
   };
 }

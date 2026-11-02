@@ -149,7 +149,8 @@ export type CommitRequest = PreviewRequest & {
   confirm_duplicate: boolean;
 };
 
-export type WizardStage = "choose" | "shape" | "preview" | "committed";
+/** "sheets" = workbook read, waiting for the operator to pick a worksheet. */
+export type WizardStage = "choose" | "sheets" | "shape" | "preview" | "committed";
 
 export type WizardError = {
   title: string;
