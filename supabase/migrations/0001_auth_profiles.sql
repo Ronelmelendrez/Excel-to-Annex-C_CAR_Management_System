@@ -20,12 +20,14 @@ create table if not exists public.user_roles (
 
 -- updated_at trigger
 create or replace function public.set_updated_at()
-returns trigger as 
+returns trigger as
+$$
 begin
   new.updated_at = now();
   return new;
 end;
- language plpgsql;
+$$
+language plpgsql;
 
 drop trigger if exists set_profiles_updated_at on public.profiles;
 create trigger set_profiles_updated_at

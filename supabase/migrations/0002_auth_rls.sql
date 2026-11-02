@@ -9,7 +9,8 @@ returns boolean
 language plpgsql
 security definer
 set search_path = public
-as 
+as
+$$
 begin
   if uid is null then
     return false;
@@ -22,6 +23,7 @@ begin
     where ur.user_id = uid and ur.role = 'admin'
   );
 end;
+$$
 ;
 
 -- profiles policies
