@@ -19,6 +19,13 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // The suite always runs against the local mock backend. A developer's
+    // .env.local may point at a live Supabase project, so the credentials are
+    // cleared here: tests must never read or write real data.
+    env: {
+      VITE_SUPABASE_URL: '',
+      VITE_SUPABASE_ANON_KEY: '',
+    },
     include: [
       'src/features/auth/__tests__/*.test.{ts,tsx}',
       'src/features/imports/__tests__/*.test.{ts,tsx}',
