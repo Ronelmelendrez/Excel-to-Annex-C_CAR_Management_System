@@ -1,4 +1,5 @@
 import React from "react";
+import { isDemoMode } from "../../../shared/supabase";
 import type { HouseholdRecord } from "../types";
 import { HouseholdSectionHeading } from "./primitives";
 
@@ -13,11 +14,17 @@ export function LinkedCars({ household }: { household: HouseholdRecord }) {
             <span className="ml-2 text-xs text-[#5b574e]">{household.car.status}</span>
           </summary>
           <p className="border-t border-[#e2ddd1] px-3 py-2 text-xs leading-5 text-[#5b574e]">
-            Mock CAR reference only. CAR authoring and review are not connected in this UI.
+            {isDemoMode
+              ? "Mock CAR reference only. CAR authoring and review are not connected in this UI."
+              : "Linked from the case assessment stored for this household in Supabase."}
           </p>
         </details>
       ) : (
-        <p className="mt-2 text-sm text-[#5b574e]">No CAR is linked in this sample record.</p>
+        <p className="mt-2 text-sm text-[#5b574e]">
+          {isDemoMode
+            ? "No CAR is linked in this sample record."
+            : "No CAR is linked to this household yet."}
+        </p>
       )}
     </section>
   );

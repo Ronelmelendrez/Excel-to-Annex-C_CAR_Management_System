@@ -1,5 +1,6 @@
 import { isDemoMode, supabase } from '../../shared/supabase';
 import { apiBase, apiCall, authHeaders, ApiError } from '../../shared/api';
+import { IMPORT_MAX_MB } from './lib/import-limits';
 import {
   demoCommit,
   demoErrorReportCsv,
@@ -26,6 +27,20 @@ export function storagePathFor(userId: string, fileHash: string, fileName: strin
   return `${userId}/${fileHash}/${safeName(fileName)}`;
 }
 
+/**
+ * The hash folder a storage path was uploaded under (`userId/<hash>/<name>`).
+ *
+ * Paths are content-addressed: the folder IS the SHA-256 of the bytes that
+ * were uploaded. Comparing it against the current upload target's hash proves
+ * the stored object already holds exactly those bytes — no re-upload needed —
+ * and catches a stored copy of a different sheet (or an older workbook) that
+ * must be replaced before validating.
+ */
+export function storageHashFromPath(path: string | null | undefined): string | null {
+  const folder = path?.split("/")[1] ?? "";
+  return /^[0-9a-f]{64}$/.test(folder) ? folder : null;
+}
+
 export async function uploadWorkbook(params: {
   userId: string;
   file: File;
@@ -42,8 +57,21 @@ export async function uploadWorkbook(params: {
     cacheControl: '3600',
   });
   // Content-addressed path: an existing object is the same workbook bytes.
-  const status = (error as { statusCode?: number } | null)?.statusCode;
+  const status = (error as { statusCode?: number | string } | null)?.statusCode;
+  const message = (error as { message?: string } | null)?.message ?? '';
   if (error && status !== 409) {
+    // Storage rejects oversized bodies (413, surfaced under HTTP 400) with a
+    // generic payload message; turn it into guidance the operator can act on.
+    const sizeRejected =
+      status === 413 ||
+      status === '413' ||
+      ((status === 400 || status === '400') && /size|large|exceed/i.test(message)) ||
+      /exceed|too large|payload too large/i.test(message);
+    if (sizeRejected) {
+      throw new Error(
+        `The upload exceeded the ${IMPORT_MAX_MB} MB limit allowed by this Supabase project. Import a smaller worksheet, then try again.`,
+      );
+    }
     throw new Error(
       'The workbook could not be uploaded to private storage. Check your connection and try again.',
     );
@@ -121,8 +149,19 @@ export async function fetchErrorReportCsv(importId: string): Promise<string> {
 
 export function normalizeImportError(error: unknown, fallbackTitle: string): ApiError {
   if (error instanceof ApiError) {
-    const guidance =
-      typeof error.payload?.guidance === 'string' ? error.payload.guidance : error.message;
+    // 546 WORKER_RESOURCE_LIMIT: the Edge Function was killed mid-request
+    // because one worksheet needs more memory than the server allows in a
+    // single pass. The raw body ("…not having enough compute resources…")
+    // is meaningless to an operator, so translate it into what to do.
+    const resourceLimit =
+      error.status === 546 ||
+      error.payload?.code === 'WORKER_RESOURCE_LIMIT' ||
+      error.payload?.code === 'WORKER_LIMIT';
+    const guidance = resourceLimit
+      ? 'The server ran out of memory processing this worksheet — it holds more data than one pass can handle. In Excel, split the worksheet\'s rows into smaller files, save each as .xlsx, and import them one at a time.'
+      : typeof error.payload?.guidance === 'string'
+        ? error.payload.guidance
+        : error.message;
     const wrapped = new ApiError(guidance || error.message, error.status, error.payload);
     wrapped.code = error.code;
     return wrapped;

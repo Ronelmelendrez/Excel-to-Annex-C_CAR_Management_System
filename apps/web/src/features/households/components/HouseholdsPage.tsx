@@ -1,6 +1,6 @@
 import React from "react";
 import { useAuth } from "../../../app/providers";
-import { mockHouseholds } from "../mock-data";
+import { isDemoMode } from "../../../shared/supabase";
 import { useHouseholdRegister } from "../hooks/useHouseholdRegister";
 import { HouseholdDetail } from "./HouseholdDetail";
 import { HouseholdFilters } from "./HouseholdFilters";
@@ -9,11 +9,11 @@ import { HouseholdList } from "./HouseholdList";
 export function HouseholdsPage() {
   const { user, profile, roles } = useAuth();
   const actor = profile?.display_name || user?.email || "Signed-in staff";
-  const register = useHouseholdRegister(actor);
   const canCorrect = roles.some((role) => ["admin", "case_worker", "reviewer"].includes(role));
   const canView = roles.some((role) =>
     ["admin", "operator", "case_worker", "reviewer", "auditor"].includes(role),
   );
+  const register = useHouseholdRegister(actor, canView);
 
   if (!canView) {
     return (
@@ -44,63 +44,98 @@ export function HouseholdsPage() {
               Check household members and resolve GRANTEE conflicts against the imported source rows.
             </p>
           </div>
-          <span className="border border-[#8a5a00] bg-[#f3ead8] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[#704700]">
-            Mock records · local changes reset on reload
+          <span
+            className={`border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] ${
+              isDemoMode
+                ? "border-[#8a5a00] bg-[#f3ead8] text-[#704700]"
+                : "border-[#2f5b3a] bg-[#e6ecdf] text-[#244b2e]"
+            }`}
+          >
+            {isDemoMode
+              ? "Mock records · local changes reset on reload"
+              : "Live Supabase records · imported from Excel"}
           </span>
         </div>
       </header>
 
-      <HouseholdFilters
-        query={register.query}
-        reviewFilter={register.reviewFilter}
-        versionFilter={register.versionFilter}
-        householdCount={mockHouseholds.length}
-        memberCount={register.totalMembers}
-        granteeCount={register.granteeCount}
-        needsReviewCount={register.needsReviewCount}
-        resultCount={register.visibleHouseholds.length}
-        onQueryChange={register.setQuery}
-        onReviewFilterChange={register.setReviewFilter}
-        onVersionFilterChange={register.setVersionFilter}
-      />
-
-      {register.feedback && (
+      {register.loading ? (
         <p
           role="status"
-          className="mt-4 border-l-4 border-[#2f5b3a] bg-[#e6ecdf] px-4 py-3 text-sm leading-6 text-[#244b2e]"
+          className="mt-5 border-l-4 border-[#4a5a72] bg-[#e9edf3] px-4 py-4 text-sm leading-6 text-[#31405a]"
         >
-          {register.feedback}
+          Loading household records from Supabase…
         </p>
-      )}
+      ) : register.loadError ? (
+        <div
+          role="alert"
+          className="mt-5 border-l-4 border-[#7a1f1f] border-y border-r border-[#7a1f1f] bg-[#f2e4e1] px-4 py-4"
+        >
+          <p className="text-sm font-semibold leading-6 text-[#3f3b34]">{register.loadError}</p>
+          <button
+            type="button"
+            onClick={register.reload}
+            className="mt-3 min-h-[40px] border border-[#161512] px-3 py-2 text-xs font-semibold hover:bg-[#161512] hover:text-[#f4f1ea] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+          >
+            Try again
+          </button>
+        </div>
+      ) : (
+        <>
+          <HouseholdFilters
+            query={register.query}
+            reviewFilter={register.reviewFilter}
+            versionFilter={register.versionFilter}
+            versionOptions={register.versionOptions}
+            householdCount={register.households.length}
+            memberCount={register.totalMembers}
+            granteeCount={register.granteeCount}
+            needsReviewCount={register.needsReviewCount}
+            resultCount={register.visibleHouseholds.length}
+            onQueryChange={register.setQuery}
+            onReviewFilterChange={register.setReviewFilter}
+            onVersionFilterChange={register.setVersionFilter}
+          />
 
-      <div className="mt-5 grid items-start gap-5 lg:grid-cols-[minmax(300px,0.82fr)_minmax(0,1.7fr)]">
-        <HouseholdList
-          items={register.visibleHouseholds}
-          selectedId={register.selected?.id ?? null}
-          onSelect={register.selectHousehold}
-        />
-        <HouseholdDetail
-          household={register.selected}
-          overlay={register.selectedOverlay}
-          status={register.selectedStatus}
-          granteeId={register.activeGrantee?.id}
-          canCorrect={canCorrect}
-          showResolveForm={register.showResolveForm}
-          candidateId={register.candidateId}
-          resolutionReason={register.resolutionReason}
-          excludeMemberId={register.excludeMemberId}
-          exclusionReason={register.exclusionReason}
-          onToggleResolveForm={register.toggleResolveForm}
-          onCandidateChange={register.setCandidateId}
-          onResolutionReasonChange={register.setResolutionReason}
-          onSaveResolution={register.saveResolution}
-          onStartExclusion={register.startExclusion}
-          onExclusionReasonChange={register.setExclusionReason}
-          onSaveExclusion={register.saveExclusion}
-          onCancelExclusion={register.cancelExclusion}
-          onRestoreMember={register.restoreMember}
-        />
-      </div>
+          {register.feedback && (
+            <p
+              role="status"
+              className="mt-4 border-l-4 border-[#2f5b3a] bg-[#e6ecdf] px-4 py-3 text-sm leading-6 text-[#244b2e]"
+            >
+              {register.feedback}
+            </p>
+          )}
+
+          <div className="mt-5 grid items-start gap-5 lg:grid-cols-[minmax(300px,0.82fr)_minmax(0,1.7fr)]">
+            <HouseholdList
+              items={register.visibleHouseholds}
+              total={register.households.length}
+              selectedId={register.selected?.id ?? null}
+              onSelect={register.selectHousehold}
+            />
+            <HouseholdDetail
+              household={register.selected}
+              overlay={register.selectedOverlay}
+              status={register.selectedStatus}
+              granteeId={register.activeGrantee?.id}
+              canCorrect={canCorrect}
+              showResolveForm={register.showResolveForm}
+              candidateId={register.candidateId}
+              resolutionReason={register.resolutionReason}
+              excludeMemberId={register.excludeMemberId}
+              exclusionReason={register.exclusionReason}
+              onToggleResolveForm={register.toggleResolveForm}
+              onCandidateChange={register.setCandidateId}
+              onResolutionReasonChange={register.setResolutionReason}
+              onSaveResolution={register.saveResolution}
+              onStartExclusion={register.startExclusion}
+              onExclusionReasonChange={register.setExclusionReason}
+              onSaveExclusion={register.saveExclusion}
+              onCancelExclusion={register.cancelExclusion}
+              onRestoreMember={register.restoreMember}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }

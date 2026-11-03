@@ -66,7 +66,13 @@ export const DEFAULT_REQUIRED_COLUMNS: CanonicalField[] = [
 
 export const IDENTIFIER_FIELDS: CanonicalField[] = ["HH_ID", "ENTRY_ID", "LRN", "PCN"];
 
-export const MAX_IMPORT_BYTES = 100 * 1024 * 1024;
+// Hard cap for a workbook, enforced by the client before upload and by the
+// server before validation. The Supabase free plan rejects files above 50 MB
+// at the platform edge (EntityTooLarge), so the app stops earlier with a
+// clear message instead of failing mid-upload. The imports bucket allows
+// 100 MB (migration 0010) so raising this for a larger plan never hits the
+// bucket; pair any raise with the plan's real per-file limit.
+export const MAX_IMPORT_BYTES = 50 * 1024 * 1024;
 export const MAX_IMPORT_ROWS = 1_000_000;
 /** Human-readable byte cap derived from MAX_IMPORT_BYTES so messages never drift. */
 export const MAX_IMPORT_MB = Math.round(MAX_IMPORT_BYTES / (1024 * 1024));

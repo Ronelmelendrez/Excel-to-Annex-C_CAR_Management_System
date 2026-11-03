@@ -323,6 +323,21 @@ describe("F3 import API", () => {
     expect(error.code).toBe("validation_failed");
     expect(error.status).toBe(422);
   });
+
+  it("translates a 546 resource-limit kill into split-the-sheet guidance", () => {
+    // The Edge Function dies mid-parse on an oversized worksheet; the raw
+    // body tells the operator nothing actionable.
+    const error = normalizeImportError(
+      new ApiError("api_error_546", 546, {
+        code: "WORKER_RESOURCE_LIMIT",
+        message: "Function failed due to not having enough compute resources (please check logs)",
+      }),
+      "Validation could not run",
+    );
+    expect(error.status).toBe(546);
+    expect(error.message).toMatch(/split the worksheet's rows into smaller files/i);
+    expect(error.message).not.toContain("api_error_546");
+  });
 });
 
 const baseHistoryProps = {

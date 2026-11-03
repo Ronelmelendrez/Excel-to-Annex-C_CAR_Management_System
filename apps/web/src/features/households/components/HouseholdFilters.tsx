@@ -1,5 +1,6 @@
 import React from "react";
 import { Label } from "../../../components/ui/label";
+import { isDemoMode } from "../../../shared/supabase";
 import type { ReviewFilter } from "../types";
 import { HouseholdStat } from "./primitives";
 
@@ -7,6 +8,7 @@ export function HouseholdFilters({
   query,
   reviewFilter,
   versionFilter,
+  versionOptions,
   householdCount,
   memberCount,
   granteeCount,
@@ -19,6 +21,7 @@ export function HouseholdFilters({
   query: string;
   reviewFilter: ReviewFilter;
   versionFilter: string;
+  versionOptions: { value: string; label: string }[];
   householdCount: number;
   memberCount: number;
   granteeCount: number;
@@ -28,14 +31,15 @@ export function HouseholdFilters({
   onReviewFilterChange: (value: ReviewFilter) => void;
   onVersionFilterChange: (value: string) => void;
 }) {
+  const isSample = isDemoMode;
   return (
     <>
       <section
-        aria-label="Sample register summary"
+        aria-label={isSample ? "Sample register summary" : "Register summary"}
         className="grid grid-cols-2 gap-5 border-b border-[#c9c3b6] py-5 sm:grid-cols-4"
       >
-        <HouseholdStat label="Sample households" value={householdCount} />
-        <HouseholdStat label="Members in sample" value={memberCount} />
+        <HouseholdStat label={isSample ? "Sample households" : "Households"} value={householdCount} />
+        <HouseholdStat label={isSample ? "Members in sample" : "Members"} value={memberCount} />
         <HouseholdStat label="Grantee OK" value={granteeCount} />
         <HouseholdStat label="Needs review" value={needsReviewCount} emphasis />
       </section>
@@ -82,13 +86,17 @@ export function HouseholdFilters({
               className="min-h-[44px] w-full border border-[#8c877c] bg-[#f8f5ee] px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#7a1f1f]"
             >
               <option value="all">All versions</option>
-              <option value="3">SY2026 Q1 · v3</option>
-              <option value="2">Region IV-A · v2</option>
+              {versionOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
           </div>
         </div>
         <p className="mt-3 text-xs text-[#5b574e]" aria-live="polite">
-          Showing {resultCount} of {householdCount} sample households
+          Showing {resultCount} of {householdCount}{" "}
+          {isSample ? "sample households" : "households"}
         </p>
       </section>
     </>

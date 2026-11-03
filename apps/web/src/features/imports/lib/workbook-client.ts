@@ -1,6 +1,6 @@
 import type { SheetInspection } from "../types";
-import { IMPORT_MAX_BYTES } from "./import-limits";
 import {
+  extractSheetWorkbook,
   inspectWorkbookSheet,
   parseWorkbookSheet,
   readWorkbookSheetNames,
@@ -14,9 +14,9 @@ import {
  * Opening a workbook reads only its sheet names — no worksheet data is parsed
  * until the operator picks a sheet, and then only THAT sheet is parsed (see
  * xlsx.worker.ts for why the parse never crosses back to the UI thread). This
- * client exposes a tiny async API — open a workbook, inspect a sheet,
- * release/cancel — and maps worker progress and errors onto values the wizard
- * can render.
+ * client exposes a tiny async API — open a workbook, inspect a sheet, extract
+ * a single-sheet copy for upload, release/cancel — and maps worker progress
+ * and errors onto values the wizard can render.
  *
  * If `Worker` is unavailable (jsdom in tests, very old browsers), it falls back
  * to doing the same work inline on the main thread using the identical engine,
@@ -39,6 +39,13 @@ type OpenResult = {
   sheetNames: string[];
 };
 
+/** A single-sheet copy produced by extractSheet(): bytes plus their hash. */
+type ExtractResult = {
+  buffer: ArrayBuffer;
+  hash: string;
+  size: number;
+};
+
 function readPositiveInt(raw: string | undefined, fallback: number): number {
   if (raw === undefined || raw.trim() === "") return fallback;
   const parsed = Number(raw);
@@ -48,7 +55,8 @@ function readPositiveInt(raw: string | undefined, fallback: number): number {
 
 type Pending =
   | { kind: "open"; resolve: (value: OpenResult) => void; reject: (error: Error) => void }
-  | { kind: "inspect"; resolve: (value: SheetInspection) => void; reject: (error: Error) => void };
+  | { kind: "inspect"; resolve: (value: SheetInspection) => void; reject: (error: Error) => void }
+  | { kind: "extract"; resolve: (value: ExtractResult) => void; reject: (error: Error) => void };
 
 /** A read or focused-sheet parse that runs longer than this is considered hung
  * and is torn down. 1,000,000-row worksheets can take 10+ minutes for SheetJS
@@ -136,6 +144,15 @@ class WorkbookClient {
           entry.reject(new Error("Received a sheet inspection response for a workbook open."));
         }
         return;
+      case "extracted":
+        this.clearRequestTimer(data.id);
+        this.pending.delete(data.id);
+        if (entry.kind === "extract") {
+          entry.resolve({ buffer: data.buffer, hash: data.hash, size: data.size });
+        } else {
+          entry.reject(new Error("Received a single-sheet extract for a different request."));
+        }
+        return;
       case "error":
         this.clearRequestTimer(data.id);
         this.pending.delete(data.id);
@@ -194,22 +211,16 @@ class WorkbookClient {
    * WITHOUT parsing any worksheet. The chosen sheet is parsed later, on
    * demand, by inspect().
    *
+   * There is deliberately NO whole-file size rejection here: the upload cap
+   * applies at save time to what actually gets uploaded (the workbook when it
+   * fits, otherwise a single-sheet copy of the chosen worksheet — see
+   * upload-target.ts), so a workbook over the cap must still open and list
+   * its sheets.
+   *
    * If `buffer` is provided (already read by the caller), the file is not read
    * a second time — this avoids doubling memory usage on large workbooks.
    */
-  async open(
-    file: File,
-    maxBytes: number = IMPORT_MAX_BYTES,
-    buffer?: ArrayBuffer,
-  ): Promise<OpenResult> {
-    // Guard the size before touching the file so we fail fast and cheaply.
-    if (file.size > maxBytes) {
-      const mb = Math.round(maxBytes / (1024 * 1024));
-      throw new Error(
-        `This file is ${(file.size / 1024 / 1024).toFixed(1)} MB. The limit is ${mb} MB. Split the workbook first.`,
-      );
-    }
-
+  async open(file: File, buffer?: ArrayBuffer): Promise<OpenResult> {
     // This client owns one workbook at a time. Tear down prior work before
     // opening another file so an older asynchronous read cannot replace it.
     this.cancel();
@@ -234,9 +245,7 @@ class WorkbookClient {
     // Do NOT transfer the buffer: the caller may reuse the same bytes (a
     // resumed session re-reads the same stored bytes) and the worker retains
     // its copy so each chosen sheet can be parsed on demand.
-    worker.postMessage(
-      { type: "open", id, buffer: bytes, fileName: file.name, size: file.size, maxBytes },
-    );
+    worker.postMessage({ type: "open", id, buffer: bytes, fileName: file.name, size: file.size });
     return promise;
   }
 
@@ -289,6 +298,33 @@ class WorkbookClient {
     // hung worker never leaves the undismissable progress overlay up forever.
     this.startRequestTimer(id);
     worker.postMessage({ type: "inspect", id, sheetName, headerRow });
+    return promise;
+  }
+
+  /**
+   * Build a single-sheet copy of the chosen worksheet (bytes + SHA-256) from
+   * the workbook opened by open(). This is the upload used when the whole
+   * workbook exceeds the upload cap: only the imported sheet is sent, so the
+   * cap applies to the sheet's data instead of the entire file. The workbook
+   * must be open — the retained bytes are what get re-serialized.
+   */
+  async extractSheet(sheetName: string): Promise<ExtractResult> {
+    if (!supportsWorker) {
+      const buffer = this.fallbackBuffer;
+      if (!buffer) throw new Error("No workbook is loaded. Choose a file first.");
+      const extracted = await extractSheetWorkbook(buffer, sheetName);
+      return { buffer: extracted.bytes, hash: extracted.hash, size: extracted.bytes.byteLength };
+    }
+
+    const id = this.nextId++;
+    const worker = this.ensureWorker();
+    const promise = new Promise<ExtractResult>((resolve, reject) => {
+      this.pending.set(id, { kind: "extract", resolve, reject });
+    });
+    // Re-serializing a very large worksheet can take a while; the same
+    // hung-request guard as inspect() keeps the overlay from sticking.
+    this.startRequestTimer(id);
+    worker.postMessage({ type: "extract", id, sheetName });
     return promise;
   }
 

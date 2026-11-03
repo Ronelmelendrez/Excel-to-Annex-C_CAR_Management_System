@@ -1,13 +1,19 @@
-export type GranteeFlag = "Yes" | "No" | "" | "Yess";
+// Plain string: real imports carry whatever the GRANTEE cell contained
+// ("Yes", "No", blanks, typos like "Yess") and normalizeGrantee judges each.
+export type GranteeFlag = string;
 
 export type HouseholdMember = {
   id: string;
   entryId: string;
   name: string;
   relationship: string;
-  age: number;
+  // null when the AGE cell was blank or not numeric in the source row.
+  age: number | null;
   granteeFlag: GranteeFlag;
   sourceRow: number;
+  // Every cell of this person's Excel row, aligned with household.headers.
+  // Absent on demo sample records.
+  raw?: (string | null)[];
 };
 
 export type HouseholdRecord = {
@@ -17,6 +23,9 @@ export type HouseholdRecord = {
   municipality: string;
   importName: string;
   importVersion: number;
+  // Header row of the import this household came from, in file order.
+  // Absent on demo sample records.
+  headers?: string[];
   members: HouseholdMember[];
   car: { reference: string; status: string } | null;
 };

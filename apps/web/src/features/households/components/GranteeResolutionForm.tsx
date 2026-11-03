@@ -1,5 +1,6 @@
 import React from "react";
 import { Label } from "../../../components/ui/label";
+import { isDemoMode } from "../../../shared/supabase";
 import type { HouseholdRecord, HouseholdOverlay } from "../types";
 
 export function GranteeResolutionForm({
@@ -23,7 +24,9 @@ export function GranteeResolutionForm({
     <form onSubmit={onSubmit} className="border-b border-[#c9c3b6] bg-[#f3ead8] px-4 py-4 sm:px-5">
       <h3 className="font-semibold">Choose the verified grantee</h3>
       <p className="mt-1 text-xs leading-5 text-[#5b574e]">
-        No member is preselected. This creates a mock correction overlay; imported flags stay as recorded.
+        {isDemoMode
+          ? "No member is preselected. This creates a mock correction overlay; imported flags stay as recorded."
+          : "No member is preselected. This records a local correction for this session; imported flags stay as recorded."}
       </p>
       <fieldset className="mt-3 space-y-2">
         <legend className="sr-only">Select one household member as the grantee</legend>

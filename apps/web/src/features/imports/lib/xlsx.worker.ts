@@ -1,5 +1,6 @@
 /// <reference lib="webworker" />
 import {
+  extractSheetWorkbook,
   inspectWorkbookSheet,
   parseWorkbookSheet,
   readWorkbookSheetNames,
@@ -24,14 +25,16 @@ import {
  * chosen sheet; the previously parsed sheet is dropped to free memory.
  *
  * Protocol (main -> worker):
- *   { type: "open",    id, buffer, fileName, size, maxBytes }   // names only
- *   { type: "inspect", id, sheetName, headerRow? }              // focused parse + inspect
+ *   { type: "open",    id, buffer, fileName, size }            // names only
+ *   { type: "inspect", id, sheetName, headerRow? }             // focused parse + inspect
+ *   { type: "extract", id, sheetName }                         // single-sheet copy for upload
  *   { type: "release" }            drop bytes and parsed sheet, free memory
  *
  * Protocol (worker -> main):
  *   { type: "progress", id, stage }
  *   { type: "opened",   id, fileHash, size, sheetNames }
  *   { type: "inspected",id, inspection }
+ *   { type: "extracted",id, buffer, hash, size }
  *   { type: "error",    id, message, retryable }
  */
 
@@ -41,7 +44,6 @@ type OpenRequest = {
   buffer: ArrayBuffer;
   fileName: string;
   size: number;
-  maxBytes: number;
 };
 
 type InspectRequest = {
@@ -51,9 +53,15 @@ type InspectRequest = {
   headerRow?: number;
 };
 
+type ExtractRequest = {
+  type: "extract";
+  id: number;
+  sheetName: string;
+};
+
 type ReleaseRequest = { type: "release" };
 
-type WorkerRequest = OpenRequest | InspectRequest | ReleaseRequest;
+type WorkerRequest = OpenRequest | InspectRequest | ExtractRequest | ReleaseRequest;
 
 type WorkerResponse =
   | { type: "progress"; id: number; stage: "hashing" | "parsing" | "sheet" | "ready" }
@@ -65,6 +73,7 @@ type WorkerResponse =
       sheetNames: string[];
     }
   | { type: "inspected"; id: number; inspection: ReturnType<typeof inspectWorkbookSheet> }
+  | { type: "extracted"; id: number; buffer: ArrayBuffer; hash: string; size: number }
   | { type: "error"; id: number; message: string; retryable: boolean };
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
@@ -91,7 +100,7 @@ function isBlankBuffer(bytes: ArrayBuffer): boolean {
 }
 
 async function handleOpen(request: OpenRequest): Promise<void> {
-  const { id, size, maxBytes } = request;
+  const { id, size } = request;
   const bytes = request.buffer;
 
   // Release any workbook from a previous session before opening a new one.
@@ -103,15 +112,10 @@ async function handleOpen(request: OpenRequest): Promise<void> {
     return;
   }
 
-  if (size > maxBytes) {
-    const mb = Math.round(maxBytes / (1024 * 1024));
-    fail(
-      id,
-      new Error(`This file is ${(size / 1024 / 1024).toFixed(1)} MB. The limit is ${mb} MB. Split the workbook first.`),
-      false,
-    );
-    return;
-  }
+  // NOTE: no whole-file size check here on purpose. The upload cap applies to
+  // what gets uploaded — the workbook when it fits, otherwise just the sheet
+  // being imported (see upload-target.ts) — so a large workbook must still
+  // open, list its sheets, and let the operator pick one.
 
   try {
     post({ type: "progress", id, stage: "hashing" });
@@ -157,6 +161,33 @@ async function handleInspect(request: InspectRequest): Promise<void> {
   }
 }
 
+/**
+ * Build a single-sheet copy of the chosen worksheet for upload. Used when the
+ * whole workbook exceeds the upload cap: only the imported sheet is sent, so
+ * the limit applies to the sheet's data rather than the entire file. The bytes
+ * are transferred (not cloned) back to the main thread.
+ */
+async function handleExtract(request: ExtractRequest): Promise<void> {
+  const { id, sheetName } = request;
+  if (!buffer) {
+    fail(id, new Error("No workbook is loaded. Choose a file first."), true);
+    return;
+  }
+  try {
+    post({ type: "progress", id, stage: "sheet" });
+    const extracted = await extractSheetWorkbook(buffer, sheetName);
+    const size = extracted.bytes.byteLength;
+    post(
+      { type: "extracted", id, buffer: extracted.bytes, hash: extracted.hash, size },
+      [extracted.bytes],
+    );
+  } catch (error) {
+    // Extraction reuses the focused-parse errors, which already carry the
+    // real cause for this specific worksheet.
+    fail(id, error, false);
+  }
+}
+
 function release() {
   buffer = null;
   focused = null;
@@ -170,6 +201,9 @@ ctx.addEventListener("message", (event: MessageEvent<WorkerRequest>) => {
       return;
     case "inspect":
       void handleInspect(request);
+      return;
+    case "extract":
+      void handleExtract(request);
       return;
     case "release":
       release();

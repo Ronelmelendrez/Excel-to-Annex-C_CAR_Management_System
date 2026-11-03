@@ -10,8 +10,15 @@ import {
   type WorkbookBundle,
 } from "../lib/analysis";
 import { workbookClient, type OpenProgress } from "../lib/workbook-client";
+import { buildUploadTarget, type UploadTarget } from "../lib/upload-target";
 import { IMPORT_BATCH_SIZE, IMPORT_MAX_ROWS } from "../lib/import-limits";
-import { commitImport, isDuplicateConflict, previewImport, uploadWorkbook } from "../api";
+import {
+  commitImport,
+  isDuplicateConflict,
+  previewImport,
+  storageHashFromPath,
+  uploadWorkbook,
+} from "../api";
 import { isDemoMode } from "../../../shared/supabase";
 import {
   LOCK_RENEW_MS,
@@ -168,6 +175,10 @@ export function useImportWizard(params: {
   /** Re-entrancy guard so a double-click on "Save to Supabase" cannot run two
    * concurrent validate/commit cycles (the second would risk a duplicate write). */
   const saveRunRef = useRef(false);
+  /** Cache of the upload target per (file, sheet): an oversized workbook is
+   * reduced to a single-sheet copy by re-parsing it, so validate + commit
+   * must share one extraction instead of doing it twice. */
+  const uploadTargetRef = useRef<{ key: string; target: UploadTarget } | null>(null);
 
   const reportStoreError = useCallback((error: unknown) => {
     const mapped = mapStoreError(error);
@@ -573,6 +584,23 @@ export function useImportWizard(params: {
   );
 
   /**
+   * The bytes this save will upload: the workbook itself when it fits the
+   * cap, otherwise a single-sheet copy of the chosen worksheet — the limit
+   * applies to the sheet being imported, not to the whole file (see
+   * upload-target.ts). Keyed by file + sheet so validate and commit reuse
+   * one extraction, and so a sheet change naturally invalidates it.
+   */
+  const getUploadTarget = useCallback(async (): Promise<UploadTarget> => {
+    if (!bundle || !sheet) throw new Error("Choose a workbook and worksheet first.");
+    const key = `${bundle.fileHash}:${sheet.sheetName}`;
+    const cached = uploadTargetRef.current;
+    if (cached?.key === key) return cached.target;
+    const target = await buildUploadTarget(bundle, sheet.sheetName);
+    uploadTargetRef.current = { key, target };
+    return target;
+  }, [bundle, sheet]);
+
+  /**
    * Upload + server validation. Returns the preview together with the storage
    * path it was validated against, or null when a guard or the server stopped
    * the flow (the error is already surfaced). The busy state belongs to the
@@ -600,9 +628,14 @@ export function useImportWizard(params: {
     }
 
     try {
+      const target = await getUploadTarget();
       let path = storagePath;
-      if (!path) {
-        const uploaded = await uploadWorkbook({ userId, file: bundle.file, fileHash: bundle.fileHash });
+      // The stored object must hold exactly these bytes. Its path embeds the
+      // hash it was uploaded under, so a matching folder means the upload is
+      // already done (legacy sessions stored the original file, whose hash is
+      // bundle.fileHash — the same comparison either way).
+      if (!path || storageHashFromPath(path) !== target.hash) {
+        const uploaded = await uploadWorkbook({ userId, file: target.file, fileHash: target.hash });
         path = uploaded.path;
         setStoragePath(path);
         // Upload succeeded -> safe to record the storage path checkpoint.
@@ -613,7 +646,7 @@ export function useImportWizard(params: {
         sheet_name: sheet.sheetName,
         header_row: sheet.headerRow,
         column_mapping: sheet.mapping as ColumnMapping,
-        file_hash: bundle.fileHash,
+        file_hash: target.hash,
         file_name: bundle.file.name,
       };
       const nextPreview = await previewImport(payload);
@@ -628,7 +661,7 @@ export function useImportWizard(params: {
       persistSession({ lastError: e?.message ?? "validation_failed" });
       return null;
     }
-  }, [bundle, coverage.missing, persistSession, sheet, storagePath, userId]);
+  }, [bundle, coverage.missing, getUploadTarget, persistSession, sheet, storagePath, userId]);
 
   /**
    * Write a validated preview to Supabase. The busy state belongs to the
@@ -649,9 +682,12 @@ export function useImportWizard(params: {
 
       setError(null);
       try {
+        const target = await getUploadTarget();
         let path = pathOverride ?? storagePath;
-        if (!path) {
-          const uploaded = await uploadWorkbook({ userId, file: bundle.file, fileHash: bundle.fileHash });
+        // Same content-addressed check as runValidate: reuse the stored copy
+        // only when it already holds exactly these bytes.
+        if (!path || storageHashFromPath(path) !== target.hash) {
+          const uploaded = await uploadWorkbook({ userId, file: target.file, fileHash: target.hash });
           path = uploaded.path;
           setStoragePath(path);
           persistSession({ storagePath: path, checkpoint: "uploaded" });
@@ -665,7 +701,7 @@ export function useImportWizard(params: {
           sheet_name: sheet.sheetName,
           header_row: sheet.headerRow,
           column_mapping: sheet.mapping as ColumnMapping,
-          file_hash: bundle.fileHash,
+          file_hash: target.hash,
           file_name: bundle.file.name,
           confirm_duplicate: duplicateConfirmed,
         });
@@ -701,7 +737,7 @@ export function useImportWizard(params: {
         }
       }
     },
-    [bundle, duplicateConfirmed, onCommitted, persistSession, sheet, storagePath, userId],
+    [bundle, duplicateConfirmed, getUploadTarget, onCommitted, persistSession, sheet, storagePath, userId],
   );
 
   const validate = useCallback(async () => {

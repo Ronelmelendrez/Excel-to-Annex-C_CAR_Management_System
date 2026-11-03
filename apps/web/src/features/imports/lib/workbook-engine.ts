@@ -259,6 +259,44 @@ export async function parseWorkbookSheet(
   return readSheetWithRecovery(XLSX, buffer, sheetName);
 }
 
+export type ExtractedSheet = {
+  /** Bytes of a fresh single-sheet workbook holding only `sheetName`. */
+  bytes: ArrayBuffer;
+  /** SHA-256 of `bytes` — the fingerprint the server verifies on upload. */
+  hash: string;
+};
+
+/**
+ * Re-serialize ONE worksheet into a new single-sheet workbook.
+ *
+ * This is how a workbook larger than the upload cap still imports: only the
+ * worksheet the operator chose is uploaded, so the size limit applies to the
+ * sheet being imported — extra sheets, formatting, and images never count
+ * against it. SheetJS writes deterministic bytes for identical input, so
+ * re-extracting the same sheet in a later session yields the same hash:
+ * resume, content-addressed storage paths, and duplicate detection keep
+ * working exactly as before. Cell values survive the round trip untouched
+ * (the server re-reads and validates them from these bytes regardless).
+ */
+export async function extractSheetWorkbook(
+  buffer: ArrayBuffer,
+  sheetName: string,
+): Promise<ExtractedSheet> {
+  assertWorkbookMagic(new Uint8Array(buffer));
+  const XLSX = await import("xlsx");
+  const parsed = readSheetWithRecovery(XLSX, buffer, sheetName);
+  const sheet = parsed.workbook?.Sheets?.[sheetName];
+  if (!sheet || typeof sheet !== "object") {
+    throw new Error(
+      `The worksheet "${sheetName}" could not be extracted from the workbook. Copy it into a new sheet in Excel, save the workbook as .xlsx, and try again.`,
+    );
+  }
+  const single = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(single, sheet, sheetName);
+  const bytes = XLSX.write(single, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+  return { bytes, hash: await sha256Hex(bytes) };
+}
+
 function sheetRefRange(parsed: ParsedSheet, sheetName: string) {
   const sheet = parsed.workbook?.Sheets?.[sheetName];
   if (!sheet) {

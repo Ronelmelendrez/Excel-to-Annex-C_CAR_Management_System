@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { analyzeRows, autoMapping, MAX_IMPORT_ROWS, type ColumnMapping } from "@import-domain";
 import { IMPORT_MAX_BYTES, IMPORT_MAX_MB, IMPORT_MAX_ROWS } from "../lib/import-limits";
 import { readWorkbookFile } from "../lib/analysis";
+import { buildUploadTarget } from "../lib/upload-target";
 import {
   inspectWorkbookSheet,
   parseWorkbookSheet,
@@ -204,11 +205,11 @@ describe("large-file mapping preview", () => {
 });
 
 describe("import limits", () => {
-  it("defaults to 100 MB and 1,000,000 rows", async () => {
+  it("defaults to 50 MB and 1,000,000 rows", async () => {
     vi.resetModules();
     const mod = await import("../lib/import-limits");
-    expect(mod.IMPORT_MAX_MB).toBe(100);
-    expect(mod.IMPORT_MAX_BYTES).toBe(100 * 1024 * 1024);
+    expect(mod.IMPORT_MAX_MB).toBe(50);
+    expect(mod.IMPORT_MAX_BYTES).toBe(50 * 1024 * 1024);
     expect(mod.IMPORT_MAX_ROWS).toBe(1_000_000);
     expect(MAX_IMPORT_ROWS).toBe(1_000_000);
   });
@@ -233,18 +234,33 @@ describe("import limits", () => {
     vi.resetModules();
     try {
       const mod = await import("../lib/import-limits");
-      expect(mod.IMPORT_MAX_MB).toBe(100);
+      expect(mod.IMPORT_MAX_MB).toBe(50);
       expect(mod.IMPORT_MAX_ROWS).toBe(1_000_000);
     } finally {
       vi.unstubAllEnvs();
     }
   });
 
-  it("rejects a workbook over the byte cap with a clear MB message", async () => {
-    const file = new File([new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8])], "huge.xlsx");
+  it("opens a workbook over the byte cap — the cap applies at save time", async () => {
+    await ensureSubtleCrypto();
+    ensureFileArrayBuffer();
+    const XLSX = await import("xlsx");
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([HEADERS, ["A", "A1", "Ana", "Cruz", "Yes"]]),
+      "Data",
+    );
+    const bytes = XLSX.write(workbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+    const file = new File([bytes], "huge.xlsx");
     Object.defineProperty(file, "size", { value: 150 * 1024 * 1024, configurable: true });
 
-    await expect(workbookClient.open(file)).rejects.toThrow(/limit is 100 MB/);
+    // No whole-file rejection: names are read so a sheet can be chosen, and
+    // the size limit is enforced later against the upload itself (a
+    // single-sheet copy of the chosen worksheet — see upload-target tests).
+    const opened = await workbookClient.open(file);
+    expect(opened.sheetNames).toEqual(["Data"]);
+    expect(opened.size).toBe(150 * 1024 * 1024);
   });
 
   it("blocks a sheet over the row cap as a structural error", () => {
@@ -261,6 +277,91 @@ describe("import limits", () => {
     expect(rowLimit).toBeDefined();
     expect(rowLimit?.message).toContain("the limit is 4");
     expect(analysis.ok).toBe(false);
+  });
+});
+
+describe("upload target — the cap applies to the imported sheet", () => {
+  const SOURCE_HASH = "a".repeat(64);
+
+  beforeEach(() => {
+    void ensureSubtleCrypto();
+    ensureFileArrayBuffer();
+  });
+
+  /** A two-sheet workbook: a small import table plus a much larger sibling. */
+  async function twoSheetFile(): Promise<File> {
+    const XLSX = await import("xlsx");
+    const junk = Array.from({ length: 4000 }, (_, i) => [`JUNK_${i}`, `value_${i}`]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([HEADERS, ["A", "A1", "Ana", "Cruz", "Yes"]]),
+      "Data",
+    );
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([["JUNK_ID", "JUNK_VALUE"], ...junk]),
+      "Junk",
+    );
+    const bytes = XLSX.write(workbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+    return new File([bytes], "roster.xlsx");
+  }
+
+  it("uploads the original workbook untouched when it fits the cap", async () => {
+    const file = await twoSheetFile();
+    expect(file.size).toBeLessThan(IMPORT_MAX_BYTES);
+
+    const target = await buildUploadTarget({ file, fileHash: SOURCE_HASH }, "Data");
+
+    expect(target.extracted).toBe(false);
+    expect(target.file).toBe(file);
+    expect(target.hash).toBe(SOURCE_HASH);
+    expect(target.sourceSize).toBe(file.size);
+  });
+
+  it("reduces an oversized workbook to just the imported sheet", async () => {
+    const file = await twoSheetFile();
+    // Pretend the workbook on disk is over the cap without building 50 MB of
+    // data: the limit check reads file.size, extraction reads the real bytes.
+    Object.defineProperty(file, "size", { value: 60 * 1024 * 1024, configurable: true });
+    await workbookClient.open(file);
+
+    const target = await buildUploadTarget({ file, fileHash: SOURCE_HASH }, "Data");
+
+    expect(target.extracted).toBe(true);
+    expect(target.file).not.toBe(file);
+    expect(target.file.name).toBe("roster.xlsx");
+    expect(target.sourceSize).toBe(60 * 1024 * 1024);
+    expect(target.file.size).toBeLessThanOrEqual(IMPORT_MAX_BYTES);
+
+    // The uploaded bytes are a workbook holding ONLY the chosen sheet...
+    const uploaded = await target.file.arrayBuffer();
+    const XLSX = await import("xlsx");
+    const parsed = XLSX.read(uploaded, { type: "array" });
+    expect(parsed.SheetNames).toEqual(["Data"]);
+    // ...with every cell of that sheet preserved.
+    expect(XLSX.utils.sheet_to_json(parsed.Sheets.Data, { header: 1 })).toEqual([
+      HEADERS,
+      ["A", "A1", "Ana", "Cruz", "Yes"],
+    ]);
+
+    // The fingerprint the server recomputes from the stored bytes must match
+    // what the client sends — it is the hash of the upload, not of the source
+    // workbook the server never sees.
+    const digest = await crypto.subtle.digest("SHA-256", uploaded);
+    const hash = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+    expect(target.hash).toBe(hash);
+    expect(target.hash).not.toBe(SOURCE_HASH);
+  });
+
+  it("fails with a sheet-scoped message when even that sheet exceeds the cap", async () => {
+    const file = await twoSheetFile();
+    Object.defineProperty(file, "size", { value: 60 * 1024 * 1024, configurable: true });
+    await workbookClient.open(file);
+
+    await expect(
+      buildUploadTarget({ file, fileHash: SOURCE_HASH }, "Data", 10),
+    ).rejects.toThrow(/The worksheet "Data" alone is .* over the \d+ MB limit/);
   });
 });
 

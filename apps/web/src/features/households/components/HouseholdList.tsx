@@ -5,10 +5,12 @@ import { HouseholdStatusLabel } from "./primitives";
 
 export function HouseholdList({
   items,
+  total,
   selectedId,
   onSelect,
 }: {
   items: HouseholdListItem[];
+  total: number;
   selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
@@ -27,9 +29,15 @@ export function HouseholdList({
     >
       {items.length === 0 ? (
         <div className="px-3 py-8">
-          <p className="font-serif text-lg">No households match those filters.</p>
+          <p className="font-serif text-lg">
+            {total === 0
+              ? "No households in the register yet."
+              : "No households match those filters."}
+          </p>
           <p className="mt-1 text-sm leading-6 text-[#5b574e]">
-            Clear the search or choose a different import version.
+            {total === 0
+              ? "Import an Excel workbook on the Imports page to build the household register."
+              : "Clear the search or choose a different import version."}
           </p>
         </div>
       ) : (

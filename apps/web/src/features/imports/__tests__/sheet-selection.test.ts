@@ -436,3 +436,58 @@ describe("workbook with a bloated Sheet1 (huge used range)", () => {
     unmount();
   }, 60_000);
 });
+
+describe("workbook larger than the upload cap", () => {
+  it("opens anyway and uploads only the chosen sheet — the cap applies to the sheet, not the file", async () => {
+    // A 59.7 MB-style workbook: Sheet1 is a large sibling sheet, Sheet2 holds
+    // the Annex C table. The on-disk size is faked over the 50 MB cap so the
+    // test stays fast; the real bytes are what get parsed and extracted.
+    const junk = Array.from({ length: 4000 }, (_, i) => [`JUNK_${i}`, `value_${i}`]);
+    const bytes = buildWorkbookBytes({
+      Sheet1: [["JUNK_ID", "JUNK_VALUE"], ...junk],
+      Sheet2: DATA_ROWS,
+    });
+    const file = new File([bytes], "Annex C - 59.7 MB.xlsx");
+    Object.defineProperty(file, "size", { value: 60 * 1024 * 1024, configurable: true });
+
+    const { result, unmount } = renderHook(() => useImportWizard({ userId: "operator-1" }));
+
+    // Opening a file over the cap must NOT be rejected: the wizard reads the
+    // sheet names and lets the operator pick a worksheet. The cap is enforced
+    // at save time against what gets uploaded.
+    await act(async () => {
+      await result.current.chooseFile(file);
+    });
+    expect(result.current.error).toBeNull();
+    await waitFor(() => expect(result.current.stage).toBe("sheets"));
+    expect(result.current.bundle?.sheetNames).toEqual(["Sheet1", "Sheet2"]);
+    expect(result.current.bundle?.size).toBe(60 * 1024 * 1024);
+
+    await act(async () => {
+      result.current.selectSheet("Sheet2");
+    });
+    await waitFor(() => expect(result.current.stage).toBe("shape"));
+    expect(result.current.sheet?.headers).toEqual(ANNEX_HEADERS);
+    expect(result.current.coverage.missing).toEqual([]);
+
+    // One click on Save to Supabase: because the workbook is over the cap,
+    // only a single-sheet copy of Sheet2 is uploaded. The server preview runs
+    // against THOSE bytes, so the workbook's other sheets never count against
+    // the 50 MB limit.
+    await act(async () => {
+      await result.current.saveToSupabase();
+    });
+    expect(result.current.error).toBeNull();
+    expect(result.current.stage).toBe("committed");
+
+    // Proof the upload held only the chosen sheet: the stored workbook lists
+    // just Sheet2 (Sheet1's junk never left the browser), and its fingerprint
+    // is the SHA-256 of the single-sheet copy — different from the original
+    // 60 MB file's hash, because the uploaded bytes are not the whole file.
+    expect(result.current.preview?.sheet_names).toEqual(["Sheet2"]);
+    expect(result.current.preview?.file_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(result.current.preview?.file_hash).not.toBe(result.current.bundle?.fileHash);
+    expect(result.current.result).not.toBeNull();
+    unmount();
+  }, 60_000);
+});

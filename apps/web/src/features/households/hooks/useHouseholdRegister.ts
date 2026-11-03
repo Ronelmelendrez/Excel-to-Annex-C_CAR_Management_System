@@ -1,6 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { normalizeGrantee } from "@import-domain";
+import { householdListError, listHouseholds } from "../api";
+import { isDemoMode } from "../../../shared/supabase";
 import { mockHouseholds } from "../mock-data";
+import type { HouseholdRecord } from "../mock-data";
 import type {
   HouseholdOverlay,
   HouseholdStatus,
@@ -9,11 +12,11 @@ import type {
 } from "../types";
 import { getGranteeStatus } from "../lib/households";
 
-export function useHouseholdRegister(actor: string) {
+export function useHouseholdRegister(actor: string, enabled = true) {
   const [query, setQuery] = useState("");
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>("all");
   const [versionFilter, setVersionFilter] = useState("all");
-  const [selectedId, setSelectedId] = useState(mockHouseholds[0]?.id ?? "");
+  const [selectedId, setSelectedId] = useState("");
   const [overlays, setOverlays] = useState<Record<string, HouseholdOverlay>>({});
   const [showResolveForm, setShowResolveForm] = useState(false);
   const [candidateId, setCandidateId] = useState("");
@@ -22,9 +25,52 @@ export function useHouseholdRegister(actor: string) {
   const [exclusionReason, setExclusionReason] = useState("");
   const [feedback, setFeedback] = useState("");
 
+  // Demo mode seeds the sample synchronously so the first render is complete;
+  // real mode starts empty and loads from Supabase below.
+  const [households, setHouseholds] = useState<HouseholdRecord[]>(() =>
+    isDemoMode ? mockHouseholds : [],
+  );
+  const [loading, setLoading] = useState(!isDemoMode);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
+
+  useEffect(() => {
+    if (isDemoMode || !enabled) return;
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
+    listHouseholds()
+      .then((result) => {
+        if (cancelled) return;
+        setHouseholds(result.households);
+        setLoading(false);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setLoadError(householdListError(error));
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, reloadToken]);
+
+  const versionOptions = useMemo(() => {
+    const options = new Map<string, string>();
+    for (const household of households) {
+      const value = `${household.importName}::${household.importVersion}`;
+      if (options.has(value)) continue;
+      const file = household.importName.replace(/\.(xlsx|xlsm|xls|csv)$/i, "");
+      options.set(value, `${file} · v${household.importVersion}`);
+    }
+    return [...options.entries()]
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [households]);
+
   const visibleHouseholds = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
-    return mockHouseholds.flatMap((household) => {
+    return households.flatMap((household) => {
       const overlay = overlays[household.id];
       const status: HouseholdStatus = overlay?.selectedGranteeId
         ? "resolved"
@@ -39,18 +85,20 @@ export function useHouseholdRegister(actor: string) {
         (reviewFilter === "needs_review" && status !== "valid" && status !== "resolved") ||
         (reviewFilter === "ok" && status === "valid") ||
         (reviewFilter === "resolved" && status === "resolved");
-      const matchesVersion = versionFilter === "all" || household.importVersion === Number(versionFilter);
+      const matchesVersion =
+        versionFilter === "all" ||
+        `${household.importName}::${household.importVersion}` === versionFilter;
 
       return matchesSearch && matchesStatus && matchesVersion ? [{ household, status }] : [];
     });
-  }, [overlays, query, reviewFilter, versionFilter]);
+  }, [households, overlays, query, reviewFilter, versionFilter]);
 
   const selected =
     visibleHouseholds.find(({ household }) => household.id === selectedId)?.household ??
     visibleHouseholds[0]?.household ??
     null;
   const selectedOverlay = selected ? overlays[selected.id] : undefined;
-  const selectedStatus = selected
+  const selectedStatus: HouseholdStatus | null = selected
     ? selectedOverlay?.selectedGranteeId
       ? "resolved"
       : getGranteeStatus(selected, selectedOverlay?.excludedMemberIds)
@@ -58,20 +106,23 @@ export function useHouseholdRegister(actor: string) {
   const activeGrantee = selectedOverlay?.selectedGranteeId
     ? selected?.members.find((member) => member.id === selectedOverlay.selectedGranteeId)
     : selected?.members.find((member) => normalizeGrantee(member.granteeFlag) === true);
-  const needsReviewCount = mockHouseholds.filter((household) => {
+  const needsReviewCount = households.filter((household) => {
     const overlay = overlays[household.id];
     return overlay?.selectedGranteeId
       ? false
       : getGranteeStatus(household, overlay?.excludedMemberIds) !== "valid";
   }).length;
-  const granteeCount = mockHouseholds.filter((household) => {
+  const granteeCount = households.filter((household) => {
     const overlay = overlays[household.id];
     return (
       Boolean(overlay?.selectedGranteeId) ||
       getGranteeStatus(household, overlay?.excludedMemberIds) === "valid"
     );
   }).length;
-  const totalMembers = mockHouseholds.reduce((total, household) => total + household.members.length, 0);
+  const totalMembers = households.reduce(
+    (total, household) => total + household.members.length,
+    0,
+  );
 
   function recordOverlay(householdId: string, event: OverlayEvent, update: Partial<HouseholdOverlay>) {
     setOverlays((current) => {
@@ -155,7 +206,7 @@ export function useHouseholdRegister(actor: string) {
       {
         action: "Member restored",
         actor,
-        reason: "Restored in this mock session.",
+        reason: "Restored in this session.",
         memberName: member.name,
         beforeValue: "Excluded by local overlay",
         afterValue: "Included in household",
@@ -163,7 +214,7 @@ export function useHouseholdRegister(actor: string) {
       },
       { excludedMemberIds },
     );
-    setFeedback(`${member.name} was restored in this mock session.`);
+    setFeedback(`${member.name} was restored.`);
   }
 
   function selectHousehold(id: string) {
@@ -197,7 +248,16 @@ export function useHouseholdRegister(actor: string) {
     setExclusionReason("");
   }
 
+  function reload() {
+    setReloadToken((token) => token + 1);
+  }
+
   return {
+    households,
+    loading,
+    loadError,
+    reload,
+    versionOptions,
     query,
     setQuery,
     reviewFilter,

@@ -6,8 +6,14 @@ import { MAX_IMPORT_BYTES, MAX_IMPORT_ROWS } from "@import-domain";
  * The shared domain exports safe defaults that also guard the server. The web
  * build can override them with Vite env vars without touching shared code:
  *
- *   VITE_IMPORT_MAX_MB=100     # byte cap for the workbook the browser/server will accept
+ *   VITE_IMPORT_MAX_MB=50      # byte cap for the upload (see below)
  *   VITE_IMPORT_MAX_ROWS=1000000  # per-sheet row cap enforced during validation
+ *
+ * The MB cap applies to what gets uploaded, NOT to the workbook on disk: a
+ * file that fits is uploaded as-is; a larger one is reduced at save time to a
+ * single-sheet copy of the worksheet being imported (lib/upload-target.ts),
+ * so the limit counts the imported sheet's data rather than the whole Excel
+ * file. The server enforces the same cap on the stored bytes.
  *
  * Values are validated here so a bad env var degrades to the safe default
  * rather than producing an unusable or unlimited import.
@@ -26,7 +32,7 @@ function readPositiveMb(raw: string | undefined, fallbackMb: number): number {
 
 const DEFAULT_MB = Math.round(MAX_IMPORT_BYTES / (1024 * 1024));
 
-/** Byte cap for an uploaded workbook (default 100 MB). */
+/** Byte cap for an uploaded workbook or single-sheet extract (default 50 MB). */
 export const IMPORT_MAX_MB = readPositiveMb(import.meta.env.VITE_IMPORT_MAX_MB, DEFAULT_MB);
 export const IMPORT_MAX_BYTES = IMPORT_MAX_MB * 1024 * 1024;
 

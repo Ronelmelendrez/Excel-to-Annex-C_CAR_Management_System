@@ -3,6 +3,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuth } from "../../../app/providers";
 import { HouseholdsPage } from "../components/HouseholdsPage";
+import { HouseholdMembersTable } from "../components/HouseholdMembersTable";
+import type { HouseholdRecord } from "../types";
 
 vi.mock("../../../app/providers", () => ({
   useAuth: vi.fn(),
@@ -86,5 +88,56 @@ describe("F4 household register", () => {
 
     expect(screen.getByRole("alert").textContent).toContain("You do not have access");
     expect(screen.queryByText("HH_ID 000083")).toBeNull();
+  });
+
+  it("shows every imported Excel column for a member source row", () => {
+    const household: HouseholdRecord = {
+      id: "hh-live",
+      hhId: "000777",
+      barangay: "Bagong Silang",
+      municipality: "Roxas City",
+      importName: "annex-c-44-columns.xlsx",
+      importVersion: 1,
+      headers: ["HH_ID", "LRN", "PCN_REMARKS"],
+      members: [
+        {
+          id: "m-live-1",
+          entryId: "E-1",
+          name: "Ana Reyes",
+          relationship: "Household head",
+          age: 33,
+          granteeFlag: "Yes",
+          sourceRow: 7,
+          raw: ["000777", "LRN-998877", null],
+        },
+      ],
+      car: null,
+    };
+
+    render(
+      <HouseholdMembersTable
+        household={household}
+        overlay={undefined}
+        granteeId="m-live-1"
+        canCorrect={false}
+        excludeMemberId={null}
+        exclusionReason=""
+        onStartExclusion={vi.fn()}
+        onReasonChange={vi.fn()}
+        onSaveExclusion={vi.fn()}
+        onCancelExclusion={vi.fn()}
+        onRestoreMember={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+
+    expect(screen.getByText("Excel row 7 · every column as imported")).toBeTruthy();
+    expect(screen.getByText("HH_ID")).toBeTruthy();
+    expect(screen.getByText("000777")).toBeTruthy();
+    expect(screen.getByText("LRN-998877")).toBeTruthy();
+    // Blank cells render as an em dash rather than an empty value.
+    expect(screen.getByText("—")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Hide columns" })).toBeTruthy();
   });
 });

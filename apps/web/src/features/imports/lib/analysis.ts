@@ -7,7 +7,6 @@ import {
 } from "@import-domain";
 import type { ImportPreview, SheetInspection } from "../types";
 import { workbookClient, type WorkbookBundle } from "./workbook-client";
-import { IMPORT_MAX_BYTES } from "./import-limits";
 
 export type { WorkbookBundle };
 
@@ -16,7 +15,9 @@ export type { WorkbookBundle };
  * lightweight metadata — file hash and worksheet names, no worksheet data.
  * The worksheet the operator picks is parsed later, on demand (see
  * workbook-client.ts / xlsx.worker.ts). Throws a user-facing message when the
- * file is the wrong type, too large, or cannot be opened.
+ * file is the wrong type or cannot be opened. No whole-file size check happens
+ * here: the upload cap is enforced at save time against what gets uploaded
+ * (see upload-target.ts).
  */
 export async function readWorkbookFile(
   file: File,
@@ -26,11 +27,7 @@ export async function readWorkbookFile(
     throw new Error("Choose an .xlsx or .xls workbook. Other file types are not read.");
   }
 
-  const { fileHash, size, sheetNames } = await workbookClient.open(
-    file,
-    IMPORT_MAX_BYTES,
-    buffer,
-  );
+  const { fileHash, size, sheetNames } = await workbookClient.open(file, buffer);
   return { file, fileHash, size, sheetNames };
 }
 
