@@ -225,25 +225,27 @@ export function CarEditor({
       </header>
 
       {mode === "edit" ? (
-        <div className="grid items-start gap-5 lg:grid-cols-[150px_minmax(0,1fr)] xl:grid-cols-[150px_minmax(0,1.7fr)_minmax(260px,0.85fr)]">
-          <div className="hidden lg:block print:hidden">
+        <div className="space-y-5">
+          <div className="min-w-0 print:hidden">
             <SectionRail
               missingBySection={sectionCounts}
               onJumpToSection={(sectionId) => onJumpToField(`section-${sectionId}`)}
             />
           </div>
-          <CarReportDocument
-            draft={draft}
-            household={household}
-            mode={mode}
-            onSlotEdit={onUpdateSlot}
-            onSlotReveal={onSlotReveal}
-            onUpdateFamilyMember={onUpdateFamilyMember}
-            onUpdateIntervention={onUpdateIntervention}
-            onAddIntervention={onAddIntervention}
-            onRemoveIntervention={onRemoveIntervention}
-          />
-          <div className="lg:col-span-2 xl:col-span-1 print:hidden">
+          <div className="min-w-0">
+            <CarReportDocument
+              draft={draft}
+              household={household}
+              mode={mode}
+              onSlotEdit={onUpdateSlot}
+              onSlotReveal={onSlotReveal}
+              onUpdateFamilyMember={onUpdateFamilyMember}
+              onUpdateIntervention={onUpdateIntervention}
+              onAddIntervention={onAddIntervention}
+              onRemoveIntervention={onRemoveIntervention}
+            />
+          </div>
+          <div className="mx-auto w-full max-w-[900px] print:hidden">
             <ReportContextPanel
               draft={draft}
               checklist={checklist}

@@ -17,7 +17,7 @@ export function SectionRail({
       <p className="mb-1 px-1 font-mono text-[10px] uppercase tracking-[0.14em] text-[#5b574e]">
         Sections
       </p>
-      <ul className="space-y-0.5">
+      <ul className="grid grid-cols-2 gap-1 sm:grid-cols-3 xl:grid-cols-4">
         {REPORT_TEMPLATE.sections
           .filter((section) => section.id !== "header")
           .map((section) => {
@@ -27,7 +27,7 @@ export function SectionRail({
                 <button
                   type="button"
                   onClick={() => onJumpToSection(section.id)}
-                  className="flex min-h-[34px] w-full items-center justify-between gap-2 px-2 text-left text-sm hover:bg-[#ece7dc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
+                  className="flex min-h-[40px] w-full items-center justify-between gap-2 px-2 text-left text-sm hover:bg-[#ece7dc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
                 >
                   <span className="flex min-w-0 items-center gap-2">
                     <span className="w-10 shrink-0 font-mono text-[10px] uppercase text-[#5b574e]">
