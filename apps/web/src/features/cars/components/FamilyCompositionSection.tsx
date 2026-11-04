@@ -16,7 +16,7 @@ export function FamilyCompositionSection({
     <section id="familyComposition" aria-labelledby="family-composition-heading" className="border-b border-[#c9c3b6] px-4 py-5 sm:px-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 id="family-composition-heading" className="font-serif text-xl">Family composition</h3>
-        <p className="text-xs text-[#5b574e]">Member details copied from the household sample</p>
+        <p className="text-xs text-[#5b574e]">Member details copied from the imported household record</p>
       </div>
       {members.length === 0 ? (
         <p className="mt-3 border-l-4 border-[#8a5a00] bg-[#f3ead8] px-3 py-3 text-sm leading-6 text-[#704700]">

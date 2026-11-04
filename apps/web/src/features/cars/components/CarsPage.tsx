@@ -1,13 +1,36 @@
 import React from "react";
 import { useAuth } from "../../../app/providers";
+import { CAR_NOT_CONFIGURED_MESSAGE } from "../api";
 import { useCarAuthoring } from "../hooks/useCarAuthoring";
 import { CarDraftList } from "./CarDraftList";
 import { CarEditor } from "./CarEditor";
 
+function StatusBadge({ text, tone }: { text: string; tone: "ok" | "warn" | "muted" }) {
+  const tones = {
+    ok: "border-[#244b2e] bg-[#e6efe7] text-[#244b2e]",
+    warn: "border-[#8a5a00] bg-[#f3ead8] text-[#704700]",
+    muted: "border-[#8c877c] bg-[#ece7dc] text-[#5b574e]",
+  } as const;
+  return (
+    <span className={`border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] ${tones[tone]}`}>
+      {text}
+    </span>
+  );
+}
+
+function Panel({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="border border-[#c9c3b6] bg-[#f8f5ee] px-5 py-8">
+      <h2 className="font-serif text-2xl">{title}</h2>
+      <div className="mt-2 max-w-[70ch] text-sm leading-6 text-[#5b574e]">{children}</div>
+    </section>
+  );
+}
+
 export function CarsPage() {
   const { roles } = useAuth();
-  const authoring = useCarAuthoring();
   const canAuthor = roles.includes("admin") || roles.includes("case_worker");
+  const authoring = useCarAuthoring(canAuthor);
 
   if (!canAuthor) {
     return (
@@ -19,6 +42,90 @@ export function CarsPage() {
         <p className="mt-2 text-sm leading-6 text-[#3f3b34]">
           CAR drafts are available to case workers. Ask an administrator to review your account role.
         </p>
+      </div>
+    );
+  }
+
+  const badge = authoring.notConfigured
+    ? { text: "Supabase not configured", tone: "warn" as const }
+    : authoring.loading
+      ? { text: "Loading CARs…", tone: "muted" as const }
+      : authoring.loadError
+        ? { text: "CARs unavailable", tone: "warn" as const }
+        : { text: "Saved in Supabase", tone: "ok" as const };
+
+  let body: React.ReactNode;
+  if (authoring.notConfigured) {
+    body = (
+      <Panel title="CAR data comes from Supabase">
+        <p>{CAR_NOT_CONFIGURED_MESSAGE}</p>
+        <p className="mt-2">
+          Until then this page stays empty — it never falls back to sample records. Set the two
+          environment variables in <code className="font-mono text-xs">apps/web/.env.local</code>,
+          apply <code className="font-mono text-xs">supabase/migrations</code>, and deploy the{" "}
+          <code className="font-mono text-xs">cars</code> function.
+        </p>
+      </Panel>
+    );
+  } else if (authoring.loading) {
+    body = (
+      <Panel title="Loading CARs">
+        <p role="status">Reading case assessment records from Supabase…</p>
+      </Panel>
+    );
+  } else if (authoring.loadError) {
+    body = (
+      <div
+        role="alert"
+        className="max-w-[70ch] border-l-4 border-[#7a1f1f] border-y border-r border-[#7a1f1f] bg-[#f2e4e1] px-4 py-4"
+      >
+        <h2 className="font-serif text-xl">CAR drafts could not be loaded</h2>
+        <p className="mt-2 text-sm leading-6 text-[#3f3b34]">{authoring.loadError}</p>
+        <button
+          type="button"
+          onClick={authoring.reload}
+          className="mt-3 min-h-[40px] border border-[#161512] bg-[#161512] px-4 py-2 text-sm font-medium text-[#f4f1ea] hover:bg-[#7a1f1f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  } else {
+    body = (
+      <div className="mt-5 grid items-start gap-6 lg:grid-cols-[minmax(245px,0.72fr)_minmax(0,1.8fr)]">
+        <CarDraftList
+          drafts={authoring.drafts}
+          households={authoring.households}
+          householdsError={authoring.householdsError}
+          actionError={authoring.createError}
+          creating={authoring.creating}
+          selectedDraftId={authoring.selectedDraft?.id ?? null}
+          onSelectDraft={authoring.selectDraft}
+          onCreateDraft={authoring.createCarDraft}
+        />
+        <CarEditor
+          key={authoring.selectedDraft?.id ?? "no-draft"}
+          draft={authoring.selectedDraft}
+          household={authoring.household}
+          checklist={authoring.checklist}
+          history={authoring.history}
+          saveState={authoring.saveState}
+          saveError={authoring.saveError}
+          actionError={authoring.actionError}
+          deleting={authoring.deleting}
+          creatingRevision={authoring.creatingRevision}
+          previewOpen={authoring.previewOpen}
+          templateVersions={authoring.templateVersions}
+          onUpdateDraft={authoring.updateDraft}
+          onUpdateFamilyMember={authoring.updateFamilyMember}
+          onUpdateIntervention={authoring.updateIntervention}
+          onAddIntervention={authoring.addIntervention}
+          onRemoveIntervention={authoring.removeIntervention}
+          onJumpToField={authoring.jumpToField}
+          onSetPreview={authoring.setPreviewOpen}
+          onDelete={authoring.deleteDraft}
+          onCreateRevision={authoring.createRevision}
+        />
       </div>
     );
   }
@@ -38,37 +145,11 @@ export function CarsPage() {
               Create a draft from a validated household, record case-worker content, and review a clearly marked preview.
             </p>
           </div>
-          <span className="border border-[#8a5a00] bg-[#f3ead8] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[#704700]">
-            Mock drafts · changes reset on reload
-          </span>
+          <StatusBadge text={badge.text} tone={badge.tone} />
         </div>
       </header>
 
-      <div className="mt-5 grid items-start gap-6 lg:grid-cols-[minmax(245px,0.72fr)_minmax(0,1.8fr)]">
-        <CarDraftList
-          drafts={authoring.drafts}
-          households={authoring.validatedHouseholds}
-          selectedDraftId={authoring.selectedDraft?.id ?? null}
-          onSelectDraft={authoring.selectDraft}
-          onCreateDraft={authoring.createCarDraft}
-        />
-        <CarEditor
-          draft={authoring.selectedDraft}
-          household={authoring.household}
-          checklist={authoring.checklist}
-          history={authoring.history}
-          saveState={authoring.saveState}
-          previewOpen={authoring.previewOpen}
-          templateVersions={authoring.templateVersions}
-          onUpdateDraft={authoring.updateDraft}
-          onUpdateFamilyMember={authoring.updateFamilyMember}
-          onUpdateIntervention={authoring.updateIntervention}
-          onAddIntervention={authoring.addIntervention}
-          onRemoveIntervention={authoring.removeIntervention}
-          onJumpToField={authoring.jumpToField}
-          onSetPreview={authoring.setPreviewOpen}
-        />
-      </div>
+      {body}
     </div>
   );
 }

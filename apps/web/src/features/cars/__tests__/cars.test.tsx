@@ -3,10 +3,107 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuth } from "../../../app/providers";
 import { CarsPage } from "../components/CarsPage";
+import { CAR_NOT_CONFIGURED_MESSAGE, listCars, createCar, deleteCar, updateCar, listCarTemplates, createCarRevision } from "../api";
+import { listHouseholds } from "../../households/api";
+import type { CarDraft } from "../types";
+import type { HouseholdRecord } from "../../households/mock-data";
+
+// Tests always run without Supabase credentials (vite.config.ts clears them),
+// so demo mode is forced off here and every data call is stubbed instead.
+const env = vi.hoisted(() => ({ demo: false }));
+
+vi.mock("../../../shared/supabase", () => ({
+  get isDemoMode() {
+    return env.demo;
+  },
+  supabase: {
+    auth: {
+      getSession: async () => ({ data: { session: null } }),
+    },
+  },
+}));
 
 vi.mock("../../../app/providers", () => ({
   useAuth: vi.fn(),
 }));
+
+vi.mock("../api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../api")>();
+  return {
+    ...actual,
+    listCars: vi.fn(),
+    listCarTemplates: vi.fn(),
+    createCar: vi.fn(),
+    updateCar: vi.fn(),
+    deleteCar: vi.fn(),
+    createCarRevision: vi.fn(),
+  };
+});
+
+vi.mock("../../households/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../households/api")>();
+  return { ...actual, listHouseholds: vi.fn() };
+});
+
+const validHousehold: HouseholdRecord = {
+  id: "hh-0091",
+  hhId: "000091",
+  barangay: "Poblacion II",
+  municipality: "Tanauan City",
+  importName: "SY2026_Q1_household_profiles.xlsx",
+  importVersion: 3,
+  members: [
+    { id: "m-091-1", entryId: "00009101", name: "Celia Ramos", relationship: "Household head", age: 42, granteeFlag: "No", sourceRow: 43 },
+    { id: "m-091-2", entryId: "00009102", name: "Jomar Ramos", relationship: "Son", age: 17, granteeFlag: "Yes", sourceRow: 44 },
+  ],
+  car: null,
+};
+
+// Two GRANTEE=Yes flags: the register marks this household "multiple", so it
+// must never appear as a CAR source.
+const invalidHousehold: HouseholdRecord = {
+  id: "hh-0083",
+  hhId: "000083",
+  barangay: "San Isidro",
+  municipality: "Tanauan City",
+  importName: "SY2026_Q1_household_profiles.xlsx",
+  importVersion: 3,
+  members: [
+    { id: "m-083-1", entryId: "00008301", name: "Rosa Dela Cruz", relationship: "Household head", age: 48, granteeFlag: "Yes", sourceRow: 17 },
+    { id: "m-083-2", entryId: "00008302", name: "Mario Dela Cruz", relationship: "Spouse", age: 51, granteeFlag: "Yes", sourceRow: 18 },
+  ],
+  car: null,
+};
+
+function makeCar(overrides: Partial<CarDraft> & { id: string; reference: string }): CarDraft {
+  return {
+    householdId: "hh-0091",
+    granteeMemberId: "m-091-2",
+    revision: 1,
+    status: "draft_incomplete",
+    workflowStatus: "draft",
+    hhId: "000091",
+    granteeName: "Jomar Ramos",
+    granteeSourceRow: 44,
+    importName: "SY2026_Q1_household_profiles.xlsx",
+    importVersion: 3,
+    templateVersion: "",
+    datePrepared: "",
+    presentingProblem: "",
+    backgroundInformation: "",
+    assessment: "",
+    interventions: [{ id: "intervention-1", type: "", details: "" }],
+    recommendation: "",
+    familyComposition: [
+      { id: "m-091-1", entryId: "00009101", name: "Celia Ramos", relationship: "Household head", age: 42, sourceRow: 43, include: true },
+      { id: "m-091-2", entryId: "00009102", name: "Jomar Ramos", relationship: "Son", age: 17, sourceRow: 44, include: true },
+    ],
+    history: [{ id: "h-created", label: "Draft created", at: "2026-10-28T08:30:00.000Z" }],
+    createdAt: "2026-10-28T08:30:00.000Z",
+    updatedAt: "2026-10-28T08:30:00.000Z",
+    ...overrides,
+  };
+}
 
 function authFor(roles: string[]) {
   return {
@@ -20,21 +117,61 @@ function authFor(roles: string[]) {
   };
 }
 
+async function renderLoadedPage() {
+  render(<CarsPage />);
+  return await screen.findByRole("heading", { name: /CAR-2026-023/ });
+}
+
 describe("F5 CAR authoring", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    env.demo = false;
     vi.mocked(useAuth).mockReturnValue(authFor(["case_worker"]));
+    vi.mocked(listCars).mockResolvedValue([makeCar({ id: "car-1", reference: "CAR-2026-023" })]);
+    vi.mocked(listCarTemplates).mockResolvedValue([
+      { id: "tpl-1", label: "Annex C · v1 (active)" },
+    ]);
+    vi.mocked(listHouseholds).mockResolvedValue({
+      households: [validHousehold, invalidHousehold],
+      total: 2,
+    });
+    vi.mocked(createCar).mockImplementation(async (householdId: string) =>
+      makeCar({
+        id: "car-2",
+        reference: "CAR-2026-024",
+        householdId,
+        familyComposition: validHousehold.members.map((member) => ({
+          id: member.id,
+          entryId: member.entryId,
+          name: member.name,
+          relationship: member.relationship,
+          age: member.age,
+          sourceRow: member.sourceRow,
+          include: true,
+        })),
+      }),
+    );
+    vi.mocked(updateCar).mockImplementation(async (draft: CarDraft) => ({
+      ...draft,
+      updatedAt: new Date().toISOString(),
+    }));
+    vi.mocked(deleteCar).mockResolvedValue(undefined);
+    vi.mocked(createCarRevision).mockResolvedValue(
+      makeCar({ id: "car-3", reference: "CAR-2026-023", revision: 2 }),
+    );
   });
 
   afterEach(() => {
     cleanup();
   });
 
-  it("shows a mock draft, validated source household, blank narrative fields, and missing-field checklist", () => {
-    render(<CarsPage />);
+  it("renders the CAR register loaded from Supabase with blank narrative fields", async () => {
+    await renderLoadedPage();
 
-    expect(screen.getByText("Mock drafts · changes reset on reload")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: /CAR-2026-023/ })).toBeTruthy();
+    expect(listCars).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Saved in Supabase")).toBeTruthy();
+    expect(screen.queryByText(/Mock drafts/)).toBeNull();
+    expect(screen.getByText("1 records")).toBeTruthy();
     expect(screen.getAllByText(/Jomar Ramos/).length).toBeGreaterThan(0);
     expect(screen.getByRole("textbox", { name: "Presenting problem" })).toHaveProperty("value", "");
     expect(screen.getByRole("textbox", { name: "Background information" })).toHaveProperty("value", "");
@@ -45,49 +182,74 @@ describe("F5 CAR authoring", () => {
     expect(screen.queryByRole("button", { name: /Approve|Submit for review/ })).toBeNull();
   });
 
-  it("creates a draft only after selecting a validated household", () => {
-    render(<CarsPage />);
+  it("creates a draft through the API only after selecting a validated household", async () => {
+    await renderLoadedPage();
 
     const householdSelect = screen.getByRole("combobox", { name: "Household" });
     expect((householdSelect as HTMLSelectElement).value).toBe("");
     expect(screen.getByRole("button", { name: "Create draft" })).toHaveProperty("disabled", true);
     expect(screen.getByRole("option", { name: /000091 · Jomar Ramos/ })).toBeTruthy();
-    expect(screen.queryByRole("option", { name: /000083|000104|000117|000132/ })).toBeNull();
+    expect(screen.queryByRole("option", { name: /000083/ })).toBeNull();
 
     fireEvent.change(householdSelect, { target: { value: "hh-0091" } });
     fireEvent.click(screen.getByRole("button", { name: "Create draft" }));
 
-    expect(screen.getByRole("heading", { name: /CAR-2026-024/ })).toBeTruthy();
+    await screen.findByRole("heading", { name: /CAR-2026-024/ });
+    expect(createCar).toHaveBeenCalledWith("hh-0091");
     expect(screen.getAllByText(/HH_ID 000091/).length).toBeGreaterThan(0);
   });
 
-  it("renders a non-final draft preview with blank sections clearly labeled", () => {
-    render(<CarsPage />);
-    fireEvent.click(screen.getByRole("button", { name: "Preview draft" }));
+  it("saves edits back to Supabase instead of keeping them in memory", async () => {
+    await renderLoadedPage();
 
-    expect(screen.getByText("DRAFT — NOT APPROVED")).toBeTruthy();
-    expect(screen.getByText(/not an official Annex C document/i)).toBeTruthy();
-    expect(screen.getAllByText("Not entered").length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: "Return to editor" })).toBeTruthy();
+    fireEvent.change(screen.getByRole("textbox", { name: "Presenting problem" }), {
+      target: { value: "Learner misses class three days a week." },
+    });
 
-    fireEvent.click(screen.getByRole("button", { name: "Return to editor" }));
-    expect(screen.getByRole("textbox", { name: "Presenting problem" })).toBeTruthy();
+    expect(screen.getByText("Saving to Supabase…")).toBeTruthy();
+
+    await waitFor(() => expect(updateCar).toHaveBeenCalledTimes(1), { timeout: 4000 });
+    expect(updateCar.mock.calls[0][0].id).toBe("car-1");
+    expect(updateCar.mock.calls[0][0].presentingProblem).toBe(
+      "Learner misses class three days a week.",
+    );
+
+    await screen.findByText("Saved to Supabase");
+    await screen.findByText("Changes saved");
   });
 
-  it("supports editing family composition and repeating intervention rows with local autosave", async () => {
+  it("deletes a draft through the API after an explicit confirmation", async () => {
+    await renderLoadedPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete draft" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+
+    await waitFor(() => expect(deleteCar).toHaveBeenCalledWith("car-1"));
+    await screen.findByText(/No CAR drafts yet/);
+    expect(screen.queryByRole("heading", { name: /CAR-2026-023/ })).toBeNull();
+  });
+
+  it("creates the next revision through the API", async () => {
+    await renderLoadedPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "New revision" }));
+
+    await waitFor(() => expect(createCarRevision).toHaveBeenCalledWith("car-1"));
+    await screen.findByRole("heading", { name: /CAR-2026-023/ });
+    expect(screen.getByRole("heading", { name: "Revision 2" })).toBeTruthy();
+    expect(screen.getAllByText(/Revision 2/).length).toBeGreaterThan(1);
+  });
+
+  it("shows an explicit not-configured state instead of sample records", () => {
+    env.demo = true;
+
     render(<CarsPage />);
 
-    const compositionToggle = screen.getAllByRole("checkbox", { name: /Included/ })[0];
-    fireEvent.click(compositionToggle);
-    expect(screen.getByText("Excluded from draft")).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: "Add intervention" }));
-    expect(screen.getByRole("group", { name: "Intervention 2" })).toBeTruthy();
-
-    await waitFor(() => {
-      expect(screen.getByText("Saved in this session")).toBeTruthy();
-      expect(screen.getByText("Autosaved locally")).toBeTruthy();
-    });
+    expect(screen.getByText(CAR_NOT_CONFIGURED_MESSAGE)).toBeTruthy();
+    expect(screen.getByText("Supabase not configured")).toBeTruthy();
+    expect(listCars).not.toHaveBeenCalled();
+    expect(screen.queryByRole("heading", { name: /CAR-2026-023/ })).toBeNull();
+    expect(screen.queryByRole("option", { name: /000091/ })).toBeNull();
   });
 
   it("denies CAR details to users without an authoring role", () => {
@@ -97,5 +259,6 @@ describe("F5 CAR authoring", () => {
 
     expect(screen.getByRole("alert").textContent).toContain("You do not have access to CAR authoring");
     expect(screen.queryByText("CAR-2026-023")).toBeNull();
+    expect(listCars).not.toHaveBeenCalled();
   });
 });

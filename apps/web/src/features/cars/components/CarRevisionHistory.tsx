@@ -14,10 +14,10 @@ export function CarRevisionHistory({
       id="car-revision-history-heading"
       eyebrow="Draft history"
       title={`Revision ${revision}`}
-      description="Local autosave activity is shown for this mock session. This is not a persisted audit log."
+      description="Saved with this CAR record in Supabase. Entries are added when the draft is created, edited, or revised."
       action={
         <span className="border border-[#8a5a00] bg-[#f3ead8] px-2 py-1 text-[10px] font-medium text-[#704700]">
-          Draft only
+          Draft
         </span>
       }
       contentClassName="pt-0"

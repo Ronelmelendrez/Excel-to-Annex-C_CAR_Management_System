@@ -6,12 +6,18 @@ import type { CarDraft, ValidatedHousehold } from "../types";
 export function CarDraftList({
   drafts,
   households,
+  householdsError,
+  actionError,
+  creating,
   selectedDraftId,
   onSelectDraft,
   onCreateDraft,
 }: {
   drafts: CarDraft[];
   households: ValidatedHousehold[];
+  householdsError: string | null;
+  actionError: string | null;
+  creating: boolean;
   selectedDraftId: string | null;
   onSelectDraft: (draftId: string) => void;
   onCreateDraft: (householdId: string) => void;
@@ -30,33 +36,49 @@ export function CarDraftList({
           </span>
         }
       >
-        <Label htmlFor="car-household" className="block text-xs font-semibold">
-          Household
-        </Label>
-        <select
-          id="car-household"
-          value={householdId}
-          onChange={(event) => setHouseholdId(event.target.value)}
-          className="mt-1 min-h-[44px] w-full border border-[#8c877c] bg-[#fbf9f4] px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
-        >
-          <option value="">Select a household</option>
-          {households.map((household) => (
-            <option key={household.id} value={household.id}>
-              {household.hhId} · {household.grantee.name}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          disabled={!householdId}
-          onClick={() => {
-            onCreateDraft(householdId);
-            setHouseholdId("");
-          }}
-          className="mt-3 min-h-[44px] w-full border border-[#161512] bg-[#161512] px-3 py-2 text-sm font-medium text-[#f4f1ea] hover:bg-[#7a1f1f] disabled:cursor-not-allowed disabled:border-[#b5afa2] disabled:bg-[#b5afa2] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
-        >
-          Create draft
-        </button>
+        {householdsError ? (
+          <p role="alert" className="border-l-4 border-[#7a1f1f] bg-[#f2e4e1] px-3 py-3 text-sm leading-6 text-[#7a1f1f]">
+            {householdsError}
+          </p>
+        ) : (
+          <>
+            <Label htmlFor="car-household" className="block text-xs font-semibold">
+              Household
+            </Label>
+            <select
+              id="car-household"
+              value={householdId}
+              disabled={creating || households.length === 0}
+              onChange={(event) => setHouseholdId(event.target.value)}
+              className="mt-1 min-h-[44px] w-full border border-[#8c877c] bg-[#fbf9f4] px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f] disabled:cursor-not-allowed disabled:bg-[#ece7dc]"
+            >
+              <option value="">
+                {households.length === 0 ? "No validated household available" : "Select a household"}
+              </option>
+              {households.map((household) => (
+                <option key={household.id} value={household.id}>
+                  {household.hhId} · {household.grantee.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              disabled={!householdId || creating}
+              onClick={() => {
+                void onCreateDraft(householdId);
+                setHouseholdId("");
+              }}
+              className="mt-3 min-h-[44px] w-full border border-[#161512] bg-[#161512] px-3 py-2 text-sm font-medium text-[#f4f1ea] hover:bg-[#7a1f1f] disabled:cursor-not-allowed disabled:border-[#b5afa2] disabled:bg-[#b5afa2] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+            >
+              {creating ? "Creating draft…" : "Create draft"}
+            </button>
+            {actionError ? (
+              <p role="alert" className="mt-3 border-l-4 border-[#7a1f1f] bg-[#f2e4e1] px-3 py-2 text-xs leading-5 text-[#7a1f1f]">
+                {actionError}
+              </p>
+            ) : null}
+          </>
+        )}
       </SectionCard>
 
       <SectionCard
@@ -73,8 +95,8 @@ export function CarDraftList({
         ) : (
           <ul className="divide-y divide-[#c9c3b6]">
             {drafts.map((draft) => {
-              const household = households.find((item) => item.id === draft.householdId);
               const selected = draft.id === selectedDraftId;
+              const ready = draft.status === "draft_ready_for_review";
               return (
                 <li key={draft.id}>
                   <button
@@ -87,12 +109,18 @@ export function CarDraftList({
                   >
                     <span className="flex items-center justify-between gap-2">
                       <span className="font-mono text-sm font-semibold">{draft.reference}</span>
-                      <span className="border border-[#8a5a00] bg-[#f3ead8] px-1.5 py-0.5 text-[10px] text-[#704700]">
-                        Draft
+                      <span
+                        className={`border px-1.5 py-0.5 text-[10px] ${
+                          ready
+                            ? "border-[#244b2e] bg-[#e6efe7] text-[#244b2e]"
+                            : "border-[#8a5a00] bg-[#f3ead8] text-[#704700]"
+                        }`}
+                      >
+                        {ready ? "Ready for review" : "Draft"}
                       </span>
                     </span>
                     <span className="mt-1 block text-xs text-[#5b574e]">
-                      HH_ID {household?.hhId ?? "Unavailable"} · Revision {draft.revision}
+                      HH_ID {draft.hhId || "Unavailable"} · Revision {draft.revision}
                     </span>
                   </button>
                 </li>

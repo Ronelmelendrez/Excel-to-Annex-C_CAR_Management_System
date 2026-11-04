@@ -18,7 +18,8 @@ export function CarChecklist({
       title="Draft completeness"
       description={
         <span className="text-xs leading-5">
-          Sample checks for this mock UI. The official CAR template and required-field policy are not connected.
+          Completeness checks for this draft. Gaps are saved with the record so a reviewer can see
+          exactly which fields are still outstanding.
         </span>
       }
       action={<span className="font-mono text-sm tabular-nums">{missingCount} missing</span>}

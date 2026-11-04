@@ -58,7 +58,7 @@ export function CarNarrativeFields({
           id="backgroundInformation"
           label="Background information"
           value={draft.backgroundInformation}
-          hint="Enter verified context relevant to this case. This mock editor does not generate narrative."
+          hint="Enter verified context relevant to this case."
           onChange={(backgroundInformation) => onChange({ backgroundInformation })}
         />
       </section>

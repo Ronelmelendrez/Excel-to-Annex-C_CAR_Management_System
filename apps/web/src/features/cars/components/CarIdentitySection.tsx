@@ -60,7 +60,7 @@ export function CarIdentitySection({
               <option key={template.id} value={template.id}>{template.label}</option>
             ))}
           </select>
-          <p className="mt-1 text-xs text-[#5b574e]">Sample option only; template management is not connected.</p>
+          <p className="mt-1 text-xs text-[#5b574e]">Read from Supabase. Pick the version this report is prepared against.</p>
         </div>
         <div>
           <Label htmlFor="datePrepared" className="block text-xs font-semibold">

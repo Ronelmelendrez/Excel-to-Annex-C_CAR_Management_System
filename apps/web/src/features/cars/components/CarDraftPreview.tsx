@@ -33,7 +33,7 @@ export function CarDraftPreview({
       </header>
       <div className="border-b border-[#c9c3b6] px-4 py-4 sm:px-7">
         <p className="text-center font-mono text-[10px] uppercase tracking-[0.14em] text-[#5b574e]">
-          Case Assessment Report · Mock preview
+          Case Assessment Report · Draft preview
         </p>
         <h2 id="car-preview-heading" className="mt-2 text-center font-serif text-2xl">
           Case Assessment Report

@@ -1,4 +1,10 @@
-import type { CarChecklistItem, CarDraft, FamilyCompositionMember, InterventionDraft } from "../types";
+import type {
+  CarChecklistItem,
+  CarDraft,
+  CarDraftHistoryEntry,
+  FamilyCompositionMember,
+  InterventionDraft,
+} from "../types";
 
 export function getCarChecklist(draft: CarDraft): CarChecklistItem[] {
   return [
@@ -46,4 +52,26 @@ export function formatCarDate(value: string) {
     month: "long",
     day: "numeric",
   });
+}
+
+const HISTORY_LIMIT = 8;
+/** Repeated saves inside this window update the existing entry instead of
+ *  growing the persisted history on every keystroke batch. */
+const HISTORY_MERGE_WINDOW_MS = 5 * 60 * 1000;
+
+/** Prepends a history entry to the list that is stored with the CAR record. */
+export function appendHistoryEntry(
+  history: CarDraftHistoryEntry[],
+  label: string,
+): CarDraftHistoryEntry[] {
+  const now = Date.now();
+  const [latest, ...rest] = history;
+  const mergedAt = latest && latest.label === label ? Date.parse(latest.at) : Number.NaN;
+  if (latest && Number.isFinite(mergedAt) && now - mergedAt < HISTORY_MERGE_WINDOW_MS) {
+    return [{ ...latest, at: new Date(now).toISOString() }, ...rest];
+  }
+  return [
+    { id: crypto.randomUUID(), label, at: new Date(now).toISOString() },
+    ...history,
+  ].slice(0, HISTORY_LIMIT);
 }

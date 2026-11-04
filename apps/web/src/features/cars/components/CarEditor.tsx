@@ -1,5 +1,11 @@
-import React from "react";
-import type { CarDraft, CarDraftHistoryEntry, CarChecklistItem, ValidatedHousehold } from "../types";
+import React, { useState } from "react";
+import type {
+  CarDraft,
+  CarDraftHistoryEntry,
+  CarChecklistItem,
+  CarSaveState,
+  ValidatedHousehold,
+} from "../types";
 import { CarChecklist } from "./CarChecklist";
 import { CarDraftPreview } from "./CarDraftPreview";
 import { CarIdentitySection } from "./CarIdentitySection";
@@ -9,12 +15,37 @@ import { FamilyCompositionSection } from "./FamilyCompositionSection";
 import { InterventionPlanSection } from "./InterventionPlanSection";
 import { RecommendationSection } from "./RecommendationSection";
 
+function SaveStatus({ state, message }: { state: CarSaveState; message: string | null }) {
+  if (state === "error") {
+    return (
+      <span role="alert" className="max-w-[46ch] text-right text-xs text-[#7a1f1f]">
+        {message ?? "Changes could not be saved."}
+      </span>
+    );
+  }
+  const label =
+    state === "saving"
+      ? "Saving to Supabase…"
+      : state === "saved"
+        ? "Saved to Supabase"
+        : "No changes yet";
+  return (
+    <span role="status" aria-live="polite" className="text-xs text-[#5b574e]">
+      {label}
+    </span>
+  );
+}
+
 export function CarEditor({
   draft,
   household,
   checklist,
   history,
   saveState,
+  saveError,
+  actionError,
+  deleting,
+  creatingRevision,
   previewOpen,
   templateVersions,
   onUpdateDraft,
@@ -24,12 +55,18 @@ export function CarEditor({
   onRemoveIntervention,
   onJumpToField,
   onSetPreview,
+  onDelete,
+  onCreateRevision,
 }: {
   draft: CarDraft | null;
   household: ValidatedHousehold | null;
   checklist: CarChecklistItem[];
   history: CarDraftHistoryEntry[];
-  saveState: "saved" | "saving";
+  saveState: CarSaveState;
+  saveError: string | null;
+  actionError: string | null;
+  deleting: boolean;
+  creatingRevision: boolean;
   previewOpen: boolean;
   templateVersions: Array<{ id: string; label: string }>;
   onUpdateDraft: (update: Partial<CarDraft>) => void;
@@ -45,7 +82,11 @@ export function CarEditor({
   onRemoveIntervention: (interventionId: string) => void;
   onJumpToField: (fieldId: string) => void;
   onSetPreview: (value: boolean) => void;
+  onDelete: () => void;
+  onCreateRevision: () => void;
 }) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
   if (!draft || !household) {
     return (
       <section className="min-w-0 border border-[#c9c3b6] bg-[#f8f5ee] px-5 py-10">
@@ -60,6 +101,7 @@ export function CarEditor({
 
   const selectedTemplate = templateVersions.find((template) => template.id === draft.templateVersion);
   const missingCount = checklist.filter((item) => !item.complete).length;
+  const canDelete = draft.workflowStatus === "draft";
 
   return (
     <section className="min-w-0">
@@ -67,19 +109,17 @@ export function CarEditor({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#5b574e]">
-              CAR authoring / {household.importName} · v{household.importVersion}
+              CAR authoring / {household.importName || "Import unavailable"} · v{household.importVersion}
             </p>
             <h2 className="mt-1 font-mono text-xl font-semibold">
               {draft.reference} <span className="text-sm font-normal text-[#5b574e]">· Revision {draft.revision}</span>
             </h2>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <span className="border border-[#8a5a00] bg-[#f3ead8] px-2 py-1 text-xs font-medium text-[#704700]">
               {draft.status === "draft_ready_for_review" ? "Draft · fields complete" : "Draft · incomplete"}
             </span>
-            <span role="status" aria-live="polite" className="text-xs text-[#5b574e]">
-              {saveState === "saving" ? "Saving locally…" : "Saved in this session"}
-            </span>
+            <SaveStatus state={saveState} message={saveError} />
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -90,12 +130,60 @@ export function CarEditor({
           >
             Preview draft
           </button>
+          <button
+            type="button"
+            onClick={onCreateRevision}
+            disabled={creatingRevision}
+            className="min-h-[44px] border border-[#161512] px-4 py-2 text-sm font-medium hover:bg-[#ece7dc] disabled:cursor-not-allowed disabled:border-[#b5afa2] disabled:text-[#777166] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+          >
+            {creatingRevision ? "Creating revision…" : "New revision"}
+          </button>
+          {canDelete ? (
+            confirmingDelete ? (
+              <span className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmingDelete(false);
+                    onDelete();
+                  }}
+                  disabled={deleting}
+                  className="min-h-[44px] border border-[#7a1f1f] bg-[#7a1f1f] px-4 py-2 text-sm font-medium text-[#f4f1ea] hover:bg-[#5e1717] disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+                >
+                  {deleting ? "Deleting…" : "Confirm delete"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingDelete(false)}
+                  className="min-h-[44px] border border-[#161512] px-4 py-2 text-sm font-medium hover:bg-[#ece7dc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+                >
+                  Cancel
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmingDelete(true)}
+                className="min-h-[44px] border border-[#7a1f1f] px-4 py-2 text-sm font-medium text-[#7a1f1f] hover:bg-[#f2e4e1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+              >
+                Delete draft
+              </button>
+            )
+          ) : null}
           <span className="text-xs text-[#5b574e]">
             {missingCount === 0
-              ? "All sample checks are complete. This draft is still not approved."
-              : `${missingCount} sample check${missingCount === 1 ? "" : "s"} incomplete. Draft remains editable.`}
+              ? "All checks are complete. This draft is still not approved."
+              : `${missingCount} check${missingCount === 1 ? "" : "s"} incomplete. Draft remains editable.`}
           </span>
         </div>
+        {actionError ? (
+          <p
+            role="alert"
+            className="mt-3 border-l-4 border-[#7a1f1f] bg-[#f2e4e1] px-3 py-2 text-sm leading-6 text-[#7a1f1f]"
+          >
+            {actionError}
+          </p>
+        ) : null}
       </header>
 
       {previewOpen ? (
@@ -130,8 +218,8 @@ export function CarEditor({
               onChange={(recommendation) => onUpdateDraft({ recommendation })}
             />
             <footer className="border-t border-[#c9c3b6] bg-[#ece7dc] px-4 py-3 text-xs leading-5 text-[#5b574e] sm:px-5">
-              Draft content and family composition are mock-only and reset when this page reloads.
-              No approval, submission, or document generation is available here.
+              Draft content is saved to Supabase as you type. Approval, submission, and document
+              generation are not available on this page.
             </footer>
           </div>
           <aside className="space-y-4 xl:sticky xl:top-4">

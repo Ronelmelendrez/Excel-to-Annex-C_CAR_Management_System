@@ -1,139 +1,252 @@
-import { useEffect, useMemo, useState } from "react";
-import { mockInitialCarDrafts, mockTemplateVersions, mockValidatedHouseholds } from "../mock-data";
-import { createFamilyComposition, createIntervention, getCarChecklist, getDraftStatus } from "../lib/car-draft";
-import type { CarDraft, CarDraftHistoryEntry } from "../types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { normalizeGrantee } from "@import-domain";
+import { householdListError, listHouseholds } from "../../households/api";
+import { getGranteeStatus } from "../../households/lib/households";
+import type { HouseholdRecord } from "../../households/mock-data";
+import { isDemoMode } from "../../../shared/supabase";
+import {
+  carErrorMessage,
+  createCar,
+  createCarRevision,
+  deleteCar,
+  listCarTemplates,
+  listCars,
+  updateCar,
+} from "../api";
+import { appendHistoryEntry, getCarChecklist, getDraftStatus } from "../lib/car-draft";
+import type {
+  CarDraft,
+  CarSaveState,
+  CarTemplateOption,
+  ValidatedHousehold,
+} from "../types";
 
-function createDraftId() {
-  return `car-draft-${Date.now()}`;
+/** How long a burst of edits waits before it is written to Supabase. */
+const AUTOSAVE_DELAY_MS = 700;
+
+const LOAD_ERROR_FALLBACK =
+  "CAR drafts could not be loaded. Check your connection and that the cars function is deployed.";
+const SAVE_ERROR_FALLBACK =
+  "Your changes could not be saved to Supabase. Check your connection and try again.";
+
+/** Households the register marks as a valid CAR source (exactly one grantee). */
+function deriveValidatedHouseholds(households: HouseholdRecord[]): ValidatedHousehold[] {
+  return households.flatMap((household) => {
+    if (getGranteeStatus(household) !== "valid") return [];
+    const grantee = household.members.find((member) => normalizeGrantee(member.granteeFlag) === true);
+    return grantee ? [{ ...household, grantee }] : [];
+  });
 }
 
-function newDraftReference(drafts: CarDraft[]) {
-  const latest = drafts.reduce((maximum, draft) => {
-    const sequence = Number(draft.reference.split("-").at(-1)) || 0;
-    return Math.max(maximum, sequence);
-  }, 0);
-  return `CAR-2026-${String(latest + 1).padStart(3, "0")}`;
-}
-
-function newDraft(householdId: string, drafts: CarDraft[]): CarDraft | null {
-  const household = mockValidatedHouseholds.find((record) => record.id === householdId);
-  if (!household) return null;
-  const now = new Date().toISOString();
+/**
+ * Fallback used when the household register cannot be reloaded: the CAR keeps
+ * its own snapshot of the source identifiers in `content`.
+ */
+function householdFromDraft(draft: CarDraft): ValidatedHousehold {
   return {
-    id: createDraftId(),
-    reference: newDraftReference(drafts),
-    householdId: household.id,
-    granteeMemberId: household.grantee.id,
-    revision: 1,
-    status: "draft_incomplete",
-    templateVersion: "",
-    datePrepared: "",
-    presentingProblem: "",
-    backgroundInformation: "",
-    assessment: "",
-    interventions: [createIntervention()],
-    recommendation: "",
-    familyComposition: household.members.map((member) => ({
-      id: member.id,
-      entryId: member.entryId,
-      name: member.name,
-      age: member.age,
-      relationship: member.relationship,
-      sourceRow: member.sourceRow,
-      include: true,
-    })),
-    createdAt: now,
-    updatedAt: now,
+    id: draft.householdId,
+    hhId: draft.hhId,
+    barangay: "",
+    municipality: "",
+    importName: draft.importName,
+    importVersion: draft.importVersion,
+    members: [],
+    car: null,
+    grantee: {
+      id: draft.granteeMemberId,
+      entryId: "",
+      name: draft.granteeName,
+      relationship: "",
+      age: null,
+      granteeFlag: "Yes",
+      sourceRow: draft.granteeSourceRow,
+    },
   };
 }
 
-export function useCarAuthoring() {
-  const [drafts, setDrafts] = useState<CarDraft[]>(mockInitialCarDrafts);
-  const [selectedDraftId, setSelectedDraftId] = useState<string | null>(mockInitialCarDrafts[0]?.id ?? null);
-  const [history, setHistory] = useState<Record<string, CarDraftHistoryEntry[]>>(() =>
-    Object.fromEntries(
-      mockInitialCarDrafts.map((draft) => [
-        draft.id,
-        [{ id: `${draft.id}-created`, label: "Draft created", at: draft.createdAt }],
-      ]),
-    ),
-  );
-  const [saveState, setSaveState] = useState<"saved" | "saving">("saved");
+export function useCarAuthoring(enabled = true) {
+  const [drafts, setDrafts] = useState<CarDraft[]>([]);
+  const [loading, setLoading] = useState(!isDemoMode && enabled);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
+
+  const [households, setHouseholds] = useState<ValidatedHousehold[]>([]);
+  const [householdsError, setHouseholdsError] = useState<string | null>(null);
+  const [templateVersions, setTemplateVersions] = useState<CarTemplateOption[]>([]);
+
+  const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<CarSaveState>("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  /** Failures from the create-draft form (shown in the left panel). */
+  const [createError, setCreateError] = useState<string | null>(null);
+  /** Failures from delete / new-revision actions (shown in the editor). */
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [creatingRevision, setCreatingRevision] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
 
+  const mountedRef = useRef(true);
+  const saveTimerRef = useRef<number | null>(null);
+  const pendingRef = useRef<CarDraft | null>(null);
+  const saveSeqRef = useRef(0);
+
   const selectedDraft = drafts.find((draft) => draft.id === selectedDraftId) ?? null;
-  const household = selectedDraft
-    ? mockValidatedHouseholds.find((record) => record.id === selectedDraft.householdId) ?? null
-    : null;
+
+  const household = useMemo(() => {
+    if (!selectedDraft) return null;
+    const match = households.find((record) => record.id === selectedDraft.householdId);
+    return match ?? householdFromDraft(selectedDraft);
+  }, [households, selectedDraft]);
+
   const checklist = useMemo(
     () => (selectedDraft ? getCarChecklist(selectedDraft) : []),
     [selectedDraft],
   );
   const missingItems = checklist.filter((item) => !item.complete);
 
-  useEffect(() => {
-    if (!selectedDraft || saveState !== "saving") return;
-    const timeout = window.setTimeout(() => {
-      setDrafts((current) =>
-        current.map((draft) =>
-          draft.id === selectedDraft.id
-            ? {
-                ...draft,
-                status: getDraftStatus(draft),
-                updatedAt: new Date().toISOString(),
-              }
-            : draft,
-        ),
-      );
-      const savedAt = new Date().toISOString();
-      setHistory((current) => ({
-        ...current,
-        [selectedDraft.id]: [
-          { id: `${selectedDraft.id}-${savedAt}`, label: "Autosaved locally", at: savedAt },
-          ...(current[selectedDraft.id] ?? []),
-        ].slice(0, 8),
-      }));
+  /** Writes the pending draft to Supabase; safe to call at any time. */
+  const flushSave = useCallback(async (): Promise<void> => {
+    const draft = pendingRef.current;
+    if (!draft) return;
+    pendingRef.current = null;
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+
+    const sequence = ++saveSeqRef.current;
+    const payload: CarDraft = {
+      ...draft,
+      history: appendHistoryEntry(draft.history, "Changes saved"),
+    };
+
+    try {
+      const saved = await updateCar(payload);
+      if (!mountedRef.current || sequence !== saveSeqRef.current) return;
+      // A newer edit is already queued: let it win instead of clobbering it.
+      if (pendingRef.current) {
+        setSaveState("saving");
+        return;
+      }
+      setDrafts((current) => current.map((item) => (item.id === saved.id ? saved : item)));
       setSaveState("saved");
-    }, 500);
-    return () => window.clearTimeout(timeout);
-  }, [selectedDraft, saveState]);
+      setSaveError(null);
+    } catch (error) {
+      if (!mountedRef.current || sequence !== saveSeqRef.current) return;
+      if (pendingRef.current) return;
+      setSaveState("error");
+      setSaveError(carErrorMessage(error, SAVE_ERROR_FALLBACK));
+    }
+  }, []);
+
+  const scheduleSave = useCallback(
+    (draft: CarDraft) => {
+      pendingRef.current = draft;
+      setSaveState("saving");
+      setSaveError(null);
+      if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = window.setTimeout(() => {
+        saveTimerRef.current = null;
+        void flushSave();
+      }, AUTOSAVE_DELAY_MS);
+    },
+    [flushSave],
+  );
+
+  // Flush anything still pending when the page unmounts so an edit is not lost.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
+      const pending = pendingRef.current;
+      pendingRef.current = null;
+      if (pending) {
+        void updateCar({
+          ...pending,
+          history: appendHistoryEntry(pending.history, "Changes saved"),
+        }).catch(() => undefined);
+      }
+    };
+  }, []);
+
+  // CAR list. Demo mode (no Supabase credentials) and users without an
+  // authoring role never reach the network.
+  useEffect(() => {
+    if (isDemoMode || !enabled) return;
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
+    listCars()
+      .then((cars) => {
+        if (cancelled) return;
+        setDrafts(cars);
+        setSelectedDraftId((current) =>
+          current && cars.some((car) => car.id === current) ? current : cars[0]?.id ?? null,
+        );
+        setLoading(false);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setLoadError(carErrorMessage(error, LOAD_ERROR_FALLBACK));
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, reloadToken]);
+
+  // Source households (create-draft dropdown) and template versions.
+  useEffect(() => {
+    if (isDemoMode || !enabled) return;
+    let cancelled = false;
+
+    listHouseholds()
+      .then((result) => {
+        if (cancelled) return;
+        setHouseholds(deriveValidatedHouseholds(result.households));
+        setHouseholdsError(null);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setHouseholds([]);
+        setHouseholdsError(householdListError(error));
+      });
+
+    // Template versions are a convenience: the editor stays usable without them.
+    listCarTemplates()
+      .then((options) => {
+        if (!cancelled) setTemplateVersions(options);
+      })
+      .catch(() => {
+        if (!cancelled) setTemplateVersions([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, reloadToken]);
+
+  function reload() {
+    setActionError(null);
+    setCreateError(null);
+    setReloadToken((token) => token + 1);
+  }
 
   function updateDraft(update: Partial<CarDraft>) {
     if (!selectedDraft) return;
-    setDrafts((current) =>
-      current.map((draft) =>
-        draft.id === selectedDraft.id
-          ? {
-              ...draft,
-              ...update,
-              status: getDraftStatus({ ...draft, ...update }),
-            }
-          : draft,
-      ),
-    );
-    setSaveState("saving");
-  }
-
-  function createCarDraft(householdId: string) {
-    const draft = newDraft(householdId, drafts);
-    if (!draft) return;
-    setDrafts((current) => [draft, ...current]);
-    setHistory((current) => ({
-      ...current,
-      [draft.id]: [{ id: `${draft.id}-created`, label: "Draft created", at: draft.createdAt }],
-    }));
-    setSelectedDraftId(draft.id);
-    setPreviewOpen(false);
-    setSaveState("saved");
+    const next: CarDraft = { ...selectedDraft, ...update };
+    next.status = getDraftStatus(next);
+    setDrafts((current) => current.map((item) => (item.id === next.id ? next : item)));
+    scheduleSave(next);
   }
 
   function updateFamilyMember(memberId: string, update: Partial<CarDraft["familyComposition"][number]>) {
     if (!selectedDraft) return;
     updateDraft({
-      familyComposition: createFamilyComposition(
-        selectedDraft.familyComposition.map((member) =>
-          member.id === memberId ? { ...member, ...update } : member,
-        ),
+      familyComposition: selectedDraft.familyComposition.map((member) =>
+        member.id === memberId ? { ...member, ...update } : member,
       ),
     });
   }
@@ -149,20 +262,32 @@ export function useCarAuthoring() {
 
   function addIntervention() {
     if (!selectedDraft) return;
-    updateDraft({ interventions: [...selectedDraft.interventions, createIntervention()] });
+    updateDraft({
+      interventions: [
+        ...selectedDraft.interventions,
+        { id: `intervention-${crypto.randomUUID()}`, type: "", details: "" },
+      ],
+    });
   }
 
   function removeIntervention(interventionId: string) {
     if (!selectedDraft) return;
     updateDraft({
-      interventions: selectedDraft.interventions.filter((intervention) => intervention.id !== interventionId),
+      interventions: selectedDraft.interventions.filter(
+        (intervention) => intervention.id !== interventionId,
+      ),
     });
   }
 
   function selectDraft(draftId: string) {
-    setSelectedDraftId(draftId);
+    const changed = draftId !== selectedDraftId;
+    if (pendingRef.current) void flushSave();
     setPreviewOpen(false);
-    setSaveState("saved");
+    if (!changed) return;
+    setSelectedDraftId(draftId);
+    setActionError(null);
+    setSaveError(null);
+    if (!pendingRef.current) setSaveState("idle");
   }
 
   function jumpToField(fieldId: string) {
@@ -175,46 +300,102 @@ export function useCarAuthoring() {
     }, 0);
   }
 
-  function createRevision() {
-    if (!selectedDraft || !household) return;
-    const now = new Date().toISOString();
-    const revision: CarDraft = {
-      ...selectedDraft,
-      id: createDraftId(),
-      reference: selectedDraft.reference,
-      revision: selectedDraft.revision + 1,
-      status: "draft_incomplete",
-      familyComposition: createFamilyComposition(selectedDraft.familyComposition),
-      interventions: selectedDraft.interventions.map((intervention) => ({ ...intervention })),
-      createdAt: now,
-      updatedAt: now,
-    };
-    setDrafts((current) => [revision, ...current]);
-    setHistory((current) => ({
-      ...current,
-      [revision.id]: [
-        { id: `${revision.id}-created`, label: `Revision ${revision.revision} created from draft`, at: now },
-      ],
-    }));
-    setSelectedDraftId(revision.id);
-    setPreviewOpen(false);
-    setSaveState("saved");
+  async function createCarDraft(householdId: string) {
+    if (!householdId || creating) return;
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const draft = await createCar(householdId);
+      if (!mountedRef.current) return;
+      setDrafts((current) => [draft, ...current]);
+      setSelectedDraftId(draft.id);
+      setPreviewOpen(false);
+      setSaveState("saved");
+      setSaveError(null);
+    } catch (error) {
+      if (!mountedRef.current) return;
+      setCreateError(
+        carErrorMessage(error, "The CAR draft could not be created. Check your connection and try again."),
+      );
+    } finally {
+      if (mountedRef.current) setCreating(false);
+    }
+  }
+
+  async function deleteDraft() {
+    const target = selectedDraft;
+    if (!target || deleting) return;
+    setDeleting(true);
+    setActionError(null);
+    try {
+      await deleteCar(target.id);
+      if (!mountedRef.current) return;
+      const remaining = drafts.filter((draft) => draft.id !== target.id);
+      setDrafts(remaining);
+      setSelectedDraftId(remaining[0]?.id ?? null);
+      setPreviewOpen(false);
+      setSaveState("idle");
+      setSaveError(null);
+    } catch (error) {
+      if (!mountedRef.current) return;
+      setActionError(
+        carErrorMessage(error, "The CAR could not be deleted. Check your connection and try again."),
+      );
+    } finally {
+      if (mountedRef.current) setDeleting(false);
+    }
+  }
+
+  async function createRevision() {
+    const target = selectedDraft;
+    if (!target || creatingRevision) return;
+    setCreatingRevision(true);
+    setActionError(null);
+    try {
+      await flushSave();
+      const revision = await createCarRevision(target.id);
+      if (!mountedRef.current) return;
+      setDrafts((current) => [revision, ...current]);
+      setSelectedDraftId(revision.id);
+      setPreviewOpen(false);
+      setSaveState("saved");
+      setSaveError(null);
+    } catch (error) {
+      if (!mountedRef.current) return;
+      setActionError(
+        carErrorMessage(error, "The new revision could not be created. Check your connection and try again."),
+      );
+    } finally {
+      if (mountedRef.current) setCreatingRevision(false);
+    }
   }
 
   return {
     drafts,
+    loading,
+    loadError,
+    notConfigured: isDemoMode,
+    reload,
+    households,
+    householdsError,
+    templateVersions,
     selectedDraft,
     household,
     checklist,
     missingItems,
-    history: selectedDraft ? history[selectedDraft.id] ?? [] : [],
+    history: selectedDraft?.history ?? [],
     saveState,
+    saveError,
+    createError,
+    actionError,
+    creating,
+    deleting,
+    creatingRevision,
     previewOpen,
-    validatedHouseholds: mockValidatedHouseholds,
-    templateVersions: mockTemplateVersions,
     selectDraft,
     createCarDraft,
     createRevision,
+    deleteDraft,
     updateDraft,
     updateFamilyMember,
     updateIntervention,
