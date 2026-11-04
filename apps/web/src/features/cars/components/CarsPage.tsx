@@ -114,15 +114,17 @@ export function CarsPage() {
           actionError={authoring.actionError}
           deleting={authoring.deleting}
           creatingRevision={authoring.creatingRevision}
-          previewOpen={authoring.previewOpen}
           templateVersions={authoring.templateVersions}
+          mode={authoring.mode}
           onUpdateDraft={authoring.updateDraft}
+          onUpdateSlot={authoring.updateSlot}
+          onSlotReveal={authoring.revealSlot}
           onUpdateFamilyMember={authoring.updateFamilyMember}
           onUpdateIntervention={authoring.updateIntervention}
           onAddIntervention={authoring.addIntervention}
           onRemoveIntervention={authoring.removeIntervention}
           onJumpToField={authoring.jumpToField}
-          onSetPreview={authoring.setPreviewOpen}
+          onSetMode={authoring.setMode}
           onDelete={authoring.deleteDraft}
           onCreateRevision={authoring.createRevision}
         />

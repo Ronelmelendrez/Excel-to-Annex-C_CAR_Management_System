@@ -5,6 +5,20 @@ import { auditLog } from '../_shared/audit.ts';
 import { getServiceClient } from '../_shared/supabase.ts';
 import { json, error, preflight, handleError, HttpError } from '../_shared/http.ts';
 import { normalizeGrantee } from '../_shared/import-domain.ts';
+import {
+  CAR_MEMBER_FIELDS,
+  DEFAULT_INTERVENTION_CATALOG,
+  REPORT_TEMPLATE_VERSION,
+  SLOT_BY_KEY,
+  computeMissingKeys,
+  resolveSlotValues,
+  type FamilySnapshot,
+  type HouseholdContext,
+  type InterventionCatalogRow,
+  type ReportDraftLike,
+  type SlotSource,
+  type SlotValues,
+} from '../_shared/report-template.ts';
 
 /** Roles that may author CARs (mirrors the /cars page RoleGuard). */
 const AUTHOR_ROLES = ['admin', 'case_worker'];
@@ -50,6 +64,63 @@ function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
+function asStringRecord(value: unknown): Record<string, string> {
+  const row = asContent(value);
+  const out: Record<string, string> = {};
+  for (const [key, entry] of Object.entries(row)) {
+    if (typeof entry === 'string') out[key] = entry;
+  }
+  return out;
+}
+
+function slotSource(value: unknown): SlotSource | undefined {
+  return value === 'derived' || value === 'computed' || value === 'manual' || value === 'setting'
+    ? value
+    : undefined;
+}
+
+/**
+ * Keeps only well-formed entries keyed by a known slot; an override without a
+ * reason is demoted to a plain value (REQ-RPT-007 is enforced on the server,
+ * not just in the editor). Raw import data is never accepted here.
+ */
+function sanitizeSlots(value: unknown): SlotValues {
+  const incoming = asContent(value);
+  const out: SlotValues = {};
+  for (const [key, entry] of Object.entries(incoming)) {
+    const def = SLOT_BY_KEY[key];
+    if (!def) continue;
+    const slot = asContent(entry);
+    if (typeof slot.value !== 'string') continue;
+    const reason = typeof slot.reason === 'string' ? slot.reason.trim() : '';
+    const overridden = slot.overridden === true && reason !== '';
+    out[key] = {
+      value: slot.value,
+      source: slotSource(slot.source) ?? def.source,
+      overridden,
+      original: overridden && typeof slot.original === 'string' ? slot.original : null,
+      reason: overridden ? reason : undefined,
+      at: typeof slot.at === 'string' ? slot.at : undefined,
+    };
+  }
+  return out;
+}
+
+/**
+ * Workbook columns snapshotted onto a family row: only these keys are stored,
+ * so a client cannot write arbitrary data into the raw-import mirror.
+ */
+function pickMemberData(value: unknown): Record<string, string> {
+  const row = asContent(value);
+  const out: Record<string, string> = {};
+  for (const field of CAR_MEMBER_FIELDS) {
+    const entry = row[field];
+    if (typeof entry === 'string' && entry.trim() !== '') out[field] = entry;
+    else if (typeof entry === 'number' && Number.isFinite(entry)) out[field] = String(entry);
+  }
+  return out;
+}
+
 /** FIRST_NAME + MIDDLE_NAME + LAST_NAME + EXT_NAME, blanks skipped. */
 function composeName(normalized: Record<string, unknown> | null): string {
   if (!normalized) return '';
@@ -67,12 +138,8 @@ function parseAge(value: unknown): number | null {
   return Number.isFinite(age) ? age : null;
 }
 
-/**
- * Mirrors apps/web/src/features/cars/lib/car-draft.ts getCarChecklist():
- * the ids are the checklist rows the editor jumps to, so both sides must stay
- * in lockstep or the saved completeness would flip after each save.
- */
-function missingFields(content: Content): string[] {
+/** Legacy drafts (written before `content.slots` existed) keep the old checks. */
+function legacyMissingFields(content: Content): string[] {
   const missing: string[] = [];
   if (!str(content, 'templateVersion')) missing.push('templateVersion');
   if (!str(content, 'datePrepared')) missing.push('datePrepared');
@@ -95,17 +162,125 @@ function missingFields(content: Content): string[] {
   return missing;
 }
 
+/** The derivation's view of `content` (mirrors the client's CarDraft shape). */
+function draftLike(content: Content, granteeMemberId: string): ReportDraftLike {
+  return {
+    hhId: str(content, 'hhId'),
+    datePrepared: str(content, 'datePrepared'),
+    granteeMemberId,
+    slots: sanitizeSlots(content.slots),
+    familyComposition: asArray(content.familyComposition).map((value) => {
+      const row = asContent(value);
+      return {
+        id: str(row, 'id'),
+        name: str(row, 'name'),
+        relationship: str(row, 'relationship'),
+        age: row.age === null || row.age === undefined ? null : num(row.age, 0),
+        sourceRow: num(row.sourceRow, 0),
+        include: row.include === true,
+        data: asStringRecord(row.data),
+      } satisfies FamilySnapshot;
+    }),
+    interventions: asArray(content.interventions).map((value) => {
+      const row = asContent(value);
+      return {
+        included: row.included === undefined ? true : row.included === true,
+        need: str(row, 'need') || str(row, 'type'),
+        type: str(row, 'type'),
+      };
+    }),
+  };
+}
+
+/**
+ * Completeness for `missing_fields`.
+ *
+ * Slot-aware drafts run the exact same `resolveSlotValues` + `computeMissingKeys`
+ * the editor runs (shared module), so the saved gaps can never drift from the
+ * checklist the case worker sees. Drafts without `content.slots` fall back to
+ * the legacy narrative checks until first saved by the new editor.
+ */
+function missingFields(
+  content: Content,
+  granteeMemberId = '',
+  household: HouseholdContext = null,
+): string[] {
+  const hasSlots =
+    content.slots !== undefined &&
+    content.slots !== null &&
+    typeof content.slots === 'object' &&
+    !Array.isArray(content.slots);
+  if (!hasSlots) return legacyMissingFields(content);
+
+  const draft = draftLike(content, granteeMemberId);
+  const values = resolveSlotValues(draft, household, null);
+  return computeMissingKeys({
+    slots: values,
+    familyIncluded: (draft.familyComposition ?? []).filter((member) => member.include).length,
+    interventions: draft.interventions ?? [],
+  });
+}
+
+/**
+ * Barangay/municipality fallback, mirroring the households register: the first
+ * member row that carries them (households/index.ts listHouseholds). New CARs
+ * answer from the `data` snapshots; legacy rows fall back to the import rows.
+ */
+function scanPlace(content: Content): HouseholdContext {
+  const rows = asArray(content.familyComposition).map((value) =>
+    asStringRecord(asContent(value).data),
+  );
+  for (const data of rows) {
+    const barangay = data.BARANGAY ?? '';
+    const municipality = data.MUNICIPALITY ?? '';
+    if (barangay.trim() || municipality.trim()) return { barangay, municipality };
+  }
+  return null;
+}
+
+/** Only queried for legacy content whose family rows predate the data snapshot. */
+async function loadPlace(supabase: any, householdId: string, content: Content): Promise<HouseholdContext> {
+  const scanned = scanPlace(content);
+  if (scanned || !householdId) return scanned;
+  const { data, error: queryError } = await supabase
+    .from('household_members')
+    .select('import_rows:import_row_id ( normalized )')
+    .eq('household_id', householdId);
+  if (queryError) throw queryError;
+  for (const member of Array.isArray(data) ? data : []) {
+    const normalized = (member?.import_rows?.normalized ?? null) as Record<string, unknown> | null;
+    if (!normalized) continue;
+    const barangay = text(normalized.BARANGAY);
+    const municipality = text(normalized.MUNICIPALITY);
+    if (barangay.trim() || municipality.trim()) return { barangay, municipality };
+  }
+  return null;
+}
+
 function mapIntervention(value: unknown): Content {
-  const row = value && typeof value === 'object' ? (value as Content) : {};
+  const row = asContent(value);
+  // Legacy rows store only {type, details}; new rows carry the full shape.
+  const need = str(row, 'need') || str(row, 'type');
+  const activities = str(row, 'activities') || str(row, 'details');
   return {
     id: str(row, 'id') || `intervention-${crypto.randomUUID()}`,
-    type: str(row, 'type'),
-    details: str(row, 'details'),
+    type: need,
+    details: activities,
+    catalogId: str(row, 'catalogId'),
+    custom: row.custom === true,
+    included: row.included === undefined ? true : row.included === true,
+    need,
+    objective: str(row, 'objective'),
+    activities,
+    responsible: str(row, 'responsible'),
+    timeline: str(row, 'timeline'),
+    remarks: str(row, 'remarks'),
+    values: asStringRecord(row.values),
   };
 }
 
 function mapFamilyMember(value: unknown): Content {
-  const row = value && typeof value === 'object' ? (value as Content) : {};
+  const row = asContent(value);
   return {
     id: str(row, 'id'),
     entryId: str(row, 'entryId'),
@@ -114,7 +289,31 @@ function mapFamilyMember(value: unknown): Content {
     age: row.age === null || row.age === undefined ? null : num(row.age, 0),
     sourceRow: num(row.sourceRow, 0),
     include: row.include === true,
+    granteeFlag: str(row, 'granteeFlag'),
+    // Raw-import mirror: only known workbook columns, never client-invented keys.
+    data: pickMemberData(row.data),
+    overlay: asStringRecord(row.overlay),
   };
+}
+
+/** Standard catalog rows a new CAR starts with (mirrors the client's
+ *  `defaultInterventions()`; admin-maintained catalog arrives in R4). */
+function defaultInterventions(): Content[] {
+  return DEFAULT_INTERVENTION_CATALOG.map((row: InterventionCatalogRow) => ({
+    id: `intervention-${row.id}-${crypto.randomUUID().slice(0, 8)}`,
+    catalogId: row.id,
+    type: row.need,
+    details: row.activities,
+    custom: false,
+    included: true,
+    need: row.need,
+    objective: row.objective,
+    activities: row.activities,
+    responsible: row.responsible,
+    timeline: row.timeline,
+    remarks: row.remarks,
+    values: {},
+  }));
 }
 
 function mapHistoryEntry(value: unknown): Content {
@@ -157,6 +356,7 @@ function mapCar(row: Record<string, unknown>): Record<string, unknown> {
     recommendation: str(content, 'recommendation'),
     interventions: asArray(content.interventions).map(mapIntervention),
     familyComposition: asArray(content.familyComposition).map(mapFamilyMember),
+    slots: sanitizeSlots(content.slots),
     history: asArray(content.history).map(mapHistoryEntry),
     createdAt: text(row.created_at),
     updatedAt: text(row.updated_at),
@@ -247,6 +447,10 @@ async function createCar(supabase: any, userId: string, body: any) {
         age: parseAge(normalized?.AGE),
         granteeFlag: text(member.is_grantee_flag_raw ?? normalized?.GRANTEE),
         sourceRow: num(member.import_rows?.source_row_no, 0),
+        // Snapshot of the workbook columns the report reads (CAR_MEMBER_FIELDS)
+        // so the CAR renders without re-reading the import; the import row
+        // itself is never written to (REQ-RPT-007).
+        data: pickMemberData(normalized),
       };
     })
     .filter((member) => member.id)
@@ -267,14 +471,18 @@ async function createCar(supabase: any, userId: string, body: any) {
     granteeSourceRow: num(grantee.sourceRow, 0),
     importName: text(household.imports?.file_name) || 'workbook.xlsx',
     importVersion: num(household.imports?.version, 1),
-    templateVersion: '',
+    // Built-in versioned template (the only template with a definition today).
+    templateVersion: REPORT_TEMPLATE_VERSION,
     datePrepared: '',
     presentingProblem: '',
     backgroundInformation: '',
     assessment: '',
     recommendation: '',
+    // Slot values: only user edits/overrides live here; derived, computed and
+    // setting slots are re-resolved on every read by both client and server.
+    slots: {},
     familyComposition: members.map((member) => ({ ...member, include: true })),
-    interventions: [{ id: `intervention-${crypto.randomUUID()}`, type: '', details: '' }],
+    interventions: defaultInterventions(),
     history: [{ id: crypto.randomUUID(), label: 'Draft created', at: now }],
   };
 
@@ -287,7 +495,7 @@ async function createCar(supabase: any, userId: string, body: any) {
       revision: 1,
       owner_id: userId,
       content,
-      missing_fields: missingFields(content),
+      missing_fields: missingFields(content, grantee.id, scanPlace(content)),
     })
     .select(CAR_SELECT)
     .single();
@@ -329,12 +537,26 @@ async function updateCar(supabase: any, userId: string, body: any) {
     if (typeof incoming[key] === 'string') content[key] = incoming[key];
   }
   for (const key of EDITABLE_ARRAY_FIELDS) {
-    if (Array.isArray(incoming[key])) content[key] = incoming[key];
+    if (!Array.isArray(incoming[key])) continue;
+    // Whitelisted mapping: only known fields survive the round-trip.
+    content[key] =
+      key === 'familyComposition'
+        ? incoming[key].map(mapFamilyMember)
+        : key === 'interventions'
+          ? incoming[key].map(mapIntervention)
+          : incoming[key].map(mapHistoryEntry);
   }
+  // Slot values are sanitized against the template registry (unknown keys and
+  // reason-less overrides are dropped server-side).
+  if (incoming.slots !== undefined) content.slots = sanitizeSlots(incoming.slots);
 
+  const household = await loadPlace(supabase, text(existing.household_id), content);
   const { data, error: updateError } = await supabase
     .from('case_assessments')
-    .update({ content, missing_fields: missingFields(content) })
+    .update({
+      content,
+      missing_fields: missingFields(content, text(existing.grantee_member_id), household),
+    })
     .eq('id', id)
     .eq('status', 'draft')
     .select(CAR_SELECT)
@@ -404,7 +626,11 @@ async function reviseCar(supabase: any, userId: string, body: any) {
       revision,
       owner_id: userId,
       content,
-      missing_fields: missingFields(content),
+      missing_fields: missingFields(
+        content,
+        text(existing.grantee_member_id),
+        await loadPlace(supabase, text(existing.household_id), content),
+      ),
     })
     .select(CAR_SELECT)
     .single();

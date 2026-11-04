@@ -14,10 +14,13 @@ import {
   updateCar,
 } from "../api";
 import { appendHistoryEntry, getCarChecklist, getDraftStatus } from "../lib/car-draft";
+import { customIntervention, resolveSlotValues, withSlotValue } from "../lib/report/values";
+import { SLOT_BY_KEY } from "@report-template";
 import type {
   CarDraft,
   CarSaveState,
   CarTemplateOption,
+  ReportMode,
   ValidatedHousehold,
 } from "../types";
 
@@ -84,7 +87,7 @@ export function useCarAuthoring(enabled = true) {
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [creatingRevision, setCreatingRevision] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const [mode, setModeState] = useState<ReportMode>("edit");
 
   const mountedRef = useRef(true);
   const saveTimerRef = useRef<number | null>(null);
@@ -100,8 +103,8 @@ export function useCarAuthoring(enabled = true) {
   }, [households, selectedDraft]);
 
   const checklist = useMemo(
-    () => (selectedDraft ? getCarChecklist(selectedDraft) : []),
-    [selectedDraft],
+    () => (selectedDraft ? getCarChecklist(selectedDraft, household) : []),
+    [selectedDraft, household],
   );
   const missingItems = checklist.filter((item) => !item.complete);
 
@@ -237,9 +240,35 @@ export function useCarAuthoring(enabled = true) {
   function updateDraft(update: Partial<CarDraft>) {
     if (!selectedDraft) return;
     const next: CarDraft = { ...selectedDraft, ...update };
-    next.status = getDraftStatus(next);
+    next.status = getDraftStatus(next, household);
     setDrafts((current) => current.map((item) => (item.id === next.id ? next : item)));
     scheduleSave(next);
+  }
+
+  /** Sets one template slot (manual edit or gap fill; `reason` marks an
+   *  override of a derived value and keeps the original). */
+  function updateSlot(key: string, value: string, reason?: string) {
+    const def = SLOT_BY_KEY[key];
+    if (!selectedDraft || !def) return;
+    // The original of an override is the value currently on screen (derived
+    // values are computed, never stored), so capture it from the resolution.
+    const resolved = resolveSlotValues(selectedDraft, household)[key]?.value ?? "";
+    updateDraft({
+      slots: withSlotValue(selectedDraft.slots ?? {}, def, value, {
+        ...(reason ? { reason } : {}),
+        previous: resolved,
+      }),
+    });
+  }
+
+  /** Revealing a sensitive value is recorded in the draft history. */
+  function revealSlot(key: string) {
+    if (!selectedDraft) return;
+    const def = SLOT_BY_KEY[key];
+    if (!def) return;
+    updateDraft({
+      history: appendHistoryEntry(selectedDraft.history, `Revealed sensitive field: ${def.label}`),
+    });
   }
 
   function updateFamilyMember(memberId: string, update: Partial<CarDraft["familyComposition"][number]>) {
@@ -263,10 +292,7 @@ export function useCarAuthoring(enabled = true) {
   function addIntervention() {
     if (!selectedDraft) return;
     updateDraft({
-      interventions: [
-        ...selectedDraft.interventions,
-        { id: `intervention-${crypto.randomUUID()}`, type: "", details: "" },
-      ],
+      interventions: [...selectedDraft.interventions, customIntervention()],
     });
   }
 
@@ -282,7 +308,7 @@ export function useCarAuthoring(enabled = true) {
   function selectDraft(draftId: string) {
     const changed = draftId !== selectedDraftId;
     if (pendingRef.current) void flushSave();
-    setPreviewOpen(false);
+    setModeState("edit");
     if (!changed) return;
     setSelectedDraftId(draftId);
     setActionError(null);
@@ -291,7 +317,7 @@ export function useCarAuthoring(enabled = true) {
   }
 
   function jumpToField(fieldId: string) {
-    setPreviewOpen(false);
+    setModeState("edit");
     window.setTimeout(() => {
       const field = document.getElementById(fieldId);
       if (!field) return;
@@ -309,7 +335,7 @@ export function useCarAuthoring(enabled = true) {
       if (!mountedRef.current) return;
       setDrafts((current) => [draft, ...current]);
       setSelectedDraftId(draft.id);
-      setPreviewOpen(false);
+      setModeState("edit");
       setSaveState("saved");
       setSaveError(null);
     } catch (error) {
@@ -333,7 +359,7 @@ export function useCarAuthoring(enabled = true) {
       const remaining = drafts.filter((draft) => draft.id !== target.id);
       setDrafts(remaining);
       setSelectedDraftId(remaining[0]?.id ?? null);
-      setPreviewOpen(false);
+      setModeState("edit");
       setSaveState("idle");
       setSaveError(null);
     } catch (error) {
@@ -357,7 +383,7 @@ export function useCarAuthoring(enabled = true) {
       if (!mountedRef.current) return;
       setDrafts((current) => [revision, ...current]);
       setSelectedDraftId(revision.id);
-      setPreviewOpen(false);
+      setModeState("edit");
       setSaveState("saved");
       setSaveError(null);
     } catch (error) {
@@ -391,7 +417,7 @@ export function useCarAuthoring(enabled = true) {
     creating,
     deleting,
     creatingRevision,
-    previewOpen,
+    mode,
     selectDraft,
     createCarDraft,
     createRevision,
@@ -402,6 +428,8 @@ export function useCarAuthoring(enabled = true) {
     addIntervention,
     removeIntervention,
     jumpToField,
-    setPreviewOpen,
+    setMode: setModeState,
+    updateSlot,
+    revealSlot,
   };
 }

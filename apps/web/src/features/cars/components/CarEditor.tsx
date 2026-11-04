@@ -4,16 +4,13 @@ import type {
   CarDraftHistoryEntry,
   CarChecklistItem,
   CarSaveState,
+  ReportMode,
   ValidatedHousehold,
 } from "../types";
-import { CarChecklist } from "./CarChecklist";
-import { CarDraftPreview } from "./CarDraftPreview";
-import { CarIdentitySection } from "./CarIdentitySection";
-import { CarNarrativeFields } from "./CarNarrativeFields";
-import { CarRevisionHistory } from "./CarRevisionHistory";
-import { FamilyCompositionSection } from "./FamilyCompositionSection";
-import { InterventionPlanSection } from "./InterventionPlanSection";
-import { RecommendationSection } from "./RecommendationSection";
+import { missingBySection } from "../lib/report/values";
+import { CarReportDocument } from "./report/CarReportDocument";
+import { ReportContextPanel } from "./report/ReportContextPanel";
+import { SectionRail } from "./report/SectionRail";
 
 function SaveStatus({ state, message }: { state: CarSaveState; message: string | null }) {
   if (state === "error") {
@@ -36,6 +33,12 @@ function SaveStatus({ state, message }: { state: CarSaveState; message: string |
   );
 }
 
+const MODES: Array<{ id: ReportMode; label: string }> = [
+  { id: "edit", label: "Edit" },
+  { id: "preview", label: "Preview" },
+  { id: "print", label: "Print" },
+];
+
 export function CarEditor({
   draft,
   household,
@@ -46,15 +49,17 @@ export function CarEditor({
   actionError,
   deleting,
   creatingRevision,
-  previewOpen,
+  mode,
   templateVersions,
   onUpdateDraft,
+  onUpdateSlot,
+  onSlotReveal,
   onUpdateFamilyMember,
   onUpdateIntervention,
   onAddIntervention,
   onRemoveIntervention,
   onJumpToField,
-  onSetPreview,
+  onSetMode,
   onDelete,
   onCreateRevision,
 }: {
@@ -67,9 +72,11 @@ export function CarEditor({
   actionError: string | null;
   deleting: boolean;
   creatingRevision: boolean;
-  previewOpen: boolean;
+  mode: ReportMode;
   templateVersions: Array<{ id: string; label: string }>;
   onUpdateDraft: (update: Partial<CarDraft>) => void;
+  onUpdateSlot: (key: string, value: string, reason?: string) => void;
+  onSlotReveal: (key: string) => void;
   onUpdateFamilyMember: (
     memberId: string,
     update: Partial<CarDraft["familyComposition"][number]>,
@@ -81,7 +88,7 @@ export function CarEditor({
   onAddIntervention: () => void;
   onRemoveIntervention: (interventionId: string) => void;
   onJumpToField: (fieldId: string) => void;
-  onSetPreview: (value: boolean) => void;
+  onSetMode: (mode: ReportMode) => void;
   onDelete: () => void;
   onCreateRevision: () => void;
 }) {
@@ -99,13 +106,13 @@ export function CarEditor({
     );
   }
 
-  const selectedTemplate = templateVersions.find((template) => template.id === draft.templateVersion);
   const missingCount = checklist.filter((item) => !item.complete).length;
   const canDelete = draft.workflowStatus === "draft";
+  const sectionCounts = missingBySection(draft, household);
 
   return (
     <section className="min-w-0">
-      <header className="mb-4 border-b border-[#161512] pb-3">
+      <header className="mb-4 border-b border-[#161512] pb-3 print:hidden">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#5b574e]">
@@ -117,24 +124,54 @@ export function CarEditor({
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <span className="border border-[#8a5a00] bg-[#f3ead8] px-2 py-1 text-xs font-medium text-[#704700]">
-              {draft.status === "draft_ready_for_review" ? "Draft · fields complete" : "Draft · incomplete"}
+              {draft.workflowStatus !== "draft"
+                ? draft.workflowStatus
+                : missingCount === 0
+                  ? "Draft · fields complete"
+                  : "Draft · incomplete"}
             </span>
             <SaveStatus state={saveState} message={saveError} />
           </div>
         </div>
+
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() => onSetPreview(true)}
-            className="min-h-[44px] border border-[#161512] bg-[#161512] px-4 py-2 text-sm font-medium text-[#f4f1ea] hover:bg-[#7a1f1f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+          <div
+            role="group"
+            aria-label="Report mode"
+            className="flex border border-[#161512] bg-[#fbf9f4]"
           >
-            Preview draft
-          </button>
+            {MODES.map((entry) => (
+              <button
+                key={entry.id}
+                type="button"
+                aria-pressed={mode === entry.id}
+                onClick={() => onSetMode(entry.id)}
+                className={`min-h-[40px] border-r border-[#c9c3b6] px-4 text-sm font-medium last:border-r-0 ${
+                  mode === entry.id
+                    ? "bg-[#161512] text-[#f4f1ea]"
+                    : "text-[#3f3b34] hover:bg-[#ece7dc]"
+                } focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#7a1f1f]`}
+              >
+                {entry.label}
+              </button>
+            ))}
+          </div>
+
+          {mode === "print" ? (
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="min-h-[40px] border border-[#161512] bg-[#161512] px-4 text-sm font-medium text-[#f4f1ea] hover:bg-[#7a1f1f]"
+            >
+              Print this report
+            </button>
+          ) : null}
+
           <button
             type="button"
             onClick={onCreateRevision}
             disabled={creatingRevision}
-            className="min-h-[44px] border border-[#161512] px-4 py-2 text-sm font-medium hover:bg-[#ece7dc] disabled:cursor-not-allowed disabled:border-[#b5afa2] disabled:text-[#777166] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+            className="min-h-[40px] border border-[#161512] px-4 text-sm font-medium hover:bg-[#ece7dc] disabled:cursor-not-allowed disabled:border-[#b5afa2] disabled:text-[#777166] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
           >
             {creatingRevision ? "Creating revision…" : "New revision"}
           </button>
@@ -148,14 +185,14 @@ export function CarEditor({
                     onDelete();
                   }}
                   disabled={deleting}
-                  className="min-h-[44px] border border-[#7a1f1f] bg-[#7a1f1f] px-4 py-2 text-sm font-medium text-[#f4f1ea] hover:bg-[#5e1717] disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+                  className="min-h-[40px] border border-[#7a1f1f] bg-[#7a1f1f] px-4 text-sm font-medium text-[#f4f1ea] hover:bg-[#5e1717] disabled:cursor-not-allowed"
                 >
                   {deleting ? "Deleting…" : "Confirm delete"}
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmingDelete(false)}
-                  className="min-h-[44px] border border-[#161512] px-4 py-2 text-sm font-medium hover:bg-[#ece7dc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+                  className="min-h-[40px] border border-[#161512] px-4 text-sm font-medium hover:bg-[#ece7dc]"
                 >
                   Cancel
                 </button>
@@ -164,7 +201,7 @@ export function CarEditor({
               <button
                 type="button"
                 onClick={() => setConfirmingDelete(true)}
-                className="min-h-[44px] border border-[#7a1f1f] px-4 py-2 text-sm font-medium text-[#7a1f1f] hover:bg-[#f2e4e1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+                className="min-h-[40px] border border-[#7a1f1f] px-4 text-sm font-medium text-[#7a1f1f] hover:bg-[#f2e4e1]"
               >
                 Delete draft
               </button>
@@ -172,10 +209,11 @@ export function CarEditor({
           ) : null}
           <span className="text-xs text-[#5b574e]">
             {missingCount === 0
-              ? "All checks are complete. This draft is still not approved."
-              : `${missingCount} check${missingCount === 1 ? "" : "s"} incomplete. Draft remains editable.`}
+              ? "All required blanks are filled. Approval still runs through review."
+              : `${missingCount} required blank${missingCount === 1 ? "" : "s"} outstanding.`}
           </span>
         </div>
+
         {actionError ? (
           <p
             role="alert"
@@ -186,50 +224,50 @@ export function CarEditor({
         ) : null}
       </header>
 
-      {previewOpen ? (
-        <CarDraftPreview
-          draft={draft}
-          household={household}
-          templateLabel={selectedTemplate?.label ?? ""}
-          onEdit={() => onSetPreview(false)}
-        />
-      ) : (
-        <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(250px,0.8fr)]">
-          <div className="min-w-0 border border-[#c9c3b6] bg-[#f8f5ee]">
-            <CarIdentitySection
-              draft={draft}
-              household={household}
-              templateVersions={templateVersions}
-              onChange={onUpdateDraft}
+      {mode === "edit" ? (
+        <div className="grid items-start gap-5 lg:grid-cols-[150px_minmax(0,1fr)] xl:grid-cols-[150px_minmax(0,1.7fr)_minmax(260px,0.85fr)]">
+          <div className="hidden lg:block print:hidden">
+            <SectionRail
+              missingBySection={sectionCounts}
+              onJumpToSection={(sectionId) => onJumpToField(`section-${sectionId}`)}
             />
-            <FamilyCompositionSection
-              members={draft.familyComposition}
-              onUpdateMember={onUpdateFamilyMember}
-            />
-            <CarNarrativeFields draft={draft} onChange={onUpdateDraft} />
-            <InterventionPlanSection
-              interventions={draft.interventions}
-              onAdd={onAddIntervention}
-              onUpdate={onUpdateIntervention}
-              onRemove={onRemoveIntervention}
-            />
-            <RecommendationSection
-              value={draft.recommendation}
-              onChange={(recommendation) => onUpdateDraft({ recommendation })}
-            />
-            <footer className="border-t border-[#c9c3b6] bg-[#ece7dc] px-4 py-3 text-xs leading-5 text-[#5b574e] sm:px-5">
-              Draft content is saved to Supabase as you type. Approval, submission, and document
-              generation are not available on this page.
-            </footer>
           </div>
-          <aside className="space-y-4 xl:sticky xl:top-4">
-            <CarChecklist
-              items={checklist}
+          <CarReportDocument
+            draft={draft}
+            household={household}
+            mode={mode}
+            onSlotEdit={onUpdateSlot}
+            onSlotReveal={onSlotReveal}
+            onUpdateFamilyMember={onUpdateFamilyMember}
+            onUpdateIntervention={onUpdateIntervention}
+            onAddIntervention={onAddIntervention}
+            onRemoveIntervention={onRemoveIntervention}
+          />
+          <div className="lg:col-span-2 xl:col-span-1 print:hidden">
+            <ReportContextPanel
+              draft={draft}
+              checklist={checklist}
               missingCount={missingCount}
+              templateVersions={templateVersions}
+              history={history}
               onJumpToField={onJumpToField}
+              onUpdateDraft={onUpdateDraft}
             />
-            <CarRevisionHistory revision={draft.revision} history={history} />
-          </aside>
+          </div>
+        </div>
+      ) : (
+        <div className="print:max-w-none">
+          <CarReportDocument
+            draft={draft}
+            household={household}
+            mode={mode}
+            onSlotEdit={onUpdateSlot}
+            onSlotReveal={onSlotReveal}
+            onUpdateFamilyMember={onUpdateFamilyMember}
+            onUpdateIntervention={onUpdateIntervention}
+            onAddIntervention={onAddIntervention}
+            onRemoveIntervention={onRemoveIntervention}
+          />
         </div>
       )}
     </section>

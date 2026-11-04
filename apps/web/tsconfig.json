@@ -16,9 +16,14 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@import-domain": ["../../supabase/functions/_shared/import-domain.ts"]
+      "@import-domain": ["../../supabase/functions/_shared/import-domain.ts"],
+      "@report-template": ["../../supabase/functions/_shared/report-template.ts"]
     }
   },
-  "include": ["src", "../../supabase/functions/_shared/import-domain.ts"],
+  "include": [
+    "src",
+    "../../supabase/functions/_shared/import-domain.ts",
+    "../../supabase/functions/_shared/report-template.ts"
+  ],
   "exclude": ["src/**/__tests__/**"]
 }

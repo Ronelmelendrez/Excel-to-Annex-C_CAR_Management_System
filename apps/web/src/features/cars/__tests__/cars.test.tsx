@@ -87,7 +87,7 @@ function makeCar(overrides: Partial<CarDraft> & { id: string; reference: string 
     granteeSourceRow: 44,
     importName: "SY2026_Q1_household_profiles.xlsx",
     importVersion: 3,
-    templateVersion: "",
+    templateVersion: "annex-c-car-v1",
     datePrepared: "",
     presentingProblem: "",
     backgroundInformation: "",
@@ -98,6 +98,7 @@ function makeCar(overrides: Partial<CarDraft> & { id: string; reference: string 
       { id: "m-091-1", entryId: "00009101", name: "Celia Ramos", relationship: "Household head", age: 42, sourceRow: 43, include: true },
       { id: "m-091-2", entryId: "00009102", name: "Jomar Ramos", relationship: "Son", age: 17, sourceRow: 44, include: true },
     ],
+    slots: {},
     history: [{ id: "h-created", label: "Draft created", at: "2026-10-28T08:30:00.000Z" }],
     createdAt: "2026-10-28T08:30:00.000Z",
     updatedAt: "2026-10-28T08:30:00.000Z",
@@ -165,7 +166,7 @@ describe("F5 CAR authoring", () => {
     cleanup();
   });
 
-  it("renders the CAR register loaded from Supabase with blank narrative fields", async () => {
+  it("renders the CAR register with the template document and slot blanks", async () => {
     await renderLoadedPage();
 
     expect(listCars).toHaveBeenCalledTimes(1);
@@ -173,13 +174,31 @@ describe("F5 CAR authoring", () => {
     expect(screen.queryByText(/Mock drafts/)).toBeNull();
     expect(screen.getByText("1 records")).toBeTruthy();
     expect(screen.getAllByText(/Jomar Ramos/).length).toBeGreaterThan(0);
-    expect(screen.getByRole("textbox", { name: "Presenting problem" })).toHaveProperty("value", "");
-    expect(screen.getByRole("textbox", { name: "Background information" })).toHaveProperty("value", "");
-    expect(screen.getByRole("textbox", { name: "Case worker assessment" })).toHaveProperty("value", "");
-    expect(screen.getByRole("textbox", { name: "Case worker recommendation" })).toHaveProperty("value", "");
+
+    // The template's fixed wording is rendered read-only; only blanks are dynamic.
+    expect(
+      screen.getByText(/The family is experiencing financial difficulties/),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Source of Information (needs input)" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Family Composition:" })).toBeTruthy();
+
+    // Context panel: approval checklist and template version.
+    expect(screen.getByRole("tab", { name: /Missing \(/ })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Data source" })).toBeTruthy();
+    // The template-version select lives under the "Data source" tab.
+    fireEvent.click(screen.getByRole("tab", { name: "Data source" }));
+    expect(screen.getByRole("combobox", { name: "Template version" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: /Missing \(/ }));
+
+    // Modes and status.
     expect(screen.getByText("Draft · incomplete")).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: /Template version selected/ }).length).toBe(1);
-    expect(screen.queryByRole("button", { name: /Approve|Submit for review/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Edit" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "Preview" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Print" })).toBeTruthy();
+    // No approval/submit action on this page (only the signatory blanks read
+    // "Approved by …"). Approval runs in the review workflow.
+    expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Submit for review" })).toBeNull();
   });
 
   it("creates a draft through the API only after selecting a validated household", async () => {
@@ -199,22 +218,30 @@ describe("F5 CAR authoring", () => {
     expect(screen.getAllByText(/HH_ID 000091/).length).toBeGreaterThan(0);
   });
 
-  it("saves edits back to Supabase instead of keeping them in memory", async () => {
+  it("saves slot edits back to Supabase instead of keeping them in memory", async () => {
     await renderLoadedPage();
 
-    fireEvent.change(screen.getByRole("textbox", { name: "Presenting problem" }), {
-      target: { value: "Learner misses class three days a week." },
+    // Fill a required manual blank through its slot chip.
+    fireEvent.click(screen.getByRole("button", { name: "Source of Information (needs input)" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Source of Information" }), {
+      target: { value: "Interview with the child’s teacher" },
     });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(screen.getByText("Saving to Supabase…")).toBeTruthy();
 
     await waitFor(() => expect(updateCar).toHaveBeenCalledTimes(1), { timeout: 4000 });
-    expect(updateCar.mock.calls[0][0].id).toBe("car-1");
-    expect(updateCar.mock.calls[0][0].presentingProblem).toBe(
-      "Learner misses class three days a week.",
-    );
+    const payload = updateCar.mock.calls[0][0];
+    expect(payload.id).toBe("car-1");
+    expect(payload.slots.source_of_information).toMatchObject({
+      value: "Interview with the child’s teacher",
+      source: "manual",
+    });
 
     await screen.findByText("Saved to Supabase");
+
+    // The save is recorded in the draft history shown in the context panel.
+    fireEvent.click(screen.getByRole("tab", { name: "History" }));
     await screen.findByText("Changes saved");
   });
 
@@ -235,9 +262,8 @@ describe("F5 CAR authoring", () => {
     fireEvent.click(screen.getByRole("button", { name: "New revision" }));
 
     await waitFor(() => expect(createCarRevision).toHaveBeenCalledWith("car-1"));
-    await screen.findByRole("heading", { name: /CAR-2026-023/ });
-    expect(screen.getByRole("heading", { name: "Revision 2" })).toBeTruthy();
-    expect(screen.getAllByText(/Revision 2/).length).toBeGreaterThan(1);
+    await screen.findByRole("heading", { name: /CAR-2026-023 · Revision 2/ });
+    expect(screen.getAllByText(/Revision 2/).length).toBeGreaterThan(0);
   });
 
   it("shows an explicit not-configured state instead of sample records", () => {

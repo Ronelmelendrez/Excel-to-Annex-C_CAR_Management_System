@@ -15,6 +15,9 @@ export default defineConfig({
       '@import-domain': fileURLToPath(
         new URL('../../supabase/functions/_shared/import-domain.ts', import.meta.url),
       ),
+      '@report-template': fileURLToPath(
+        new URL('../../supabase/functions/_shared/report-template.ts', import.meta.url),
+      ),
     },
   },
   test: {
@@ -38,5 +41,9 @@ export default defineConfig({
       'src/features/audit/__tests__/*.test.tsx',
     ],
     globals: true,
+    // Rendering the full Annex C document (60+ slots, three tables) in jsdom
+    // is slow, and parallel test files slow it further — the default 5s is
+    // not enough for the CAR page suites.
+    testTimeout: 20000,
   },
 })

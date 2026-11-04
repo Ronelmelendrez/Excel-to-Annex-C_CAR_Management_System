@@ -129,7 +129,7 @@ IDs are stable. Tests and tickets should cite them (e.g. `REQ-IMP-004`).
 | REQ-AUD-003 | Auditors and admins can filter by actor, entity, action and date. | M |
 | REQ-AUD-004 | Audit rows are inserted by the server only; clients cannot modify them. | M |
 
-### 1.12 CAR Report Page (F05) — see `features/F05-car-authoring/REPORT-PAGE-REFACTOR-PLAN.md`
+### 1.12 CAR Report Page (F05) — see `.agents/REFACTOR-PLAN-REPORT-PAGE.md`
 | ID | Requirement | Pri |
 |----|-------------|:--:|
 | REQ-RPT-001 | The CAR page reproduces the Annex C template layout and wording; fixed template text is always displayed. | M |

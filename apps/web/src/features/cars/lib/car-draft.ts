@@ -1,3 +1,4 @@
+import { getReportChecklist } from "./report/values";
 import type {
   CarChecklistItem,
   CarDraft,
@@ -6,27 +7,18 @@ import type {
   InterventionDraft,
 } from "../types";
 
-export function getCarChecklist(draft: CarDraft): CarChecklistItem[] {
-  return [
-    { id: "templateVersion", label: "Template version selected", complete: Boolean(draft.templateVersion) },
-    { id: "datePrepared", label: "Date prepared", complete: Boolean(draft.datePrepared) },
-    {
-      id: "familyComposition",
-      label: "Family composition has at least one included member",
-      complete: draft.familyComposition.some((member) => member.include),
-    },
-    { id: "presentingProblem", label: "Presenting problem", complete: Boolean(draft.presentingProblem.trim()) },
-    { id: "backgroundInformation", label: "Background information", complete: Boolean(draft.backgroundInformation.trim()) },
-    { id: "assessment", label: "Assessment", complete: Boolean(draft.assessment.trim()) },
-    {
-      id: "interventions",
-      label: "At least one intervention has a type and details",
-      complete: draft.interventions.some(
-        (intervention) => Boolean(intervention.type) && Boolean(intervention.details.trim()),
-      ),
-    },
-    { id: "recommendation", label: "Recommendation", complete: Boolean(draft.recommendation.trim()) },
-  ];
+/**
+ * Checklist for the context panel: every required slot from the template
+ * registry plus the family/intervention structural checks. Ids are the DOM
+ * jump targets (`slot-<key>`). The server computes the same list through
+ * `computeMissingKeys` in _shared/report-template.ts, so completeness in the
+ * UI and `missing_fields` can never drift.
+ */
+export function getCarChecklist(
+  draft: CarDraft,
+  household?: { barangay?: string; municipality?: string } | null,
+): CarChecklistItem[] {
+  return getReportChecklist(draft, household);
 }
 
 export function createFamilyComposition(
@@ -36,11 +28,27 @@ export function createFamilyComposition(
 }
 
 export function createIntervention(): InterventionDraft {
-  return { id: `intervention-${crypto.randomUUID()}`, type: "", details: "" };
+  return {
+    id: `intervention-${crypto.randomUUID()}`,
+    type: "",
+    details: "",
+    custom: true,
+    included: true,
+    need: "",
+    objective: "",
+    activities: "",
+    responsible: "",
+    timeline: "",
+    remarks: "",
+    values: {},
+  };
 }
 
-export function getDraftStatus(draft: CarDraft): CarDraft["status"] {
-  return getCarChecklist(draft).every((item) => item.complete)
+export function getDraftStatus(
+  draft: CarDraft,
+  household?: { barangay?: string; municipality?: string } | null,
+): CarDraft["status"] {
+  return getCarChecklist(draft, household).every((item) => item.complete)
     ? "draft_ready_for_review"
     : "draft_incomplete";
 }

@@ -1,5 +1,6 @@
 import { ApiError, apiCall } from "../../shared/api";
 import { isDemoMode } from "../../shared/supabase";
+import type { SlotValue, SlotValues } from "@report-template";
 import type {
   CarDraft,
   CarDraftHistoryEntry,
@@ -57,12 +58,53 @@ function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
+function asStringRecord(value: unknown): Record<string, string> {
+  const row = asContent(value);
+  const out: Record<string, string> = {};
+  for (const [key, entry] of Object.entries(row)) {
+    if (typeof entry === "string") out[key] = entry;
+  }
+  return out;
+}
+
+/** Keeps only well-formed slot entries; the server re-sanitizes on write. */
+function mapSlotValues(value: unknown): SlotValues {
+  const row = asContent(value);
+  const out: SlotValues = {};
+  for (const [key, entry] of Object.entries(row)) {
+    const slot = asContent(entry);
+    if (typeof slot.value !== "string") continue;
+    out[key] = {
+      value: slot.value,
+      source: typeof slot.source === "string" ? (slot.source as SlotValue["source"]) : undefined,
+      overridden: slot.overridden === true,
+      original: typeof slot.original === "string" ? slot.original : null,
+      reason: typeof slot.reason === "string" ? slot.reason : undefined,
+      at: typeof slot.at === "string" ? slot.at : undefined,
+    };
+  }
+  return out;
+}
+
 function mapIntervention(value: unknown): InterventionDraft {
   const row = asContent(value);
+  // Legacy rows store only {type, details}; new rows carry the full shape.
+  const need = str(row.need) || str(row.type);
+  const activities = str(row.activities) || str(row.details);
   return {
     id: str(row.id) || `intervention-${crypto.randomUUID()}`,
-    type: str(row.type),
-    details: str(row.details),
+    type: need,
+    details: activities,
+    catalogId: typeof row.catalogId === "string" ? row.catalogId : undefined,
+    custom: row.custom === true,
+    included: row.included === undefined ? true : row.included === true,
+    need,
+    objective: str(row.objective),
+    activities,
+    responsible: str(row.responsible),
+    timeline: str(row.timeline),
+    remarks: str(row.remarks),
+    values: asStringRecord(row.values),
   };
 }
 
@@ -76,6 +118,8 @@ function mapFamilyMember(value: unknown): FamilyCompositionMember {
     age: row.age === null || row.age === undefined ? null : num(row.age, 0),
     sourceRow: num(row.sourceRow, 0),
     include: row.include === true,
+    data: asStringRecord(row.data),
+    overlay: asStringRecord(row.overlay),
   };
 }
 
@@ -118,6 +162,7 @@ function asCar(raw: unknown): CarDraft | null {
     recommendation: str(row.recommendation),
     interventions: asArray(row.interventions).map(mapIntervention),
     familyComposition: asArray(row.familyComposition).map(mapFamilyMember),
+    slots: mapSlotValues(row.slots),
     history: asArray(row.history).map(mapHistoryEntry),
     createdAt: str(row.createdAt),
     updatedAt: str(row.updatedAt),
@@ -132,15 +177,19 @@ function requireCar(raw: unknown): CarDraft {
 
 /** The editable slice of a draft; identity fields stay server-owned. */
 function toContent(draft: CarDraft): Record<string, unknown> {
+  // Legacy mirror: the report date slot also fills the old `datePrepared`
+  // field so older readers (and old drafts) keep working.
+  const reportDate = draft.slots?.report_date?.value ?? "";
   return {
     templateVersion: draft.templateVersion,
-    datePrepared: draft.datePrepared,
+    datePrepared: /^\d{4}-\d{2}-\d{2}$/.test(reportDate) ? reportDate : draft.datePrepared,
     presentingProblem: draft.presentingProblem,
     backgroundInformation: draft.backgroundInformation,
     assessment: draft.assessment,
     recommendation: draft.recommendation,
     familyComposition: draft.familyComposition,
     interventions: draft.interventions,
+    slots: draft.slots,
     history: draft.history,
   };
 }
