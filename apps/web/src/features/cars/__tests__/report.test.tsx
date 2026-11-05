@@ -1,9 +1,11 @@
 import React from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import PizZip from "pizzip";
 import {
   DEFAULT_REPORT_SETTINGS,
   FORBIDDEN_STATIC_NAMES,
+  INTERVENTION_COLUMNS,
   REPORT_TEMPLATE,
   SLOT_BY_KEY,
   SLOT_DEFS,
@@ -17,9 +19,16 @@ import {
 } from "@report-template";
 import { useAuth } from "../../../app/providers";
 import { CarsPage } from "../components/CarsPage";
+import { InterventionPlanTable } from "../components/report/InterventionPlanTable";
 import { SlotChip } from "../components/report/SlotChip";
-import { getReportChecklist, withSlotValue } from "../lib/report/values";
+import {
+  defaultInterventions,
+  ensureInterventions,
+  getReportChecklist,
+  withSlotValue,
+} from "../lib/report/values";
 import { listCars, createCar, deleteCar, updateCar, listCarTemplates, createCarRevision } from "../api";
+import { downloadDocx } from "../../templates/lib/annex-c-docx";
 import { listHouseholds } from "../../households/api";
 import type { CarDraft } from "../types";
 import type { HouseholdRecord } from "../../households/mock-data";
@@ -59,6 +68,13 @@ vi.mock("../api", async (importOriginal) => {
 vi.mock("../../households/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../households/api")>();
   return { ...actual, listHouseholds: vi.fn() };
+});
+
+// Keep the real renderer (it must produce the actual .docx bytes) but capture
+// the download so the test can unzip and compare the file with the page.
+vi.mock("../../templates/lib/annex-c-docx", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../templates/lib/annex-c-docx")>();
+  return { ...actual, downloadDocx: vi.fn() };
 });
 
 /* ------------------------------------------------------- shared fixture */
@@ -466,6 +482,66 @@ function authFor(roles: string[]) {
   };
 }
 
+describe("Annex C intervention plan", () => {
+  it("restores standard rows when a saved CAR contains only blank intervention rows", () => {
+    const restored = ensureInterventions(
+      Array.from({ length: 4 }, (_, index) => ({
+        id: `legacy-row-${index}`,
+        type: "",
+        details: "",
+      })),
+    );
+
+    expect(restored).toHaveLength(6);
+    expect(restored.map((row) => row.need)).toEqual([
+      "Medical Assistance",
+      "Scholarship for college ongoing children",
+      "Increased social network",
+      "Stable Employment",
+      "Capability Building",
+      "Progress Monitoring",
+    ]);
+    expect(restored[0].activities).toContain("to RHU");
+    expect(restored[4].responsible).toContain("TESDA");
+  });
+
+  it("shows all six standard source rows and their prefilled details in the CAR table", () => {
+    render(
+      <InterventionPlanTable
+        interventions={defaultInterventions()}
+        values={{}}
+        mode="preview"
+        onUpdate={() => undefined}
+        onAddCustom={() => undefined}
+        onRemove={() => undefined}
+      />,
+    );
+
+    const table = screen.getByRole("table");
+    const rows = Array.from(table.querySelectorAll("tbody tr"));
+    expect(rows).toHaveLength(6);
+    const cells = rows.map((row) =>
+      Array.from(row.querySelectorAll("td")).map((cell) =>
+        (cell.textContent ?? "").replace(/\s+/g, " ").trim(),
+      ),
+    );
+    expect(cells.map((row) => row[0])).toEqual([
+      "Medical Assistance",
+      "Scholarship for college ongoing children",
+      "Increased social network",
+      "Stable Employment",
+      "Capability Building",
+      "Progress Monitoring",
+    ]);
+    expect(cells[0][2]).toContain("_________ to RHU");
+    expect(cells[0][5]).toContain("maintain the _________’s overall health");
+    expect(cells[3][3]).toContain("___________");
+    expect(cells[4][2]).toContain("link ________ to TESDA");
+    expect(cells[5][4]).toBe("Every 6mons");
+    expect(document.body.textContent).not.toContain("Untitled row —");
+  });
+});
+
 describe("report page modes and audit behaviour", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -535,6 +611,70 @@ describe("report page modes and audit behaviour", () => {
     // Back to Edit.
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     expect(screen.getByRole("button", { name: "Source of Information (needs input)" })).toBeTruthy();
+  }, 30000);
+
+  it("exports the Intervention Plan table and Goal paragraph to DOCX exactly as shown on the page", async () => {
+    await renderLoaded();
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+
+    // ---- what the page shows ----------------------------------------
+    const goalOnPage = Array.from(document.querySelectorAll("p"))
+      .map((p) => p.textContent ?? "")
+      .find((text) => text.trim().startsWith("Goal:"));
+    expect(goalOnPage).toBeTruthy();
+
+    const planTable = Array.from(document.querySelectorAll("table")).find((table) =>
+      (table.textContent ?? "").includes("Need/Problem"),
+    );
+    expect(planTable).toBeTruthy();
+    const headersOnPage = Array.from(planTable!.querySelectorAll("th")).map((th) =>
+      (th.textContent ?? "").trim(),
+    );
+    expect(headersOnPage).toEqual([...INTERVENTION_COLUMNS]);
+
+    const rowCellsOnPage = Array.from(planTable!.querySelectorAll("tbody tr")).map((tr) =>
+      Array.from(tr.querySelectorAll("td")).map((td) => (td.textContent ?? "").trim()),
+    );
+    expect(rowCellsOnPage.length).toBeGreaterThan(0);
+
+    const reportParagraphs = Array.from(document.querySelectorAll("p"))
+      .map((p) => p.textContent ?? "")
+      .map((text) => text.replace(/\s+/g, " ").trim());
+    expect(reportParagraphs.some((text) => text.startsWith("Untitled row —"))).toBe(false);
+
+    // ---- download and unzip ------------------------------------------
+    fireEvent.click(screen.getByRole("button", { name: "Download DOCX" }));
+    await waitFor(() => expect(downloadDocx).toHaveBeenCalledTimes(1), { timeout: 20000 });
+
+    const [bytes, filename] = vi.mocked(downloadDocx).mock.calls[0];
+    expect(filename).toBe("Annex C - CASE STUDY REPORT - Jomar Ramos (000091).docx");
+
+    const zip = new PizZip(new Uint8Array(bytes as ArrayBuffer));
+    const xml = zip.file("word/document.xml")?.asText() ?? "";
+    expect(xml).not.toContain("{{");
+    const docxText = xml
+      .replace(/<w:tab\s*\/>/g, " ")
+      .replace(/<w:br\s*\/>|<w:cr\s*\/>/g, " ")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'")
+      .replace(/&amp;/g, "&")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    // Same six columns, same first-row cells, same Goal paragraph — the
+    // page and the DOCX are generated from one definition (REQ-RPT-005).
+    for (const header of headersOnPage) {
+      expect(docxText).toContain(header);
+    }
+    for (const cell of rowCellsOnPage[0]) {
+      if (cell) expect(docxText).toContain(cell);
+    }
+    expect(docxText).not.toContain("Untitled row —");
+    expect(docxText).toContain((goalOnPage ?? "").replace(/\s+/g, " ").trim());
+    expect(docxText).toContain("INTERVENTION PLAN");
   }, 30000);
 
   it("requires a reason before overriding a derived value and stores it", async () => {

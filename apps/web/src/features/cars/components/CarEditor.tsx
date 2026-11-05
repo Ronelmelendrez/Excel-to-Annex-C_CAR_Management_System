@@ -8,6 +8,7 @@ import type {
   ValidatedHousehold,
 } from "../types";
 import { missingBySection } from "../lib/report/values";
+import { annexCDocxFileName, downloadDocx, renderAnnexCDocx } from "../../templates/lib/annex-c-docx";
 import { CarReportDocument } from "./report/CarReportDocument";
 import { ReportContextPanel } from "./report/ReportContextPanel";
 import { SectionRail } from "./report/SectionRail";
@@ -93,6 +94,8 @@ export function CarEditor({
   onCreateRevision: () => void;
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   if (!draft || !household) {
     return (
@@ -109,6 +112,33 @@ export function CarEditor({
   const missingCount = checklist.filter((item) => !item.complete).length;
   const canDelete = draft.workflowStatus === "draft";
   const sectionCounts = missingBySection(draft, household);
+  // Captured after the null guard so the export handler sees non-null values.
+  const currentDraft = draft;
+  const currentHousehold = household;
+
+  /**
+   * Exports exactly what is on screen: the same REPORT_TEMPLATE blocks and
+   * `buildDocxData` derivation the preview renders, so the .docx carries the
+   * Intervention Plan table (same rows and columns) and the Goal paragraph
+   * verbatim — only the `____` blanks are dynamic (REQ-RPT-005/006).
+   */
+  async function handleDownloadDocx() {
+    if (downloading) return;
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      const bytes = await renderAnnexCDocx(currentDraft, currentHousehold);
+      downloadDocx(bytes, annexCDocxFileName(currentDraft));
+    } catch (error) {
+      setDownloadError(
+        error instanceof Error && error.message
+          ? error.message
+          : "The Annex C document could not be generated. Try again.",
+      );
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   return (
     <section className="min-w-0">
@@ -156,6 +186,15 @@ export function CarEditor({
               </button>
             ))}
           </div>
+
+          <button
+            type="button"
+            onClick={() => handleDownloadDocx()}
+            disabled={downloading}
+            className="min-h-[40px] border border-[#161512] px-4 text-sm font-medium hover:bg-[#ece7dc] disabled:cursor-not-allowed disabled:border-[#b5afa2] disabled:text-[#777166] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
+          >
+            {downloading ? "Preparing DOCX…" : "Download DOCX"}
+          </button>
 
           {mode === "print" ? (
             <button
@@ -220,6 +259,15 @@ export function CarEditor({
             className="mt-3 border-l-4 border-[#7a1f1f] bg-[#f2e4e1] px-3 py-2 text-sm leading-6 text-[#7a1f1f]"
           >
             {actionError}
+          </p>
+        ) : null}
+
+        {downloadError ? (
+          <p
+            role="alert"
+            className="mt-3 border-l-4 border-[#7a1f1f] bg-[#f2e4e1] px-3 py-2 text-sm leading-6 text-[#7a1f1f]"
+          >
+            {downloadError}
           </p>
         ) : null}
       </header>

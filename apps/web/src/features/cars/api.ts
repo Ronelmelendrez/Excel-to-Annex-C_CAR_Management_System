@@ -1,6 +1,7 @@
 import { ApiError, apiCall } from "../../shared/api";
 import { isDemoMode } from "../../shared/supabase";
 import type { SlotValue, SlotValues } from "@report-template";
+import { ensureInterventions } from "./lib/report/values";
 import type {
   CarDraft,
   CarDraftHistoryEntry,
@@ -160,7 +161,7 @@ function asCar(raw: unknown): CarDraft | null {
     backgroundInformation: str(row.backgroundInformation),
     assessment: str(row.assessment),
     recommendation: str(row.recommendation),
-    interventions: asArray(row.interventions).map(mapIntervention),
+    interventions: ensureInterventions(asArray(row.interventions).map(mapIntervention)),
     familyComposition: asArray(row.familyComposition).map(mapFamilyMember),
     slots: mapSlotValues(row.slots),
     history: asArray(row.history).map(mapHistoryEntry),

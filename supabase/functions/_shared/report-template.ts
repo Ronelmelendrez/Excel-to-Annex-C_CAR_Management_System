@@ -498,26 +498,25 @@ export type InterventionCatalogRow = {
   remarks: string;
 };
 
-/** Standard rows shipped with template v1; an admin maintains the live
- *  catalog, each CAR may include/exclude rows or add custom ones. */
+/** Standard intervention rows copied from the Annex C source template. */
 export const DEFAULT_INTERVENTION_CATALOG: InterventionCatalogRow[] = [
   {
     id: 'int-medical',
     need: 'Medical Assistance',
     objective: 'Avail free medical assistance and check-up',
     activities:
-      '-refer {{grantee_first_name}} to RHU or barangay health center for monthly heath check up and receive free medicine',
+      '-refer _________ to RHU or barangay health center for monthly heath check up and receive free medicine',
     responsible: 'Brgy. Health Center\nRHU',
     timeline: '',
     remarks:
-      'Access regular health services, receive timely medical checkup, and maintain the {{grantee_possessive}} overall health and well-being.',
+      'Access regular health services, receive timely medical checkup, and maintain the _________’s overall health and well-being.',
   },
   {
     id: 'int-scholarship',
     need: 'Scholarship for college ongoing children',
     objective: 'To avail educational scholarship',
     activities:
-      '- {{grantee_first_name}} attend career pathway seminars\n-apply scholarship in CHED\n-take entrance examination in state university\n-apply and take exam in DOST\n-refer to DSWD for educational assistance',
+      '- _________attend career pathway seminars\n-apply scholarship in CHED\n-take entrance examination in state university\n-apply and take exam in DOST\n-refer to DSWD for educational assistance',
     responsible: 'CHED\nDOST\nDSWD',
     timeline: '',
     remarks: 'Avail scholarship for college',
@@ -527,7 +526,7 @@ export const DEFAULT_INTERVENTION_CATALOG: InterventionCatalogRow[] = [
     need: 'Increased social network',
     objective: 'Strengthen social support',
     activities:
-      'Encourage participation in more community support groups\n-continue to actively participate their SHG',
+      'Encourage participation in more community support groups \n-continue to actively participate their SHG',
     responsible: 'Grantee\nLGU Tagbilaran\nBarangay Officials',
     timeline: '',
     remarks:
@@ -538,8 +537,8 @@ export const DEFAULT_INTERVENTION_CATALOG: InterventionCatalogRow[] = [
     need: 'Stable Employment',
     objective: 'To obtain stable employment',
     activities:
-      '-Encourage {{grantee_first_name}} to apply in any job vacancy position that aligns with his skills\n-refer to PESO for job vacancy',
-    responsible: '{{responsible_person}}\nPESO\nLGU\nML',
+      '-Encourage_________to apply in any job vacancy position that aligns with his skills \n-refer to PESO for job vacancy',
+    responsible: '___________\nPESO\nLGU\nML',
     timeline: '',
     remarks:
       'Secure a steady job that provides consistent income and benefits, ensuring financial stability for the family.',
@@ -549,10 +548,10 @@ export const DEFAULT_INTERVENTION_CATALOG: InterventionCatalogRow[] = [
     need: 'Capability Building',
     objective: 'Enhance Entrepreneurial Skills',
     activities:
-      'link {{grantee_first_name}} to TESDA to access technical assistance\n-refer {{grantee_first_name}} to SLP for livelihood assistance and capability building.',
-    responsible: '{{responsible_person}}\nTESDA\nSLP\nML',
+      'link ________ to TESDA to access technical assistance \n-refer ________ to SLP for livelihood assistance and capability building.',
+    responsible: '_____________TESDA\nSLP\nML',
     timeline: '',
-    remarks: 'Avail livelihood assistance and capability building.',
+    remarks: 'Avail livelihood assistance and capability building.  ',
   },
   {
     id: 'int-monitoring',
@@ -561,7 +560,7 @@ export const DEFAULT_INTERVENTION_CATALOG: InterventionCatalogRow[] = [
     activities: 'Regular household monitoring and follow-up',
     responsible: 'Grantee\nCase Manager',
     timeline: 'Every 6mons',
-    remarks: 'Accurately monitor and evaluate progress',
+    remarks: 'Accurately monitor and evaluate progress ',
   },
 ];
 
@@ -973,6 +972,24 @@ export function resolveSlotValues(
   return values;
 }
 
+/* ------------------------------------- intervention prose (one per row) */
+
+/** Per-row slot values override report-wide values when filling table cells. */
+export type InterventionRowValuesInput = {
+  values?: Record<string, string>;
+};
+
+export function interventionRowValues(
+  row: InterventionRowValuesInput,
+  values: SlotValues,
+): SlotValues {
+  const merged: SlotValues = { ...values };
+  for (const [key, entry] of Object.entries(row.values ?? {})) {
+    merged[key] = { value: entry };
+  }
+  return merged;
+}
+
 /* ------------------------------------------------------------ DOCX data */
 
 /**
@@ -985,9 +1002,9 @@ export function resolveSlotValues(
  *     `FamilyCompositionTable` shows them (overlay wins, blanks stay blank,
  *     Monitored Child splits into a ✓ in the YES/NO cell),
  *   - `interventions` → one row per included plan row, cells exactly as
- *     `InterventionPlanTable` shows them (`need || "Untitled row"`, filled
- *     catalog text or `____`), with catalog `{{...}}` tokens already resolved
- *     so no nested tag ever reaches docxtemplater.
+ *     `InterventionPlanTable` shows them (`need`, filled catalog text or
+ *     `____`), with catalog `{{...}}` tokens already resolved so no nested
+ *     tag ever reaches docxtemplater.
  *
  * Used by the web DOCX generator, tests, and scripts — one builder, no drift.
  */
@@ -1026,13 +1043,10 @@ export function buildDocxData(
     .filter((row) => row.included ?? true)
     .map((row) => {
       // Same merge fillInterventionText applies in the preview table.
-      const merged: SlotValues = { ...values };
-      for (const [key, entry] of Object.entries(row.values ?? {})) {
-        merged[key] = { value: entry };
-      }
+      const merged = interventionRowValues(row, values);
       const fill = (text: string | undefined) => fillText(text ?? '', merged) || '____';
       return {
-        need: (row.need ?? row.type ?? '').trim() || 'Untitled row',
+        need: (row.need ?? row.type ?? '').trim(),
         objective: fill(row.objective),
         activities: fill(row.activities),
         responsible: fill(row.responsible),

@@ -7,7 +7,7 @@ import type { CarDraft, ValidatedHousehold } from "../../cars/types";
 import { householdListError, listHouseholds } from "../../households/api";
 import { getGranteeStatus } from "../../households/lib/households";
 import { isDemoMode } from "../../../shared/supabase";
-import { downloadDocx, renderAnnexCDocx } from "../lib/annex-c-docx";
+import { annexCDocxFileName, downloadDocx, renderAnnexCDocx } from "../lib/annex-c-docx";
 import { synthesizeDraft } from "../lib/synthesize-draft";
 
 /** Households the register marks as a valid CAR source (exactly one grantee). */
@@ -21,11 +21,6 @@ function deriveValidatedHouseholds(
     );
     return grantee ? [{ ...household, grantee }] : [];
   });
-}
-
-function downloadFileName(draft: CarDraft): string {
-  const safeName = draft.granteeName.replace(/[\\/:*?"<>|]/g, " ").trim() || "grantee";
-  return `Annex C - CASE STUDY REPORT - ${safeName} (${draft.hhId}).docx`;
 }
 
 /**
@@ -121,7 +116,7 @@ export function TemplatesPage() {
     setDownloaded(false);
     try {
       const bytes = await renderAnnexCDocx(draft, household);
-      downloadDocx(bytes, downloadFileName(draft));
+      downloadDocx(bytes, annexCDocxFileName(draft));
       setDownloaded(true);
     } catch (error) {
       setDownloadError(

@@ -82,10 +82,10 @@ export function InterventionPlanTable({
                             aria-label={`Include ${need || "row"} in the report`}
                             className="h-4 w-4 accent-[#7a1f1f]"
                           />
-                          <span>{need || <em className="text-[#8a5a00]">Untitled row</em>}</span>
+                          <span>{need}</span>
                         </span>
                       ) : (
-                        need || <em>Untitled row</em>
+                        need
                       )}
                     </td>
                     <td className="border border-[#e2ddd1] px-2 py-2 align-top">

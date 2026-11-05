@@ -19,6 +19,7 @@ import {
   type ReportDraftLike,
 } from '@report-template';
 import { renderAnnexCDocx } from '../lib/annex-c-docx';
+import { defaultInterventions } from '../../cars/lib/report/values';
 
 /* --------------------------------------------------------------- fixtures */
 
@@ -195,16 +196,18 @@ describe('Annex C DOCX generation', () => {
     const values = resolveSlotValues(draft, household);
 
     // UI side: the versioned template filled with the same derived values.
-    const expected = normalize(fillTemplate(REPORT_TEMPLATE, values).join('\n'));
+    const lines = fillTemplate(REPORT_TEMPLATE, values);
+    const expected = normalize(lines.join('\n'));
 
     // DOCX side: paragraph text (tables dropped), cut at the sign-off block
     // which the UI preview does not render.
-    const lines = paragraphTexts(documentXml);
-    const cutAt = lines.findIndex((line) => normalize(line).startsWith('Prepared by:'));
+    const docxLines = paragraphTexts(documentXml);
+    const cutAt = docxLines.findIndex((line) => normalize(line).startsWith('Prepared by:'));
     expect(cutAt).toBeGreaterThanOrEqual(0);
-    const actual = normalize(lines.slice(0, cutAt).join('\n'));
+    const actual = normalize(docxLines.slice(0, cutAt).join('\n'));
 
     expect(actual).toBe(expected);
+    expect(documentXml).not.toContain('Untitled row —');
   });
 
   it('keeps the DSWD letterhead and footer parts intact', async () => {
@@ -259,5 +262,38 @@ describe('Annex C DOCX generation', () => {
     // docxtemplater): {{grantee_first_name}} → derived first name.
     expect(documentXml).toContain('refer Ana to RHU');
     expect(documentXml).toContain("Ana’s overall health");
+  });
+
+  it('exports the six Annex C intervention rows in the plan table', async () => {
+    const bytes = await renderAnnexCDocx(
+      { ...makeDraft(), interventions: defaultInterventions() },
+      { barangay: 'Poblacion', municipality: 'Tagbilaran City' },
+    );
+    const zip = new PizZip(new Uint8Array(bytes));
+    const xml = zip.file('word/document.xml')?.asText() ?? '';
+    const tables = xml.match(/<w:tbl[\s\S]*?<\/w:tbl>/g) ?? [];
+    const interventionTable = tables[1];
+    expect((interventionTable.match(/<w:tr\b/g) ?? []).length).toBe(7);
+    for (const need of [
+      'Medical Assistance',
+      'Scholarship for college ongoing children',
+      'Increased social network',
+      'Stable Employment',
+      'Capability Building',
+      'Progress Monitoring',
+    ]) {
+      expect(interventionTable).toContain(need);
+    }
+    expect(interventionTable).toContain('_________');
+    expect(interventionTable).toContain('Brgy');
+    expect(interventionTable).toContain('Every 6mons');
+    expect(xml).not.toContain('Untitled row —');
+    expect(xml).not.toContain('Helping activities:');
+  });
+
+  it('does not append prose duplicates after the intervention table', async () => {
+    const { documentXml } = await render();
+    expect(documentXml).not.toContain('Untitled row —');
+    expect(documentXml).not.toContain('Helping activities:');
   });
 });

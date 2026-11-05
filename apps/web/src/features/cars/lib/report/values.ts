@@ -13,6 +13,7 @@ import {
   SLOT_DEFS,
   computeMissingKeys,
   fillText,
+  interventionRowValues,
   resolveSettings,
   resolveSlotValues,
   sentenceForSlot,
@@ -272,15 +273,32 @@ export function defaultInterventions(): InterventionDraft[] {
   return DEFAULT_INTERVENTION_CATALOG.map(interventionFromCatalog);
 }
 
+/** Restores the standard Annex C rows for legacy drafts with only blank rows. */
+export function ensureInterventions(
+  interventions: InterventionDraft[],
+): InterventionDraft[] {
+  const isEmptyRow = (row: InterventionDraft) =>
+    ![
+      row.need,
+      row.type,
+      row.objective,
+      row.activities,
+      row.responsible,
+      row.timeline,
+      row.remarks,
+    ].some((value) => value?.trim());
+
+  if (interventions.length === 0 || interventions.every(isEmptyRow)) {
+    return defaultInterventions();
+  }
+  return interventions;
+}
+
 /** Fills catalog tokens (`{{grantee_first_name}}`, per-row values) for render. */
 export function fillInterventionText(
   text: string,
   values: SlotValues,
   row: InterventionDraft | undefined,
 ): string {
-  const merged: SlotValues = { ...values };
-  for (const [key, entry] of Object.entries(row?.values ?? {})) {
-    merged[key] = { value: entry };
-  }
-  return fillText(text, merged);
+  return fillText(text, interventionRowValues(row ?? {}, values));
 }

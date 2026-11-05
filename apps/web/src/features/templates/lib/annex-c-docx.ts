@@ -62,6 +62,15 @@ export async function renderAnnexCDocx(
   return doc.getZip().generate({ type: 'arraybuffer' }) as ArrayBuffer;
 }
 
+/**
+ * Download filename for a CAR draft — shared by the report generator page and
+ * the CAR authoring page so both exports are named identically.
+ */
+export function annexCDocxFileName(draft: { granteeName: string; hhId: string }): string {
+  const safeName = draft.granteeName.replace(/[\\/:*?"<>|]/g, ' ').trim() || 'grantee';
+  return `Annex C - CASE STUDY REPORT - ${safeName} (${draft.hhId}).docx`;
+}
+
 /** Triggers a browser download of already-rendered .docx bytes. */
 export function downloadDocx(bytes: ArrayBuffer, filename: string): void {
   const blob = new Blob([bytes], { type: DOCX_MIME_TYPE });
