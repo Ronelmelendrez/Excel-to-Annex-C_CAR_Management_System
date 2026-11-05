@@ -86,15 +86,25 @@ export function HouseholdsPage() {
             reviewFilter={register.reviewFilter}
             versionFilter={register.versionFilter}
             versionOptions={register.versionOptions}
-            householdCount={register.households.length}
-            memberCount={register.totalMembers}
-            granteeCount={register.granteeCount}
-            needsReviewCount={register.needsReviewCount}
+            householdCount={register.registerStats?.householdCount ?? null}
+            memberCount={register.registerStats?.memberCount ?? null}
+            granteeCount={register.registerStats?.granteeCount ?? null}
+            needsReviewCount={register.registerStats?.needsReviewCount ?? null}
             resultCount={register.visibleHouseholds.length}
+            statsError={register.statsError}
             onQueryChange={register.setQuery}
             onReviewFilterChange={register.setReviewFilter}
             onVersionFilterChange={register.setVersionFilter}
           />
+
+          {register.searchError && (
+            <p
+              role="alert"
+              className="mt-4 border-l-4 border-[#7a1f1f] bg-[#f2e4e1] px-4 py-3 text-sm leading-6 text-[#3f3b34]"
+            >
+              {register.searchError}
+            </p>
+          )}
 
           {register.feedback && (
             <p
@@ -108,7 +118,7 @@ export function HouseholdsPage() {
           <div className="mt-5 grid items-start gap-5 lg:grid-cols-[minmax(300px,0.82fr)_minmax(0,1.7fr)]">
             <HouseholdList
               items={register.visibleHouseholds}
-              total={register.households.length}
+              total={register.registerStats?.householdCount ?? register.households.length}
               selectedId={register.selected?.id ?? null}
               onSelect={register.selectHousehold}
             />

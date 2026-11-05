@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { normalizeGrantee } from "@import-domain";
-import { householdListError, listHouseholds } from "../api";
+import {
+  getHouseholdRegisterStats,
+  householdListError,
+  listHouseholds,
+  type HouseholdRegisterStats,
+} from "../api";
 import { isDemoMode } from "../../../shared/supabase";
 import { mockHouseholds } from "../mock-data";
 import type { HouseholdRecord } from "../mock-data";
@@ -30,8 +35,27 @@ export function useHouseholdRegister(actor: string, enabled = true) {
   const [households, setHouseholds] = useState<HouseholdRecord[]>(() =>
     isDemoMode ? mockHouseholds : [],
   );
+  const [searchedHouseholds, setSearchedHouseholds] = useState<HouseholdRecord[]>([]);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [loading, setLoading] = useState(!isDemoMode);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [registerStats, setRegisterStats] = useState<HouseholdRegisterStats | null>(() => {
+    if (!isDemoMode) return null;
+    const householdCount = mockHouseholds.length;
+    const granteeCount = mockHouseholds.filter(
+      (household) => getGranteeStatus(household) === "valid",
+    ).length;
+    return {
+      householdCount,
+      memberCount: mockHouseholds.reduce(
+        (total, household) => total + household.members.length,
+        0,
+      ),
+      granteeCount,
+      needsReviewCount: householdCount - granteeCount,
+    };
+  });
+  const [statsError, setStatsError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
@@ -55,9 +79,83 @@ export function useHouseholdRegister(actor: string, enabled = true) {
     };
   }, [enabled, reloadToken]);
 
+  useEffect(() => {
+    if (isDemoMode || !enabled) return;
+    let cancelled = false;
+    let refreshing = false;
+
+    async function refreshStats() {
+      if (refreshing) return;
+      refreshing = true;
+      try {
+        const stats = await getHouseholdRegisterStats();
+        if (!cancelled) {
+          setRegisterStats(stats);
+          setStatsError(null);
+        }
+      } catch (error: unknown) {
+        if (!cancelled) setStatsError(householdListError(error));
+      } finally {
+        refreshing = false;
+      }
+    }
+
+    void refreshStats();
+    const interval = window.setInterval(() => {
+      void refreshStats();
+    }, 15_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [enabled, reloadToken]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setSearchedHouseholds([]);
+    setSearchError(null);
+
+    const hhId = query.trim();
+    const isIdLike = /^[\p{L}\p{N}_-]{4,}$/u.test(hhId);
+    if (
+      isDemoMode ||
+      !enabled ||
+      !isIdLike ||
+      households.some((household) => household.hhId === hhId)
+    ) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const timer = window.setTimeout(() => {
+      listHouseholds(hhId)
+        .then((result) => {
+          if (!cancelled) setSearchedHouseholds(result.households);
+        })
+        .catch((error: unknown) => {
+          if (!cancelled) setSearchError(householdListError(error));
+        });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [enabled, households, query]);
+
+  const searchableHouseholds = useMemo(() => {
+    const loadedIds = new Set(households.map((household) => household.id));
+    return [
+      ...households,
+      ...searchedHouseholds.filter((household) => !loadedIds.has(household.id)),
+    ];
+  }, [households, searchedHouseholds]);
+
   const versionOptions = useMemo(() => {
     const options = new Map<string, string>();
-    for (const household of households) {
+    for (const household of searchableHouseholds) {
       const value = `${household.importName}::${household.importVersion}`;
       if (options.has(value)) continue;
       const file = household.importName.replace(/\.(xlsx|xlsm|xls|csv)$/i, "");
@@ -66,12 +164,13 @@ export function useHouseholdRegister(actor: string, enabled = true) {
     return [...options.entries()]
       .map(([value, label]) => ({ value, label }))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [households]);
+  }, [searchableHouseholds]);
 
   const visibleHouseholds = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
-    return households.flatMap((household) => {
+    return searchableHouseholds.flatMap((household) => {
       const overlay = overlays[household.id];
+      const matchesHouseholdId = household.hhId.toLocaleLowerCase() === needle;
       const status: HouseholdStatus = overlay?.selectedGranteeId
         ? "resolved"
         : getGranteeStatus(household, overlay?.excludedMemberIds);
@@ -81,17 +180,19 @@ export function useHouseholdRegister(actor: string, enabled = true) {
         household.barangay.toLocaleLowerCase().includes(needle) ||
         household.members.some((member) => member.name.toLocaleLowerCase().includes(needle));
       const matchesStatus =
+        matchesHouseholdId ||
         reviewFilter === "all" ||
         (reviewFilter === "needs_review" && status !== "valid" && status !== "resolved") ||
         (reviewFilter === "ok" && status === "valid") ||
         (reviewFilter === "resolved" && status === "resolved");
       const matchesVersion =
+        matchesHouseholdId ||
         versionFilter === "all" ||
         `${household.importName}::${household.importVersion}` === versionFilter;
 
       return matchesSearch && matchesStatus && matchesVersion ? [{ household, status }] : [];
     });
-  }, [households, overlays, query, reviewFilter, versionFilter]);
+  }, [searchableHouseholds, overlays, query, reviewFilter, versionFilter]);
 
   const selected =
     visibleHouseholds.find(({ household }) => household.id === selectedId)?.household ??
@@ -256,6 +357,9 @@ export function useHouseholdRegister(actor: string, enabled = true) {
     households,
     loading,
     loadError,
+    searchError,
+    registerStats,
+    statsError,
     reload,
     versionOptions,
     query,

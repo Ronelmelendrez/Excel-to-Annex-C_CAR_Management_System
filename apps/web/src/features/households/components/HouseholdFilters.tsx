@@ -14,6 +14,7 @@ export function HouseholdFilters({
   granteeCount,
   needsReviewCount,
   resultCount,
+  statsError,
   onQueryChange,
   onReviewFilterChange,
   onVersionFilterChange,
@@ -22,11 +23,12 @@ export function HouseholdFilters({
   reviewFilter: ReviewFilter;
   versionFilter: string;
   versionOptions: { value: string; label: string }[];
-  householdCount: number;
-  memberCount: number;
-  granteeCount: number;
-  needsReviewCount: number;
+  householdCount: number | null;
+  memberCount: number | null;
+  granteeCount: number | null;
+  needsReviewCount: number | null;
   resultCount: number;
+  statsError: string | null;
   onQueryChange: (value: string) => void;
   onReviewFilterChange: (value: ReviewFilter) => void;
   onVersionFilterChange: (value: string) => void;
@@ -38,11 +40,17 @@ export function HouseholdFilters({
         aria-label={isSample ? "Sample register summary" : "Register summary"}
         className="grid grid-cols-2 gap-5 border-b border-[#c9c3b6] py-5 sm:grid-cols-4"
       >
-        <HouseholdStat label={isSample ? "Sample households" : "Households"} value={householdCount} />
-        <HouseholdStat label={isSample ? "Members in sample" : "Members"} value={memberCount} />
-        <HouseholdStat label="Grantee OK" value={granteeCount} />
-        <HouseholdStat label="Needs review" value={needsReviewCount} emphasis />
+        <HouseholdStat label={isSample ? "Sample households" : "Households"} value={householdCount ?? "—"} />
+        <HouseholdStat label={isSample ? "Members in sample" : "Members"} value={memberCount ?? "—"} />
+        <HouseholdStat label="Grantee OK" value={granteeCount ?? "—"} />
+        <HouseholdStat label="Needs review" value={needsReviewCount ?? "—"} emphasis />
       </section>
+      {!isSample && (
+        <div className="flex flex-wrap justify-between gap-2 py-2 text-xs text-[#5b574e]" aria-live="polite">
+          <span>{statsError ? statsError : "Live Supabase counts · refreshed every 15 seconds"}</span>
+          {statsError && <span>Last successful counts remain visible.</span>}
+        </div>
+      )}
 
       <section aria-label="Household search and filters" className="border-b border-[#c9c3b6] py-5">
         <div className="grid gap-3 md:grid-cols-[minmax(220px,1.5fr)_minmax(160px,1fr)_minmax(180px,1fr)]">
@@ -95,7 +103,7 @@ export function HouseholdFilters({
           </div>
         </div>
         <p className="mt-3 text-xs text-[#5b574e]" aria-live="polite">
-          Showing {resultCount} of {householdCount}{" "}
+          Showing {resultCount} of {householdCount ?? "—"}{" "}
           {isSample ? "sample households" : "households"}
         </p>
       </section>

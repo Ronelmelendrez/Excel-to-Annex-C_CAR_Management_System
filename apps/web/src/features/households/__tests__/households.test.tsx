@@ -3,8 +3,10 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuth } from "../../../app/providers";
 import { HouseholdsPage } from "../components/HouseholdsPage";
+import { HouseholdList } from "../components/HouseholdList";
 import { HouseholdMembersTable } from "../components/HouseholdMembersTable";
 import type { HouseholdRecord } from "../types";
+import { asHousehold } from "../api";
 
 vi.mock("../../../app/providers", () => ({
   useAuth: vi.fn(),
@@ -79,6 +81,26 @@ describe("F4 household register", () => {
     fireEvent.change(search, { target: { value: "not-in-the-register" } });
     expect(screen.getByText("No households match those filters.")).toBeTruthy();
     expect(screen.getByText("Select a household")).toBeTruthy();
+  });
+
+  it("preserves and renders a long HH_ID from an uppercase import-shaped response", () => {
+    const household = asHousehold({
+      id: "hh-long-id",
+      HH_ID: "700007993656",
+      members: [],
+    });
+
+    expect(household?.hhId).toBe("700007993656");
+    render(
+      <HouseholdList
+        items={household ? [{ household, status: "valid" }] : []}
+        total={1}
+        selectedId={null}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /HH_ID 700007993656/ })).toBeTruthy();
   });
 
   it("shows a clear access denial without household details for unrecognized roles", () => {

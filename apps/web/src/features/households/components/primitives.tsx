@@ -36,7 +36,7 @@ export function HouseholdStat({
   emphasis = false,
 }: {
   label: string;
-  value: number;
+  value: number | string;
   emphasis?: boolean;
 }) {
   return (

@@ -37,8 +37,8 @@ function carReference(assessment: Record<string, unknown>): string {
   return `CAR-${text(assessment.case_group_id).slice(0, 8).toUpperCase()}`;
 }
 
-async function listHouseholds(supabase: any) {
-  const { data, error: queryError, count } = await supabase
+async function listHouseholds(supabase: any, hhId?: string, offset = 0) {
+  let query = supabase
     .from('households')
     .select(
       `id, hh_id,
@@ -49,9 +49,12 @@ async function listHouseholds(supabase: any) {
        ),
        case_assessments ( id, status, revision, case_group_id, content, created_at )`,
       { count: 'exact' },
-    )
+    );
+  if (hhId) query = query.eq('hh_id', hhId);
+  const { data, error: queryError, count } = await query
     .order('hh_id', { ascending: true })
-    .limit(MAX_HOUSEHOLDS);
+    .order('id', { ascending: true })
+    .range(offset, offset + MAX_HOUSEHOLDS - 1);
   if (queryError) throw queryError;
 
   const households = (data ?? []).map((row: any) => {
@@ -117,6 +120,34 @@ async function listHouseholds(supabase: any) {
   return json({ households, total: count ?? households.length });
 }
 
+async function getHouseholdStats(supabase: any) {
+  const [households, members, granteeOk, needsReview] = await Promise.all([
+    supabase.from('households').select('id', { count: 'exact', head: true }),
+    supabase.from('household_members').select('id', { count: 'exact', head: true }),
+    supabase
+      .from('households')
+      .select('id', { count: 'exact', head: true })
+      .eq('grantee_status', 'valid'),
+    supabase
+      .from('households')
+      .select('id', { count: 'exact', head: true })
+      .neq('grantee_status', 'valid'),
+  ]);
+  const queryError = households.error ?? members.error ?? granteeOk.error ?? needsReview.error;
+  if (queryError) throw queryError;
+  const counts = [households.count, members.count, granteeOk.count, needsReview.count];
+  if (counts.some((count) => !Number.isSafeInteger(count) || count < 0)) {
+    throw new Error('Household summary query returned an invalid count.');
+  }
+
+  return json({
+    householdCount: households.count,
+    memberCount: members.count,
+    granteeCount: granteeOk.count,
+    needsReviewCount: needsReview.count,
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return preflight();
 
@@ -129,7 +160,15 @@ Deno.serve(async (req) => {
 
     const url = new URL(req.url);
     const action = url.searchParams.get('action') ?? 'list';
-    if (action === 'list') return await listHouseholds(getServiceClient());
+    if (action === 'summary') return await getHouseholdStats(getServiceClient());
+    if (action === 'list') {
+      const hhId = url.searchParams.get('hh_id')?.trim() ?? '';
+      if (hhId.length > 128) return error(400, 'invalid_hh_id');
+      const rawOffset = url.searchParams.get('offset');
+      const offset = rawOffset === null ? 0 : Number(rawOffset);
+      if (!Number.isSafeInteger(offset) || offset < 0) return error(400, 'invalid_offset');
+      return await listHouseholds(getServiceClient(), hhId || undefined, offset);
+    }
     return error(404, 'not_found');
   } catch (e) {
     return handleError(e);
