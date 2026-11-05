@@ -11,7 +11,7 @@ export function DashboardTrend({ points }: { points: DashboardTrendPoint[] }) {
     <SectionCard
       id="dashboard-import-trend"
       title="Import activity"
-      description="Rows in committed imports by week · October 2026 sample"
+      description="Rows in committed imports by week"
       eyebrow="Volume"
     >
       {points.length === 0 ? (

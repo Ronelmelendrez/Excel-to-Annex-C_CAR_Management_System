@@ -17,7 +17,7 @@ export function DashboardCarPipeline({ summary }: { summary: DashboardSummary })
     <SectionCard
       id="dashboard-car-pipeline"
       title="CAR pipeline"
-      description="Latest revision per CAR · sample scope"
+      description="Latest revision per CAR in the selected scope"
       eyebrow="Case assessments"
     >
       <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2">

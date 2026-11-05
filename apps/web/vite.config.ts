@@ -62,6 +62,7 @@ export default defineConfig({
       'src/features/templates/__tests__/*.test.{ts,tsx}',
       'src/features/documents/__tests__/*.test.tsx',
       'src/features/dashboard/__tests__/*.test.tsx',
+      'src/features/dashboard/__tests__/api.test.ts',
       'src/features/audit/__tests__/*.test.tsx',
     ],
     globals: true,

@@ -1,4 +1,5 @@
 import { useAuth } from "../../../app/providers";
+import { isDemoMode } from "../../../shared/supabase";
 import { useDashboardSummary } from "../hooks/useDashboardSummary";
 import { isDashboardRole } from "../lib/dashboard";
 import { DashboardActivity } from "./DashboardActivity";
@@ -10,7 +11,7 @@ export function DashboardPage() {
   const { roles } = useAuth();
   const canView = roles.some(isDashboardRole);
   const scope = roles.includes("admin") ? "system" : "assigned";
-  const summary = useDashboardSummary(scope);
+  const dashboard = useDashboardSummary(scope);
 
   if (!canView) {
     return (
@@ -41,30 +42,51 @@ export function DashboardPage() {
               Follow import volume, household review work, CAR progress, and document failures.
             </p>
           </div>
-          <span className="border border-[#8a5a00] bg-[#f3ead8] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[#704700]">
-            Mock aggregates · no live records
+          <span
+            className={`border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] ${
+              isDemoMode
+                ? "border-[#8a5a00] bg-[#f3ead8] text-[#704700]"
+                : "border-[#2f5b3a] bg-[#e6ecdf] text-[#244b2e]"
+            }`}
+          >
+            {isDemoMode ? "Sample data · demo mode" : "Live Supabase data · refreshes every 15 seconds"}
           </span>
         </div>
       </header>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs">
-        <p className="font-semibold">{summary.scopeLabel}</p>
-        <p className="text-[#5b574e]">Reporting window: Oct 1-29, 2026</p>
-      </div>
-      <p className="mt-2 border-l-4 border-[#8a5a00] bg-[#f3ead8] px-3 py-2 text-xs leading-5 text-[#704700]">
-        Sample figures only. This UI is not connected to persisted records; production scope and
-        metric access must be enforced by the server and database.
-      </p>
-
-      <DashboardMetrics summary={summary} />
-
-      <div className="mt-5 grid items-start gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-        <div className="grid gap-5">
-          <DashboardTrend points={summary.importTrend} />
-          <DashboardCarPipeline summary={summary} />
+      {dashboard.loading && !dashboard.summary ? (
+        <p role="status" className="mt-5 border-l-4 border-[#4a5a72] bg-[#e9edf3] px-4 py-4 text-sm">
+          Loading live dashboard metrics from Supabase…
+        </p>
+      ) : dashboard.error && !dashboard.summary ? (
+        <div role="alert" className="mt-5 border-l-4 border-[#7a1f1f] bg-[#f2e4e1] px-4 py-4">
+          <p className="text-sm">{dashboard.error}</p>
+          <button type="button" onClick={dashboard.reload} className="mt-3 underline">
+            Try again
+          </button>
         </div>
-        <DashboardActivity items={summary.recentActivity} />
-      </div>
+      ) : dashboard.summary ? (
+        <>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <p className="font-semibold">{dashboard.summary.scopeLabel}</p>
+            <p className="text-[#5b574e]">Import trend · last 5 weeks</p>
+          </div>
+          {dashboard.error && (
+            <p role="status" className="mt-2 text-xs text-[#7a1f1f]">
+              {dashboard.error} Showing the last successful data.
+            </p>
+          )}
+          <DashboardMetrics summary={dashboard.summary} />
+
+          <div className="mt-5 grid items-start gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+            <div className="grid gap-5">
+              <DashboardTrend points={dashboard.summary.importTrend} />
+              <DashboardCarPipeline summary={dashboard.summary} />
+            </div>
+            <DashboardActivity items={dashboard.summary.recentActivity} />
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }

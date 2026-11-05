@@ -8,42 +8,42 @@ export function DashboardMetrics({ summary }: { summary: DashboardSummary }) {
       label: "Imports committed",
       value: summary.importsCommitted,
       definition:
-        "Count of committed import batches in this sample scope. Failed or uncommitted batches are excluded.",
+        "Count of committed import batches in your assigned scope or across the system. Failed and uncommitted imports are excluded.",
     },
     {
       id: "rows",
       label: "Rows processed",
       value: summary.rowsProcessed,
       definition:
-        "Sum of source rows in committed import batches. Failed or uncommitted batches contribute zero.",
+        "Sum of source rows in committed import batches in the selected scope.",
     },
     {
       id: "households",
       label: "Households detected",
       value: summary.householdsDetected,
       definition:
-        "Sum of households produced by committed import versions. A household in a later import version is counted again.",
+        "Household records in committed imports. A household in a later import version is counted again.",
     },
     {
       id: "grantee-issues",
       label: "Grantee issues",
       value: summary.granteeIssues,
       definition:
-        "Households in committed imports with no single supported grantee flag, including blank, invalid, or conflicting flags.",
+        "Household records in committed imports without a valid grantee status.",
     },
     {
       id: "awaiting-review",
       label: "Awaiting CAR review",
       value: summary.awaitingReview,
       definition:
-        "Latest CAR revisions currently in submitted status in this sample scope.",
+        "Latest CAR revisions currently in submitted status in the selected scope.",
     },
     {
       id: "export-failures",
       label: "Export failures",
       value: summary.exportFailures,
       definition:
-        "Document export jobs in failed status in the October 2026 sample period. Each job is counted once.",
+        "Document export jobs currently in failed status in the selected scope.",
     },
   ];
 
