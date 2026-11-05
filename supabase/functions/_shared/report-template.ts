@@ -722,6 +722,8 @@ export type FamilySnapshot = {
   include?: boolean;
   sourceRow?: number;
   data?: Record<string, string>;
+  /** Case-worker cell corrections kept beside the raw values, never over them. */
+  overlay?: Record<string, string>;
 };
 
 /** The slice of a draft the derivation needs (client `CarDraft` / server
@@ -734,7 +736,19 @@ export type ReportDraftLike = {
   granteeMemberId?: string;
   slots?: SlotValues;
   familyComposition?: FamilySnapshot[];
-  interventions?: Array<{ included?: boolean; need?: string; type?: string }>;
+  interventions?: Array<{
+    included?: boolean;
+    need?: string;
+    type?: string;
+    objective?: string;
+    activities?: string;
+    responsible?: string;
+    timeline?: string;
+    remarks?: string;
+    /** Per-row slot values (e.g. `responsible_person`), merged over the
+     *  report's values when filling catalog text. */
+    values?: Record<string, string>;
+  }>;
 };
 
 export type HouseholdContext = { barangay?: string; municipality?: string } | null;
@@ -957,6 +971,77 @@ export function resolveSlotValues(
     values[def.key] = { value: '', source: 'manual' };
   }
   return values;
+}
+
+/* ------------------------------------------------------------ DOCX data */
+
+/**
+ * Data object for the tagged Annex C .docx (docxtemplater), built from the
+ * same derivation as the UI preview so REQ-RPT-005 holds by construction:
+ *
+ *   - every scalar slot key → formatted display text, blank → the paper's
+ *     `____` (the same missing default `fillTemplate` renders),
+ *   - `familyComposition` → one row per included member, cells exactly as
+ *     `FamilyCompositionTable` shows them (overlay wins, blanks stay blank,
+ *     Monitored Child splits into a ✓ in the YES/NO cell),
+ *   - `interventions` → one row per included plan row, cells exactly as
+ *     `InterventionPlanTable` shows them (`need || "Untitled row"`, filled
+ *     catalog text or `____`), with catalog `{{...}}` tokens already resolved
+ *     so no nested tag ever reaches docxtemplater.
+ *
+ * Used by the web DOCX generator, tests, and scripts — one builder, no drift.
+ */
+export function buildDocxData(
+  draft: ReportDraftLike,
+  household?: HouseholdContext,
+  settingsOverrides?: SettingsOverrides,
+): Record<string, unknown> {
+  const values = resolveSlotValues(draft, household, settingsOverrides);
+  const data: Record<string, unknown> = {};
+
+  for (const def of SLOT_DEFS) {
+    data[def.key] = formatSlotValue(def, values[def.key]?.value ?? '') || '____';
+  }
+
+  data.familyComposition = includedSnapshots(draft).map((member) => {
+    const cell = (column: FamilyColumnKey) => familyCellDisplay(column, member);
+    const monitored = cell('monitoredChild');
+    return {
+      member_name: cell('name'),
+      member_sex: cell('sex'),
+      member_age: cell('age'),
+      member_civil_status: cell('civilStatus'),
+      member_relationship: cell('relationship'),
+      member_staying: cell('stayingWithHh'),
+      member_monitored_yes: monitored === 'YES' ? '✓' : '',
+      member_monitored_no: monitored === 'NO' ? '✓' : '',
+      member_education: cell('educationalAttainment'),
+      member_occupation: cell('occupation'),
+      member_income: cell('monthlyIncome'),
+      member_disability: cell('typeOfDisability'),
+    };
+  });
+
+  data.interventions = (draft.interventions ?? [])
+    .filter((row) => row.included ?? true)
+    .map((row) => {
+      // Same merge fillInterventionText applies in the preview table.
+      const merged: SlotValues = { ...values };
+      for (const [key, entry] of Object.entries(row.values ?? {})) {
+        merged[key] = { value: entry };
+      }
+      const fill = (text: string | undefined) => fillText(text ?? '', merged) || '____';
+      return {
+        need: (row.need ?? row.type ?? '').trim() || 'Untitled row',
+        objective: fill(row.objective),
+        activities: fill(row.activities),
+        responsible: fill(row.responsible),
+        timeline: fill(row.timeline),
+        remarks: fill(row.remarks),
+      };
+    });
+
+  return data;
 }
 
 /* ------------------------------------------------------------- completeness */

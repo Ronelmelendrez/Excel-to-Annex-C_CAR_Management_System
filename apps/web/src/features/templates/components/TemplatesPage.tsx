@@ -1,117 +1,273 @@
-import React from "react";
-import { useAuth } from "../../../app/providers";
-import { useTemplateManager } from "../hooks/useTemplateManager";
-import { TemplateDetail } from "./TemplateDetail";
-import { TemplateFilters } from "./TemplateFilters";
-import { TemplateUploadPanel } from "./TemplateUploadPanel";
-import { TemplateVersionList } from "./TemplateVersionList";
+import React, { useEffect, useMemo, useState } from "react";
+import { normalizeGrantee } from "@import-domain";
+import { CarReportDocument } from "../../cars/components/report/CarReportDocument";
+import { listCars } from "../../cars/api";
+import { getCarChecklist } from "../../cars/lib/car-draft";
+import type { CarDraft, ValidatedHousehold } from "../../cars/types";
+import { householdListError, listHouseholds } from "../../households/api";
+import { getGranteeStatus } from "../../households/lib/households";
 import { isDemoMode } from "../../../shared/supabase";
+import { downloadDocx, renderAnnexCDocx } from "../lib/annex-c-docx";
+import { synthesizeDraft } from "../lib/synthesize-draft";
 
+/** Households the register marks as a valid CAR source (exactly one grantee). */
+function deriveValidatedHouseholds(
+  households: Awaited<ReturnType<typeof listHouseholds>>["households"],
+): ValidatedHousehold[] {
+  return households.flatMap((household) => {
+    if (getGranteeStatus(household) !== "valid") return [];
+    const grantee = household.members.find(
+      (member) => normalizeGrantee(member.granteeFlag) === true,
+    );
+    return grantee ? [{ ...household, grantee }] : [];
+  });
+}
+
+function downloadFileName(draft: CarDraft): string {
+  const safeName = draft.granteeName.replace(/[\\/:*?"<>|]/g, " ").trim() || "grantee";
+  return `Annex C - CASE STUDY REPORT - ${safeName} (${draft.hhId}).docx`;
+}
+
+/**
+ * Annex C report generator (REQ-RPT-001..014): pick a validated household,
+ * preview the report rendered from the versioned template definition, and
+ * download a .docx filled from the real source Word template. Read-only —
+ * nothing here writes to the household register or creates CAR records.
+ */
 export function TemplatesPage() {
-  const { profile, user, roles } = useAuth();
-  const actor = profile?.display_name || user?.email || "Template administrator";
-  const canManageTemplates = roles.includes("admin");
-  const manager = useTemplateManager(actor, user?.id ?? null, canManageTemplates);
+  const [households, setHouseholds] = useState<ValidatedHousehold[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [cars, setCars] = useState<CarDraft[]>([]);
+  const [carsNote, setCarsNote] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [downloaded, setDownloaded] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
 
-  if (!canManageTemplates) {
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
+    listHouseholds()
+      .then((response) => {
+        if (cancelled) return;
+        const validated = deriveValidatedHouseholds(response.households);
+        setHouseholds(validated);
+        setSelectedId((current) =>
+          current && validated.some((household) => household.id === current)
+            ? current
+            : (validated[0]?.id ?? null),
+        );
+        setLoading(false);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setLoadError(householdListError(error));
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadToken]);
+
+  /** Saved CARs make the preview reflect the case worker's slot edits; the
+   *  register alone still produces a full synthesized preview. */
+  useEffect(() => {
+    let cancelled = false;
+    if (isDemoMode) {
+      setCarsNote("Demo mode: preview is synthesized from the sample import data.");
+      return;
+    }
+    listCars()
+      .then((saved) => {
+        if (!cancelled) setCars(saved);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCars([]);
+          setCarsNote(
+            "Saved CAR drafts could not be loaded; the preview is synthesized from import data.",
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadToken]);
+
+  const household = useMemo(
+    () => households.find((item) => item.id === selectedId) ?? households[0] ?? null,
+    [households, selectedId],
+  );
+
+  const draft = useMemo(() => {
+    if (!household) return null;
+    const saved = cars.find((car) => car.householdId === household.id);
+    return saved ?? synthesizeDraft(household);
+  }, [household, cars]);
+
+  const checklist = useMemo(
+    () => (draft && household ? getCarChecklist(draft, household) : []),
+    [draft, household],
+  );
+  const missing = checklist.filter((item) => !item.complete);
+
+  async function handleDownload() {
+    if (!draft || !household || downloading) return;
+    setDownloading(true);
+    setDownloadError(null);
+    setDownloaded(false);
+    try {
+      const bytes = await renderAnnexCDocx(draft, household);
+      downloadDocx(bytes, downloadFileName(draft));
+      setDownloaded(true);
+    } catch (error) {
+      setDownloadError(
+        error instanceof Error && error.message
+          ? error.message
+          : "The Annex C document could not be generated. Try again.",
+      );
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  if (loading) {
     return (
-      <div
-        role="alert"
-        className="max-w-[680px] border-l-4 border-[#7a1f1f] border-y border-r border-[#7a1f1f] bg-[#f2e4e1] px-4 py-4"
-      >
-        <h1 className="font-serif text-2xl">You do not have access to template management</h1>
-        <p className="mt-2 text-sm leading-6 text-[#3f3b34]">
-          Template administration is restricted to administrators. No template details are shown.
+      <div className="mx-auto max-w-[1180px] px-4 py-8 sm:px-6">
+        <p className="text-sm text-[#3f3b34]">Loading households…</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="mx-auto max-w-[1180px] px-4 py-8 sm:px-6">
+        <div
+          role="alert"
+          className="max-w-[680px] border-l-4 border-[#7a1f1f] border-y border-r border-[#7a1f1f] bg-[#f2e4e1] px-4 py-4"
+        >
+          <h1 className="font-serif text-2xl">Report generator unavailable</h1>
+          <p className="mt-2 text-sm leading-6 text-[#3f3b34]">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => setReloadToken((token) => token + 1)}
+            className="mt-3 min-h-[40px] border border-[#161512] bg-[#161512] px-4 py-2 text-sm font-medium text-[#f4f1ea] hover:bg-[#7a1f1f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!household || !draft) {
+    return (
+      <div className="mx-auto max-w-[1180px] px-4 py-8 sm:px-6">
+        <h1 className="font-serif text-3xl">Annex C report generator</h1>
+        <p className="mt-4 max-w-[70ch] text-sm leading-6 text-[#3f3b34]">
+          No household is ready for a report yet. A household qualifies when the register
+          marks exactly one member as the grantee.
         </p>
+        <button
+          type="button"
+          onClick={() => setReloadToken((token) => token + 1)}
+          className="mt-4 min-h-[40px] border border-[#161512] px-4 py-2 text-sm font-medium hover:bg-[#e8e3d7] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+        >
+          Reload households
+        </button>
       </div>
     );
   }
 
   return (
-    <div>
-      <header className="border-b border-[#161512] pb-5">
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#5b574e]">
-          Document templates
+    <div className="mx-auto max-w-[1180px] px-4 py-8 sm:px-6">
+      <header className="border-b border-[#c9c3b6] pb-4">
+        <h1 className="font-serif text-3xl">Annex C report generator</h1>
+        <p className="mt-2 max-w-[75ch] text-sm leading-6 text-[#3f3b34]">
+          Pick a validated household to preview the CASE STUDY REPORT rendered from the
+          versioned template, then download it as a Word document filled from the real
+          Annex C template — letterhead, fonts and table borders preserved.
         </p>
-        <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="font-serif text-4xl leading-none tracking-tight sm:text-5xl">
-              Template management
-            </h1>
-            <p className="mt-3 max-w-[62ch] text-sm leading-6 text-[#3f3b34]">
-              Map detected fields, configure repeating rows, validate the version, and review a sample before activation.
-            </p>
-          </div>
-          <span className="border border-[#8a5a00] bg-[#f3ead8] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[#704700]">
-            {isDemoMode ? "Supabase not configured" : "Private Supabase storage"}
-          </span>
-        </div>
       </header>
 
-      {manager.feedback && (
-        <p
-          role="status"
-          className="mt-4 border-l-4 border-[#2f5b3a] bg-[#e6ecdf] px-4 py-3 text-sm leading-6 text-[#244b2e]"
-        >
-          {manager.feedback}
-        </p>
-      )}
-
-      {manager.loadError && (
-        <div
-          role="alert"
-          className="mt-4 flex flex-wrap items-center justify-between gap-3 border-l-4 border-[#7a1f1f] bg-[#f2e4e1] px-4 py-3 text-sm leading-6 text-[#3f3b34]"
-        >
-          <p>{manager.loadError}</p>
-          <button
-            type="button"
-            onClick={() => void manager.refresh()}
-            disabled={manager.loading}
-            className="min-h-[40px] border border-[#7a1f1f] px-3 py-2 text-xs font-semibold disabled:opacity-60"
+      <div className="mt-5 flex flex-wrap items-end gap-4 print:hidden">
+        <div className="min-w-[260px] flex-1">
+          <label htmlFor="report-household" className="block text-sm font-medium">
+            Household
+          </label>
+          <select
+            id="report-household"
+            value={household.id}
+            onChange={(event) => setSelectedId(event.target.value)}
+            className="mt-1 min-h-[40px] w-full border border-[#161512] bg-[#f4f1ea] px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
           >
-            {manager.loading ? "Loading…" : "Retry"}
-          </button>
+            {households.map((item) => (
+              <option key={item.id} value={item.id}>
+                {`HH ${item.hhId} · ${item.grantee.name} · ${item.barangay || item.municipality}`}
+              </option>
+            ))}
+          </select>
         </div>
-      )}
+        <button
+          type="button"
+          onClick={handleDownload}
+          disabled={downloading}
+          className="min-h-[40px] border border-[#161512] bg-[#161512] px-5 py-2 text-sm font-medium text-[#f4f1ea] hover:bg-[#7a1f1f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {downloading ? "Generating…" : "Download DOCX"}
+        </button>
+      </div>
 
-      <TemplateFilters
-        search={manager.search}
-        status={manager.statusFilter}
-        onSearchChange={manager.setSearch}
-        onStatusChange={manager.setStatusFilter}
-      />
+      <div className="mt-3 space-y-1 text-sm text-[#3f3b34] print:hidden" role="status">
+        {downloaded ? (
+          <p>
+            Annex C downloaded for {draft.granteeName} ({draft.hhId}).
+          </p>
+        ) : null}
+        {downloadError ? (
+          <p role="alert" className="border-l-4 border-[#7a1f1f] bg-[#f2e4e1] px-3 py-2 text-[#7a1f1f]">
+            {downloadError}
+          </p>
+        ) : null}
+        <p>
+          Source:{" "}
+          {cars.find((car) => car.householdId === household.id)
+            ? `saved CAR ${draft.reference}`
+            : "preview synthesized from import data"}
+          {" · "}template {draft.templateVersion}{" · "}
+          {missing.length === 0
+            ? "all required report fields present"
+            : `${missing.length} required field${missing.length === 1 ? "" : "s"} still blank`}
+        </p>
+        {carsNote ? <p>{carsNote}</p> : null}
+      </div>
 
-      <div className="mt-5 grid items-start gap-5 lg:grid-cols-[minmax(260px,0.78fr)_minmax(0,1.55fr)]">
-        <aside className="min-w-0 space-y-4" aria-label="Template versions and upload">
-          <TemplateUploadPanel
-            fileError={manager.fileError}
-            selectedFile={manager.selectedFile}
-            busy={manager.busy}
-            onChooseFile={manager.chooseFile}
-            onAddDraft={manager.addDraftVersion}
-          />
-          <TemplateVersionList
-            versions={manager.visibleVersions}
-            selectedId={manager.selectedTemplate?.id ?? null}
-            loading={manager.loading}
-            onSelect={manager.selectTemplate}
-          />
-        </aside>
-        <TemplateDetail
-          template={manager.selectedTemplate}
-          activeTemplate={manager.activeTemplate}
-          validationIssues={manager.validationIssues}
-          busy={manager.busy}
-          pendingAction={manager.pendingAction}
-          samplePreviewOpen={manager.samplePreviewOpen}
-          onUpdateMapping={manager.updateMapping}
-          onUpdateRepeatingTable={manager.updateRepeatingTable}
-          onValidate={manager.validateDraft}
-          onRequestAction={manager.requestAction}
-          onCancelAction={manager.cancelAction}
-          onConfirmAction={manager.confirmAction}
-          onToggleSamplePreview={manager.setSamplePreviewOpen}
-          onPrepareSampleOutput={manager.prepareSampleOutput}
+      {missing.length > 0 ? (
+        <details className="mt-3 max-w-[70ch] border-l-4 border-[#7a1f1f] bg-[#f2e4e1] px-4 py-3 text-sm print:hidden">
+          <summary className="cursor-pointer font-medium text-[#7a1f1f]">
+            Missing ({missing.length})
+          </summary>
+          <ul className="mt-2 list-inside list-disc space-y-1 text-[#3f3b34]">
+            {missing.map((item) => (
+              <li key={item.id}>{item.label}</li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+
+      <div className="mt-6 min-w-0" data-testid="annex-c-preview">
+        <CarReportDocument
+          draft={draft}
+          household={household}
+          mode="preview"
+          onSlotEdit={() => undefined}
+          onUpdateFamilyMember={() => undefined}
+          onUpdateIntervention={() => undefined}
+          onAddIntervention={() => undefined}
+          onRemoveIntervention={() => undefined}
         />
       </div>
     </div>

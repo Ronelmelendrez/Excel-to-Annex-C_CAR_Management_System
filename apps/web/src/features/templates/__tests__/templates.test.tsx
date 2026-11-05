@@ -1,50 +1,49 @@
 import React from "react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuth } from "../../../app/providers";
-import {
-  activateTemplate,
-  approveTemplate,
-  createTemplateDraft,
-  downloadTemplateFile,
-  listTemplateVersions,
-  markTemplateValidated,
-  updateTemplateConfiguration,
-} from "../api";
-import {
-  downloadDocxSample,
-  inspectDocxTemplate,
-  renderDocxSample,
-} from "../lib/docx-template";
-import { TemplatesPage } from "../components/TemplatesPage";
-import type { TemplateVersion } from "../types";
+import { RoleGuard } from "../../../app/guards";
+import { REPORT_GENERATOR_ROLES, TemplatesPage } from "..";
+import { DOCX_MIME_TYPE } from "../lib/annex-c-docx";
+import { listHouseholds } from "../../households/api";
+import { listCars } from "../../cars/api";
+import type { HouseholdRecord } from "../../households/mock-data";
 
-vi.mock("../../../app/providers", () => ({
-  useAuth: vi.fn(),
+/* ------------------------------------------------------------------ *
+ * Annex C report generator: pick a validated household → live preview *
+ * from the versioned template → download a real filled .docx.         *
+ * ------------------------------------------------------------------ */
+
+const env = vi.hoisted(() => ({ demo: false }));
+
+vi.mock("../../../shared/supabase", () => ({
+  get isDemoMode() {
+    return env.demo;
+  },
+  supabase: {
+    auth: { getSession: async () => ({ data: { session: null } }) },
+  },
 }));
 
-vi.mock("../api", () => ({
-  activateTemplate: vi.fn(),
-  approveTemplate: vi.fn(),
-  createTemplateDraft: vi.fn(),
-  downloadTemplateFile: vi.fn(),
-  listTemplateVersions: vi.fn(),
-  markTemplateValidated: vi.fn(),
-  updateTemplateConfiguration: vi.fn(),
-}));
+vi.mock("../../../app/providers", () => ({ useAuth: vi.fn() }));
 
-vi.mock("../lib/docx-template", () => ({
-  downloadDocxSample: vi.fn(),
-  inspectDocxTemplate: vi.fn(),
-  renderDocxSample: vi.fn(),
-}));
+vi.mock("../../households/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../households/api")>();
+  return { ...actual, listHouseholds: vi.fn() };
+});
+
+vi.mock("../../cars/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../cars/api")>();
+  return { ...actual, listCars: vi.fn() };
+});
 
 function authFor(roles: string[]) {
   return {
     session: {},
-    user: { id: "admin-01", email: "admin@example.test" },
-    profile: { id: "admin-01", display_name: "Demo administrator", status: "active" as const },
+    user: { id: "case-01", email: "worker@example.test" },
+    profile: { id: "case-01", display_name: "Demo worker", status: "active" as const },
     roles,
     loading: false,
     signIn: async () => ({}),
@@ -52,273 +51,185 @@ function authFor(roles: string[]) {
   };
 }
 
-function withArrayBuffer<T extends Blob>(blob: T): T {
-  if (typeof blob.arrayBuffer !== "function") {
-    Object.defineProperty(blob, "arrayBuffer", {
-      value: () =>
-        new Promise<ArrayBuffer>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            if (reader.result instanceof ArrayBuffer) resolve(reader.result);
-            else reject(new Error("The test Blob could not be read as an ArrayBuffer."));
-          };
-          reader.onerror = () => reject(reader.error);
-          reader.readAsArrayBuffer(blob);
-        }),
-    });
-  }
-  return blob;
-}
+/* ------------------------------------------------------- fixtures */
 
-const draftTemplate: TemplateVersion = {
-  id: "annex-c-v2-draft",
-  name: "Annex C",
-  version: 2,
-  fileName: "Annex_C_template_v2.docx",
-  fileSizeBytes: 284_160,
-  storagePath: "annex-c/template-2/Annex_C_template_v2.docx",
-  status: "draft",
-  uploadedAt: "2026-10-28T07:45:00.000Z",
-  uploadedBy: "admin-01",
-  mappings: [
-    { id: "car-ref", placeholder: "CAR_REFERENCE", fieldKey: "car.reference", required: true },
-    { id: "assessment", placeholder: "ASSESSMENT", fieldKey: "", required: true },
-  ],
-  repeatingTables: [
-    {
-      id: "family",
-      label: "Family composition rows",
-      enabled: true,
-      required: true,
-      collectionKey: "familyComposition",
-      sectionTag: "familyComposition",
-    },
-    {
-      id: "interventions",
-      label: "Intervention plan rows",
-      enabled: false,
-      required: true,
-      collectionKey: "",
-      sectionTag: "interventions",
-    },
-  ],
-};
+const households: HouseholdRecord[] = [
+  {
+    id: "hh-0091",
+    hhId: "000091",
+    barangay: "Poblacion II",
+    municipality: "Tanauan City",
+    importName: "SY2026_Q1_household_profiles.xlsx",
+    importVersion: 3,
+    members: [
+      { id: "m-091-1", entryId: "00009101", name: "Celia Ramos", relationship: "Household head", age: 42, granteeFlag: "No", sourceRow: 43 },
+      { id: "m-091-2", entryId: "00009102", name: "Jomar Ramos", relationship: "Son", age: 17, granteeFlag: "Yes", sourceRow: 44 },
+    ],
+    car: null,
+  },
+  {
+    id: "hh-0142",
+    hhId: "000142",
+    barangay: "San Jose",
+    municipality: "Tanauan City",
+    importName: "SY2026_Q1_household_profiles.xlsx",
+    importVersion: 3,
+    members: [
+      { id: "m-142-1", entryId: "00014201", name: "Lorna Bautista", relationship: "Household head", age: 35, granteeFlag: "Yes", sourceRow: 12 },
+      { id: "m-142-2", entryId: "00014202", name: "Pedro Bautista", relationship: "Spouse", age: 37, granteeFlag: "No", sourceRow: 13 },
+    ],
+    car: null,
+  },
+  // Two "Yes" flags → not a valid CAR source, must not be offered.
+  {
+    id: "hh-0083",
+    hhId: "000083",
+    barangay: "San Isidro",
+    municipality: "Tanauan City",
+    importName: "SY2026_Q1_household_profiles.xlsx",
+    importVersion: 3,
+    members: [
+      { id: "m-083-1", entryId: "00008301", name: "Rosa Dela Cruz", relationship: "Household head", age: 48, granteeFlag: "Yes", sourceRow: 17 },
+      { id: "m-083-2", entryId: "00008302", name: "Mario Dela Cruz", relationship: "Spouse", age: 51, granteeFlag: "Yes", sourceRow: 18 },
+    ],
+    car: null,
+  },
+];
 
-const activeTemplate: TemplateVersion = {
-  ...draftTemplate,
-  id: "annex-c-v1-active",
-  version: 1,
-  fileName: "Annex_C_template_v1.docx",
-  storagePath: "annex-c/template-1/Annex_C_template_v1.docx",
-  status: "active",
-  mappings: draftTemplate.mappings.map((mapping) => ({
-    ...mapping,
-    fieldKey: mapping.fieldKey || "car.assessment",
-  })),
-  repeatingTables: draftTemplate.repeatingTables.map((table) => ({
-    ...table,
-    enabled: true,
-    collectionKey: table.sectionTag ?? "familyComposition",
-  })),
-  approvedBy: "admin-01",
-  approvedAt: "2026-10-27T03:00:00.000Z",
-  activatedAt: "2026-10-28T04:30:00.000Z",
-};
+/* ------------------------------------------------------- lifecycle */
 
-const configuredDraftTemplate: TemplateVersion = {
-  ...draftTemplate,
-  mappings: draftTemplate.mappings.map((mapping) => ({
-    ...mapping,
-    fieldKey: mapping.fieldKey || "car.assessment",
-  })),
-  repeatingTables: draftTemplate.repeatingTables.map((table) => ({
-    ...table,
-    enabled: true,
-    collectionKey: table.id === "interventions" ? "interventions" : table.collectionKey,
-  })),
-};
+beforeEach(() => {
+  vi.clearAllMocks();
+  env.demo = false;
+  vi.mocked(useAuth).mockReturnValue(authFor(["case_worker"]));
+  vi.mocked(listHouseholds).mockResolvedValue({ households, total: households.length });
+  vi.mocked(listCars).mockResolvedValue([]);
+});
 
-describe("F7 template management", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(useAuth).mockReturnValue(authFor(["admin"]));
-    vi.mocked(listTemplateVersions).mockResolvedValue([draftTemplate, activeTemplate]);
-    vi.mocked(inspectDocxTemplate).mockResolvedValue({
-      placeholders: ["CAR_REFERENCE", "ASSESSMENT"],
-      repeatingSections: ["familyComposition"],
-    });
-    vi.mocked(createTemplateDraft).mockImplementation(async ({ file, mappings, repeatingTables }) => ({
-      ...draftTemplate,
-      id: "annex-c-v3-draft",
-      version: 3,
-      fileName: file.name,
-      storagePath: "annex-c/template-3/template.docx",
-      mappings,
-      repeatingTables,
-    }));
-    vi.mocked(updateTemplateConfiguration).mockImplementation(async (template) => template);
-    vi.mocked(downloadTemplateFile).mockResolvedValue(withArrayBuffer(new Blob(["template"])));
-    vi.mocked(renderDocxSample).mockResolvedValue(new Blob(["sample"]));
-    vi.mocked(markTemplateValidated).mockResolvedValue({
-      ...draftTemplate,
-      status: "validated",
-    });
-    vi.mocked(approveTemplate).mockResolvedValue({
-      ...draftTemplate,
-      status: "validated",
-      approvedBy: "admin-01",
-      approvedAt: "2026-10-29T03:00:00.000Z",
-    });
-    vi.mocked(activateTemplate).mockResolvedValue([
-      { ...draftTemplate, status: "active", approvedBy: "admin-01" },
-      { ...activeTemplate, status: "retired" },
-    ]);
-  });
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
-  afterEach(() => {
-    cleanup();
-  });
+/* ----------------------------------------------------------------- */
 
-  it("loads persisted versions and blocks incomplete required mappings", async () => {
+describe("Annex C report generator page", () => {
+  it("offers only validated households and previews the fixed template wording with the grantee", async () => {
     render(<TemplatesPage />);
 
-    expect(await screen.findByRole("heading", { name: "Annex_C_template_v2.docx" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Template management" })).toBeTruthy();
-    expect(screen.getByRole("combobox", { name: "CAR field for ASSESSMENT" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Validate template" })).toHaveProperty(
-      "disabled",
-      true,
-    );
-    expect(screen.getByRole("button", { name: "Generate sample DOCX" })).toHaveProperty(
-      "disabled",
-      true,
-    );
-    expect(listTemplateVersions).toHaveBeenCalledOnce();
+    const select = await screen.findByRole("combobox", { name: "Household" });
+    expect(within(select).getByRole("option", { name: /HH 000091 · Jomar Ramos/ })).toBeTruthy();
+    expect(within(select).getByRole("option", { name: /HH 000142 · Lorna Bautista/ })).toBeTruthy();
+    // Two grantee flags → never offered as a report source.
+    expect(within(select).queryByRole("option", { name: /HH 000083/ })).toBeNull();
+
+    // Static wording comes from the versioned definition, verbatim.
+    const preview = screen.getByTestId("annex-c-preview");
+    expect(
+      within(preview).getByRole("heading", { name: "CASE ASSESSMENT REPORT (CAR)" }),
+    ).toBeTruthy();
+    expect(within(preview).getByRole("heading", { name: "Identifying Information:" })).toBeTruthy();
+    expect(within(preview).getByRole("heading", { name: "Family Composition:" })).toBeTruthy();
+    // Derived blank filled from the import data.
+    expect(within(preview).getAllByText("Jomar Ramos").length).toBeGreaterThan(0);
+
+    // Source note + completeness summary.
+    expect(screen.getByRole("status")).toHaveTextContent("preview synthesized from import data");
+    expect(screen.getByText(/required fields? still blank/)).toBeTruthy();
+    expect(listHouseholds).toHaveBeenCalledOnce();
   });
 
-  it("uploads a DOCX, detects its real placeholders, and saves a draft version", async () => {
+  it("switches the preview when another household is selected", async () => {
     render(<TemplatesPage />);
-    await screen.findByRole("heading", { name: "Annex_C_template_v2.docx" });
-    const file = new File(["docx bytes"], "New_Annex_C.docx", {
-      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    });
-    fireEvent.change(screen.getByLabelText("Word template"), { target: { files: [file] } });
-    fireEvent.click(screen.getByRole("button", { name: "Upload and inspect" }));
 
-    await waitFor(() => expect(createTemplateDraft).toHaveBeenCalledOnce());
-    expect(inspectDocxTemplate).toHaveBeenCalledWith(file);
-    expect(createTemplateDraft).toHaveBeenCalledWith({
-      file,
-      userId: "admin-01",
-      mappings: [
-        { id: "placeholder-1", placeholder: "CAR_REFERENCE", fieldKey: "", required: true },
-        { id: "placeholder-2", placeholder: "ASSESSMENT", fieldKey: "", required: true },
-      ],
-      repeatingTables: [
-        {
-          id: "repeat-familyComposition",
-          label: "Family composition rows",
-          enabled: true,
-          required: true,
-          collectionKey: "familyComposition",
-          sectionTag: "familyComposition",
-        },
-      ],
-    });
-    expect(await screen.findByRole("heading", { name: "New_Annex_C.docx" })).toBeTruthy();
-    expect(screen.getByRole("status").textContent).toContain("uploaded to private storage");
+    const select = await screen.findByRole("combobox", { name: "Household" });
+    const preview = screen.getByTestId("annex-c-preview");
+    expect(within(preview).getAllByText("Jomar Ramos").length).toBeGreaterThan(0);
+
+    fireEvent.change(select, { target: { value: "hh-0142" } });
+
+    // The name lands in several slots (grantee, provider, family row).
+    expect((await within(preview).findAllByText("Lorna Bautista")).length).toBeGreaterThan(0);
+    expect(within(preview).queryByText("Jomar Ramos")).toBeNull();
+    expect(screen.getByRole("status")).toHaveTextContent("preview synthesized from import data");
   });
 
-  it("persists configuration, validates the DOCX, approves, and activates the version", async () => {
-    vi.mocked(markTemplateValidated).mockResolvedValue({
-      ...configuredDraftTemplate,
-      status: "validated",
+  it("downloads a real Annex C .docx built from the committed template", async () => {
+    const createObjectURL = vi.fn(() => "blob:annex-c");
+    const revokeObjectURL = vi.fn();
+    const originalCreate = URL.createObjectURL;
+    const originalRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = createObjectURL;
+    URL.revokeObjectURL = revokeObjectURL;
+    const downloads: string[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      downloads.push(this.download);
     });
-    vi.mocked(approveTemplate).mockResolvedValue({
-      ...configuredDraftTemplate,
-      status: "validated",
-      approvedBy: "admin-01",
-      approvedAt: "2026-10-29T03:00:00.000Z",
-    });
-    vi.mocked(activateTemplate).mockResolvedValue([
-      {
-        ...configuredDraftTemplate,
-        status: "active",
-        approvedBy: "admin-01",
-      },
-      { ...activeTemplate, status: "retired" },
-    ]);
 
-    render(<TemplatesPage />);
-    await screen.findByRole("heading", { name: "Annex_C_template_v2.docx" });
+    try {
+      render(<TemplatesPage />);
+      await screen.findByRole("combobox", { name: "Household" });
 
-    fireEvent.change(screen.getByLabelText("CAR field for ASSESSMENT"), {
-      target: { value: "car.assessment" },
-    });
-    await waitFor(() => expect(updateTemplateConfiguration).toHaveBeenCalled());
-    await waitFor(() =>
-      expect(screen.getByLabelText("CAR field for ASSESSMENT")).not.toBeDisabled(),
-    );
+      fireEvent.click(screen.getByRole("button", { name: "Download DOCX" }));
 
-    fireEvent.click(screen.getAllByRole("checkbox", { name: "Enabled" })[1]);
-    await waitFor(() => expect(updateTemplateConfiguration).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(screen.getAllByRole("combobox", { name: "Source collection" })[1]).not.toBeDisabled());
-    fireEvent.change(screen.getAllByRole("combobox", { name: "Source collection" })[1], {
-      target: { value: "interventions" },
-    });
-    await waitFor(() => expect(updateTemplateConfiguration).toHaveBeenCalledTimes(3));
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Validate template" })).not.toBeDisabled(),
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "Validate template" }));
-    await waitFor(() => expect(markTemplateValidated).toHaveBeenCalledWith(draftTemplate.id));
-    expect(downloadTemplateFile).toHaveBeenCalledWith(draftTemplate.storagePath);
-    expect(renderDocxSample).toHaveBeenCalled();
-
-    fireEvent.click(await screen.findByRole("button", { name: "Approve version" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Confirm approval" }));
-    await waitFor(() => expect(approveTemplate).toHaveBeenCalledWith("annex-c-v2-draft", "admin-01"));
-
-    fireEvent.click(await screen.findByRole("button", { name: "Activate version" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Confirm activation" }));
-    await waitFor(() => expect(activateTemplate).toHaveBeenCalledWith("annex-c-v2-draft"));
-    expect(screen.getByRole("status").textContent).toContain("was activated");
+      await waitFor(() => expect(createObjectURL).toHaveBeenCalledOnce());
+      const blob = createObjectURL.mock.calls[0][0] as Blob;
+      expect(blob.type).toBe(DOCX_MIME_TYPE);
+      expect(downloads).toEqual([
+        "Annex C - CASE STUDY REPORT - Jomar Ramos (000091).docx",
+      ]);
+      expect(revokeObjectURL).toHaveBeenCalledWith("blob:annex-c");
+      expect(await screen.findByText(/Annex C downloaded for Jomar Ramos \(000091\)/)).toBeTruthy();
+      expect(screen.queryByRole("alert")).toBeNull();
+    } finally {
+      if (originalCreate) URL.createObjectURL = originalCreate;
+      else delete (URL as unknown as Record<string, unknown>).createObjectURL;
+      if (originalRevoke) URL.revokeObjectURL = originalRevoke;
+      else delete (URL as unknown as Record<string, unknown>).revokeObjectURL;
+    }
   });
 
-  it("generates a real DOCX sample and clearly leaves PDF unavailable", async () => {
-    vi.mocked(listTemplateVersions).mockResolvedValue([activeTemplate]);
-    render(<TemplatesPage />);
-    await screen.findByRole("heading", { name: "Annex_C_template_v1.docx" });
+  it("reports a household load failure with a retry", async () => {
+    vi.mocked(listHouseholds)
+      .mockRejectedValueOnce(new Error("network down"))
+      .mockResolvedValueOnce({ households, total: households.length });
 
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Generate sample DOCX" })).not.toBeDisabled(),
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Generate sample DOCX" }));
-    await waitFor(() => expect(downloadDocxSample).toHaveBeenCalledOnce());
-    expect(screen.getByRole("status").textContent).toContain("DOCX sample with fabricated test values was downloaded");
-    expect(screen.getByRole("button", { name: "PDF output unavailable" })).toBeDisabled();
-    expect(screen.getByText("PDF: Not available in this workflow")).toBeTruthy();
-  });
-
-  it("shows a clear load error with retry and does not fetch templates for non-admins", async () => {
-    vi.mocked(listTemplateVersions)
-      .mockRejectedValueOnce(new Error("Supabase is not configured."))
-      .mockResolvedValueOnce([]);
     render(<TemplatesPage />);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Supabase is not configured.");
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("household register could not be loaded");
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
-    expect(await screen.findByText(/No template versions match/)).toBeTruthy();
-    expect(listTemplateVersions).toHaveBeenCalledTimes(2);
+    expect(await screen.findByRole("combobox", { name: "Household" })).toBeTruthy();
+    expect(listHouseholds).toHaveBeenCalledTimes(2);
+  });
+
+  it("lets report roles into /templates and redirects everyone else", async () => {
+    const route = (
+      <MemoryRouter initialEntries={["/templates"]}>
+        <Routes>
+          <Route
+            path="/templates"
+            element={
+              <RoleGuard roles={REPORT_GENERATOR_ROLES}>
+                <div>generator-route</div>
+              </RoleGuard>
+            }
+          />
+          <Route path="/dashboard" element={<div>dashboard-route</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    vi.mocked(useAuth).mockReturnValue(authFor(["auditor"]));
+    render(route);
+    expect(await screen.findByText("dashboard-route")).toBeTruthy();
+    expect(screen.queryByText("generator-route")).toBeNull();
 
     cleanup();
-    vi.clearAllMocks();
     vi.mocked(useAuth).mockReturnValue(authFor(["case_worker"]));
-    render(<TemplatesPage />);
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "You do not have access to template management",
-    );
-    expect(listTemplateVersions).not.toHaveBeenCalled();
+    render(route);
+    expect(await screen.findByText("generator-route")).toBeTruthy();
   });
 });

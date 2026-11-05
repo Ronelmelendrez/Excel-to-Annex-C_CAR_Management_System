@@ -10,7 +10,7 @@ import { ImportsPage } from '../features/imports';
 import { HouseholdsPage } from '../features/households';
 import { CarsPage } from '../features/cars';
 import { ReviewPage } from '../features/review';
-import { TemplatesPage } from '../features/templates';
+import { TemplatesPage, REPORT_GENERATOR_ROLES } from '../features/templates';
 import { DocumentsPage } from '../features/documents';
 import { DashboardPage } from '../features/dashboard';
 import { AuditPage } from '../features/audit';
@@ -83,7 +83,7 @@ export function Router() {
             path="/templates"
             element={
               <AuthGuard>
-                <RoleGuard roles={['admin']}>
+                <RoleGuard roles={REPORT_GENERATOR_ROLES}>
                   <AppShell>
                     <TemplatesPage />
                   </AppShell>

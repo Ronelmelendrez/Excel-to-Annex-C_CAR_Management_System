@@ -1,9 +1,33 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+import { readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 
+/**
+ * Vite only honours `?inline` for assets at build time — in dev and under
+ * vitest the import resolves to a bare URL, which the browser/tests cannot
+ * decode. This plugin answers `*.docx?inline` with a data-URI module in every
+ * mode, so `annex-c-docx.ts` always receives the same base64 payload.
+ */
+function inlineDocx(): Plugin {
+  return {
+    name: 'inline-docx',
+    enforce: 'pre',
+    load(id) {
+      if (!id.includes('.docx?inline')) return null
+      const file = id.split('?')[0]
+      const base64 = readFileSync(file).toString('base64')
+      const uri = `data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,${base64}`
+      return `export default ${JSON.stringify(uri)}`
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [inlineDocx(), react()],
+  // .docx is not a built-in asset type; the Annex C template is imported with
+  // `?inline` (data URI) so it ships inside the bundle — no runtime fetch.
+  assetsInclude: ['**/*.docx'],
   // Emit ES-module workers so the parser worker can code-split its dynamic
   // `import("xlsx")` instead of inlining everything into an IIFE bundle.
   worker: {
@@ -35,7 +59,7 @@ export default defineConfig({
       'src/features/households/__tests__/*.test.{ts,tsx}',
       'src/features/cars/__tests__/*.test.tsx',
       'src/features/review/__tests__/*.test.tsx',
-      'src/features/templates/__tests__/*.test.tsx',
+      'src/features/templates/__tests__/*.test.{ts,tsx}',
       'src/features/documents/__tests__/*.test.tsx',
       'src/features/dashboard/__tests__/*.test.tsx',
       'src/features/audit/__tests__/*.test.tsx',
