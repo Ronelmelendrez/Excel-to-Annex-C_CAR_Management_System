@@ -10,9 +10,11 @@ import {
   SLOT_BY_KEY,
   SLOT_DEFS,
   computeMissingKeys,
+  familyCellDisplay,
   fillTemplate,
   fillText,
   lintReportTemplate,
+  mergeMemberReportData,
   resolveSlotValues,
   type ReportDraftLike,
   type SlotValues,
@@ -481,6 +483,46 @@ function authFor(roles: string[]) {
     signOut: async () => {},
   };
 }
+
+describe("imported grantee and family report fields", () => {
+  it("uses the current normalized Supabase columns for grantee slots and family cells", () => {
+    const refreshedGranteeData = mergeMemberReportData(
+      { SEX: "", CIVIL_STATUS: "" },
+      {
+        BIRTHDAY: "May 1, 2009",
+        SEX: "Male",
+        CIVIL_STATUS: "Single",
+        GRADE_LEVEL: "Grade 11",
+        HH_SET: "HH Set B",
+      },
+    );
+    const refreshedFamilyData = mergeMemberReportData(
+      {},
+      {
+        SEX: "Female",
+        CIVIL_STATUS: "Married",
+        GRADE_LEVEL: "Grade 12",
+      },
+    );
+    const draft: ReportDraftLike = {
+      ...fixtureDraft,
+      familyComposition: [
+        { ...fixtureDraft.familyComposition[0], data: refreshedGranteeData },
+        { ...fixtureDraft.familyComposition[1], data: refreshedFamilyData },
+      ],
+    };
+
+    const slots = resolveSlotValues(draft);
+    expect(slots.birthday?.value).toBe("May 1, 2009");
+    expect(slots.sex?.value).toBe("Male");
+    expect(slots.civil_status?.value).toBe("Single");
+    expect(slots.educational_attainment?.value).toBe("Grade 11");
+    expect(slots.hh_set_group?.value).toBe("HH Set B");
+    expect(familyCellDisplay("sex", draft.familyComposition[1])).toBe("Female");
+    expect(familyCellDisplay("civilStatus", draft.familyComposition[1])).toBe("Married");
+    expect(familyCellDisplay("educationalAttainment", draft.familyComposition[1])).toBe("Grade 12");
+  });
+});
 
 describe("Annex C intervention plan", () => {
   it("restores standard rows when a saved CAR contains only blank intervention rows", () => {

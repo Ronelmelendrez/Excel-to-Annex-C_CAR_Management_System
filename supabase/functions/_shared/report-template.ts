@@ -195,6 +195,25 @@ export const CAR_MEMBER_FIELDS = [
   'MEMBER_STATUS',
 ] as const;
 
+/** Fresh normalized import values replace the saved snapshot; absent fields
+ *  fall back to the report's stored snapshot for legacy/import-retired CARs. */
+export function mergeMemberReportData(
+  snapshot: Record<string, unknown> | null | undefined,
+  normalized: Record<string, unknown> | null | undefined,
+): Record<string, string> {
+  const merged: Record<string, string> = {};
+  for (const field of CAR_MEMBER_FIELDS) {
+    const saved = snapshot?.[field];
+    if (typeof saved === 'string' && saved.trim()) merged[field] = saved;
+    else if (typeof saved === 'number' && Number.isFinite(saved)) merged[field] = String(saved);
+
+    const current = normalized?.[field];
+    if (typeof current === 'string' && current.trim()) merged[field] = current;
+    else if (typeof current === 'number' && Number.isFinite(current)) merged[field] = String(current);
+  }
+  return merged;
+}
+
 /* ---------------------------------------------------------------- template */
 
 export type ReportField = { label: string; slot: string };

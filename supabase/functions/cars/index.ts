@@ -11,6 +11,7 @@ import {
   REPORT_TEMPLATE_VERSION,
   SLOT_BY_KEY,
   computeMissingKeys,
+  mergeMemberReportData,
   resolveSlotValues,
   type FamilySnapshot,
   type HouseholdContext,
@@ -401,7 +402,45 @@ async function listCars(supabase: any) {
     .order('created_at', { ascending: false })
     .limit(MAX_CARS);
   if (queryError) throw queryError;
-  return json({ cars: (data ?? []).map(mapCar) });
+
+  const assessments = data ?? [];
+  const memberIds = [
+    ...new Set(
+      assessments.flatMap((assessment: Record<string, unknown>) =>
+        asArray(asContent(assessment.content).familyComposition)
+          .map((member) => str(asContent(member), 'id'))
+          .filter(Boolean),
+      ),
+    ),
+  ];
+  if (memberIds.length === 0) return json({ cars: assessments.map(mapCar) });
+
+  const { data: sourceMembers, error: membersError } = await supabase
+    .from('household_members')
+    .select('id, import_rows:import_row_id ( normalized )')
+    .in('id', memberIds);
+  if (membersError) throw membersError;
+
+  const currentDataByMember = new Map<string, Record<string, string>>();
+  for (const source of sourceMembers ?? []) {
+    const normalized = asContent(asContent(source.import_rows).normalized);
+    currentDataByMember.set(text(source.id), pickMemberData(normalized));
+  }
+
+  const cars = assessments.map((assessment: Record<string, unknown>) => {
+    const content = asContent(assessment.content);
+    const familyComposition = asArray(content.familyComposition).map((value) => {
+      const member = asContent(value);
+      const currentData = currentDataByMember.get(str(member, 'id'));
+      if (!currentData) return member;
+      return {
+        ...member,
+        data: mergeMemberReportData(asContent(member.data), currentData),
+      };
+    });
+    return mapCar({ ...assessment, content: { ...content, familyComposition } });
+  });
+  return json({ cars });
 }
 
 async function listTemplates(supabase: any) {
