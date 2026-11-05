@@ -152,7 +152,7 @@ async function dashboardSummary(supabase: any, userId: string, systemScope: bool
       ),
     ...exportJobs
       .filter((row) => row.state === 'failed' && Date.parse(row.created_at) >= activitySince)
-      .map((row) => activity(row.id, row.created_at, 'Document export needs attention', '/documents')),
+      .map((row) => activity(row.id, row.created_at, 'Document export needs attention', '/templates')),
   ]
     .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))
     .slice(0, 5);

@@ -32,7 +32,7 @@ export type DashboardActivity = {
   scope: DashboardScope;
   occurredAt: string;
   label: string;
-  destination: "/imports" | "/households" | "/review" | "/documents" | "/cars";
+  destination: "/imports" | "/households" | "/review" | "/templates" | "/cars";
 };
 
 export type DashboardMetric = {

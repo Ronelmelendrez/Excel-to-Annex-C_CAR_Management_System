@@ -93,7 +93,7 @@ export const mockDashboardActivity: DashboardActivity[] = [
     scope: "assigned",
     occurredAt: "2026-10-28T11:10:00.000Z",
     label: "PDF export needs attention",
-    destination: "/documents",
+    destination: "/templates",
   },
   {
     id: "activity-car-submitted",
@@ -121,6 +121,6 @@ export const mockDashboardActivity: DashboardActivity[] = [
     scope: "system",
     occurredAt: "2026-10-22T13:45:00.000Z",
     label: "PDF export needs attention",
-    destination: "/documents",
+    destination: "/templates",
   },
 ];

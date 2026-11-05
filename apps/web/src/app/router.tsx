@@ -11,7 +11,6 @@ import { HouseholdsPage } from '../features/households';
 import { CarsPage } from '../features/cars';
 import { ReviewPage } from '../features/review';
 import { TemplatesPage, REPORT_GENERATOR_ROLES } from '../features/templates';
-import { DocumentsPage } from '../features/documents';
 import { DashboardPage } from '../features/dashboard';
 import { AuditPage } from '../features/audit';
 
@@ -92,18 +91,6 @@ export function Router() {
             }
           />
           <Route
-            path="/documents"
-            element={
-              <AuthGuard>
-                <RoleGuard roles={['admin', 'case_worker', 'reviewer', 'auditor']}>
-                  <AppShell>
-                    <DocumentsPage />
-                  </AppShell>
-                </RoleGuard>
-              </AuthGuard>
-            }
-          />
-          <Route
             path="/audit"
             element={
               <AuthGuard>
@@ -115,6 +102,7 @@ export function Router() {
               </AuthGuard>
             }
           />
+          <Route path="/documents" element={<Navigate to="/dashboard" replace />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </AuthProvider>

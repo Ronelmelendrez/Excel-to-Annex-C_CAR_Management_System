@@ -20,9 +20,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const canGenerateReports = roles.some((role) =>
     ['admin', 'case_worker', 'reviewer'].includes(role),
   );
-  const canViewDocuments = roles.some((role) =>
-    ['admin', 'case_worker', 'reviewer', 'auditor'].includes(role),
-  );
   const canViewAudit = roles.includes('admin') || roles.includes('auditor');
 
   const handleSignOut = async () => {
@@ -130,16 +127,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   }
                 >
                   Report generator
-                </NavLink>
-              )}
-              {canViewDocuments && (
-                <NavLink
-                  to="/documents"
-                  className={({ isActive }) =>
-                    `${linkBase} ${isActive ? 'font-semibold underline decoration-2' : 'text-[#3f3b34]'}`
-                  }
-                >
-                  Documents
                 </NavLink>
               )}
               {canViewAudit && (
