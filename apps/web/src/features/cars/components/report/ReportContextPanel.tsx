@@ -34,7 +34,7 @@ export function ReportContextPanel({
 
   return (
     <aside className="min-w-0 space-y-3 xl:sticky xl:top-4">
-      <div className="border border-[#c9c3b6] bg-[#f8f5ee]">
+      <div className="border border-[#c9c3b6] bg-[#fbf9f4]">
         <div className="flex border-b border-[#c9c3b6]" role="tablist" aria-label="Report context">
           {tabs.map((entry) => (
             <button
@@ -57,7 +57,7 @@ export function ReportContextPanel({
         <div className="px-3 py-3">
           {tab === "missing" ? (
             missingCount === 0 ? (
-              <p className="text-sm leading-6 text-[#244b2e]">
+              <p className="text-sm leading-6 text-[#161512]">
                 Every required field is filled. This draft is still not approved until a reviewer
                 approves it.
               </p>
@@ -71,8 +71,10 @@ export function ReportContextPanel({
                   {checklist.map((item) => (
                     <li key={item.id} className="py-1.5">
                       {item.complete ? (
-                        <span className="flex items-start gap-2 text-sm text-[#244b2e]">
-                          <span aria-hidden="true">✓</span>
+                        <span className="flex items-start gap-2 text-sm text-[#161512]">
+                          <span aria-hidden="true" className="text-[#7a1f1f]">
+                            ✓
+                          </span>
                           <span>{item.label}</span>
                           <span className="sr-only">Complete</span>
                         </span>
@@ -102,7 +104,7 @@ export function ReportContextPanel({
                     aria-label="Template version"
                     value={draft.templateVersion}
                     onChange={(event) => onUpdateDraft({ templateVersion: event.target.value })}
-                    className="min-h-[38px] w-full border border-[#8c877c] bg-[#fbf9f4] px-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
+                    className="min-h-[38px] w-full border border-[#c9c3b6] bg-white px-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
                   >
                     <option value={REPORT_TEMPLATE_VERSION}>
                       Annex C · {REPORT_TEMPLATE_VERSION} (built in)
@@ -135,9 +137,9 @@ export function ReportContextPanel({
                   {draft.granteeName} · import row {draft.granteeSourceRow}
                 </dd>
               </div>
-              <p className="border-l-4 border-[#0b5c56] bg-[#e3f1ef] px-2 py-1.5 text-xs leading-5 text-[#0b4a46]">
-                Teal blanks are filled from these imported rows. Overrides keep the original value
-                and a reason; the imported rows themselves are never edited.
+              <p className="border-l-4 border-[#161512] bg-[#ece7dc] px-2 py-1.5 text-xs leading-5 text-[#3f3b34]">
+                Imported blanks are filled automatically from these rows. Overrides keep the
+                original value and a reason; the imported rows themselves are never edited.
               </p>
             </dl>
           ) : null}
@@ -148,7 +150,7 @@ export function ReportContextPanel({
                 <li className="text-sm text-[#5b574e]">No draft history entries yet.</li>
               ) : (
                 history.map((entry) => (
-                  <li key={entry.id} className="border-l-2 border-[#8c877c] pl-3">
+                  <li key={entry.id} className="border-l-2 border-[#c9c3b6] pl-3">
                     <p className="text-sm font-medium">{entry.label}</p>
                     <time dateTime={entry.at} className="mt-1 block font-mono text-[10px] text-[#5b574e]">
                       {new Date(entry.at).toLocaleString()}

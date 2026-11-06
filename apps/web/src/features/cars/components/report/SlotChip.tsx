@@ -5,11 +5,13 @@ import { SLOT_BY_KEY, formatSlotValue, parseSegments, slotDisplay } from "@repor
 /**
  * One dynamic blank (`____`) of the template.
  *
- * Edit mode shows the chip states from the plan: teal for derived/computed,
- * indigo for manual, amber underline for missing, dotted underline + "edited"
- * for overrides, `•••••` + Reveal for sensitive fields. Preview and Print
- * render plain filled text so the document reads exactly like the paper form.
- * Static template wording is never routed through this component.
+ * Edit mode shows the chip states from the plan, in the landing page's
+ * paper/ink palette: white for values you type (like the other inputs),
+ * grey panel for derived/computed values, amber underline for missing,
+ * dotted accent underline + "edited" for overrides, `•••••` + Reveal for
+ * sensitive fields. Preview and Print render plain filled text so the
+ * document reads exactly like the paper form. Static template wording is
+ * never routed through this component.
  */
 export function SlotChip({
   def,
@@ -99,12 +101,12 @@ export function SlotChip({
   }
 
   const triggerClass = missing
-    ? "border-b-2 border-dashed border-[#d6a100] bg-[#fdf6e6] text-[#8a5a00] hover:bg-[#f7ecd2]"
+    ? "border-b-2 border-dashed border-[#b45309] bg-[#f3ead8] text-[#8a5a00] hover:bg-[#f7ecd2]"
     : overridden
-      ? "border-b border-dotted border-[#7a1f1f] bg-[#f6eeee] text-[#3f3b34] hover:bg-[#f2e4e1]"
+      ? "border-b border-dotted border-[#7a1f1f] bg-[#f6eaea] text-[#3f3b34] hover:bg-[#f2e4e1]"
       : def.source === "derived" || def.source === "computed"
-        ? "border-b border-[#0b5c56] bg-[#e3f1ef] text-[#0b5c56] hover:bg-[#d3e9e6]"
-        : "border-b border-[#3b3fa0] bg-[#e9e9f7] text-[#33357f] hover:bg-[#dedef3]";
+        ? "border-b border-[#161512] bg-[#ece7dc] text-[#161512] hover:bg-[#e2ddd1]"
+        : "border-b border-[#c9c3b6] bg-white text-[#3f3b34] hover:bg-[#f4f1ea]";
 
   const triggerTitle = [
     missing ? `${def.label} — needs input` : def.label,
@@ -146,7 +148,7 @@ export function SlotChip({
           </span>
         ) : null}
         {def.source === "computed" && !missing ? (
-          <span className="ml-1 align-super text-[9px] font-semibold text-[#0b5c56]">calc</span>
+          <span className="ml-1 align-super text-[9px] font-semibold text-[#161512]">calc</span>
         ) : null}
       </button>
 
@@ -158,14 +160,14 @@ export function SlotChip({
             onReveal?.();
           }}
           aria-label={`Reveal ${def.label}`}
-          className="ml-1 border border-[#8c877c] bg-[#ece7dc] px-1 text-[10px] font-medium text-[#5b574e] hover:bg-[#e2ddd1]"
+          className="ml-1 border border-[#c9c3b6] bg-[#ece7dc] px-1 text-[10px] font-medium text-[#5b574e] hover:bg-[#e2ddd1]"
         >
           Reveal
         </button>
       ) : null}
 
       {open ? (
-        <span className="absolute left-0 top-full z-30 mt-1 block w-[min(340px,80vw)] border border-[#8c877c] bg-[#fbf9f4] p-3 text-left shadow-lg">
+        <span className="absolute left-0 top-full z-30 mt-1 block w-[min(340px,80vw)] border border-[#161512] bg-[#fbf9f4] p-3 text-left shadow-[0_18px_36px_-24px_rgba(22,21,18,0.6)]">
           <span className="block font-mono text-[10px] uppercase tracking-[0.12em] text-[#5b574e]">
             {def.label}
           </span>
@@ -178,7 +180,7 @@ export function SlotChip({
                 onChange={(event) => setDraftValue(event.target.value)}
                 rows={3}
                 aria-label={def.label}
-                className="w-full border border-[#8c877c] bg-white px-2 py-1 text-sm leading-6 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
+                className="w-full border border-[#c9c3b6] bg-white px-2 py-1 text-sm leading-6 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
               />
             ) : def.type === "select" && def.options ? (
               <select
@@ -186,7 +188,7 @@ export function SlotChip({
                 value={draftValue}
                 onChange={(event) => setDraftValue(event.target.value)}
                 aria-label={def.label}
-                className="min-h-[36px] w-full border border-[#8c877c] bg-white px-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
+                className="min-h-[36px] w-full border border-[#c9c3b6] bg-white px-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
               >
                 <option value="">Select…</option>
                 {def.options.map((option) => (
@@ -202,13 +204,13 @@ export function SlotChip({
                 value={draftValue}
                 onChange={(event) => setDraftValue(event.target.value)}
                 aria-label={def.label}
-                className="min-h-[36px] w-full border border-[#8c877c] bg-white px-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
+                className="min-h-[36px] w-full border border-[#c9c3b6] bg-white px-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
               />
             )}
           </span>
 
           {previewSentence ? (
-            <span className="mt-2 block border-l-2 border-[#0b5c56] bg-[#e3f1ef] px-2 py-1 text-xs leading-5 text-[#0b4a46]">
+            <span className="mt-2 block border-l-2 border-[#161512] bg-[#ece7dc] px-2 py-1 text-xs leading-5 text-[#3f3b34]">
               <span className="mb-1 block font-mono text-[9px] uppercase tracking-[0.1em]">
                 In context
               </span>
@@ -229,7 +231,7 @@ export function SlotChip({
                 onChange={(event) => setReason(event.target.value)}
                 aria-label={`Reason for changing ${def.label}`}
                 placeholder="Reason for changing this value (required)"
-                className="min-h-[36px] w-full border border-[#8c877c] bg-white px-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
+                className="min-h-[36px] w-full border border-[#c9c3b6] bg-white px-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
               />
             </span>
           ) : null}
@@ -239,14 +241,14 @@ export function SlotChip({
               type="button"
               onClick={save}
               disabled={requiresReason && !reason.trim()}
-              className="min-h-[32px] border border-[#161512] bg-[#161512] px-3 text-xs font-medium text-[#f4f1ea] hover:bg-[#7a1f1f] disabled:cursor-not-allowed disabled:border-[#b5afa2] disabled:bg-[#b5afa2]"
+              className="min-h-[32px] border border-[#161512] bg-[#161512] px-3 text-xs font-medium text-[#f4f1ea] hover:bg-[#7a1f1f] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {requiresReason ? "Override value" : isComputed ? "Close" : "Save"}
             </button>
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="min-h-[32px] border border-[#8c877c] px-3 text-xs font-medium text-[#5b574e] hover:bg-[#ece7dc]"
+              className="min-h-[32px] border border-[#c9c3b6] px-3 text-xs font-medium text-[#5b574e] hover:bg-[#ece7dc]"
             >
               Cancel
             </button>

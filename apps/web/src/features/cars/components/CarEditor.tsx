@@ -8,6 +8,7 @@ import type {
   ValidatedHousehold,
 } from "../types";
 import { missingBySection } from "../lib/report/values";
+import { AlertTriangleIcon } from "../../../components/icons";
 import { annexCDocxFileName, downloadDocx, renderAnnexCDocx } from "../../templates/lib/annex-c-docx";
 import { CarReportDocument } from "./report/CarReportDocument";
 import { ReportContextPanel } from "./report/ReportContextPanel";
@@ -99,7 +100,7 @@ export function CarEditor({
 
   if (!draft || !household) {
     return (
-      <section className="min-w-0 border border-[#c9c3b6] bg-[#f8f5ee] px-5 py-10">
+      <section className="min-w-0 border border-[#c9c3b6] bg-[#fbf9f4] px-5 py-10">
         <h2 className="font-serif text-2xl">Start with a validated household</h2>
         <p className="mt-2 max-w-[58ch] text-sm leading-6 text-[#5b574e]">
           A CAR draft can only be created from a household with exactly one supported GRANTEE=Yes flag.
@@ -141,10 +142,10 @@ export function CarEditor({
 
   return (
     <section className="min-w-0">
-      <header className="mb-4 border-b border-[#161512] pb-3 print:hidden">
+      <header className="motion-safe:animate-fade-up mb-4 border-b border-[#161512] pb-3 print:hidden">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#5b574e]">
+            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#7a1f1f]">
               CAR authoring / {household.importName || "Import unavailable"} · v{household.importVersion}
             </p>
             <h2 className="mt-1 font-mono text-xl font-semibold">
@@ -152,7 +153,7 @@ export function CarEditor({
             </h2>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <span className="border border-[#8a5a00] bg-[#f3ead8] px-2 py-1 text-xs font-medium text-[#704700]">
+            <span className="border border-[#b45309] px-2 py-1 text-xs font-medium text-[#8a5a00]">
               {draft.workflowStatus !== "draft"
                 ? draft.workflowStatus
                 : missingCount === 0
@@ -190,7 +191,7 @@ export function CarEditor({
             type="button"
             onClick={() => handleDownloadDocx()}
             disabled={downloading}
-            className="min-h-[40px] border border-[#161512] px-4 text-sm font-medium hover:bg-[#ece7dc] disabled:cursor-not-allowed disabled:border-[#b5afa2] disabled:text-[#777166] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
+            className="min-h-[40px] border border-[#161512] px-4 text-sm font-medium hover:bg-[#ece7dc] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
           >
             {downloading ? "Preparing Word document…" : "Download Word document"}
           </button>
@@ -209,7 +210,7 @@ export function CarEditor({
             type="button"
             onClick={onCreateRevision}
             disabled={creatingRevision}
-            className="min-h-[40px] border border-[#161512] px-4 text-sm font-medium hover:bg-[#ece7dc] disabled:cursor-not-allowed disabled:border-[#b5afa2] disabled:text-[#777166] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
+            className="min-h-[40px] border border-[#161512] px-4 text-sm font-medium hover:bg-[#ece7dc] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
           >
             {creatingRevision ? "Creating revision…" : "New revision"}
           </button>
@@ -239,7 +240,7 @@ export function CarEditor({
               <button
                 type="button"
                 onClick={() => setConfirmingDelete(true)}
-                className="min-h-[40px] border border-[#7a1f1f] px-4 text-sm font-medium text-[#7a1f1f] hover:bg-[#f2e4e1]"
+                className="min-h-[40px] border border-[#7a1f1f] px-4 text-sm font-medium text-[#7a1f1f] hover:bg-[#f6eaea]"
               >
                 Delete draft
               </button>
@@ -255,18 +256,20 @@ export function CarEditor({
         {actionError ? (
           <p
             role="alert"
-            className="mt-3 border-l-4 border-[#7a1f1f] bg-[#f2e4e1] px-3 py-2 text-sm leading-6 text-[#7a1f1f]"
+            className="mt-3 flex items-start gap-3 border-l-4 border-[#7a1f1f] bg-[#f6eaea] px-3 py-2 text-sm leading-6 text-[#7a1f1f]"
           >
-            {actionError}
+            <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{actionError}</span>
           </p>
         ) : null}
 
         {downloadError ? (
           <p
             role="alert"
-            className="mt-3 border-l-4 border-[#7a1f1f] bg-[#f2e4e1] px-3 py-2 text-sm leading-6 text-[#7a1f1f]"
+            className="mt-3 flex items-start gap-3 border-l-4 border-[#7a1f1f] bg-[#f6eaea] px-3 py-2 text-sm leading-6 text-[#7a1f1f]"
           >
-            {downloadError}
+            <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{downloadError}</span>
           </p>
         ) : null}
       </header>

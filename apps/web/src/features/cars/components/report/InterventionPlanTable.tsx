@@ -129,7 +129,7 @@ export function InterventionPlanTable({
 
           <ul className="space-y-2">
             {interventions.map((row, index) => (
-              <li key={row.id} className="border border-[#d6d0c4] bg-[#fbf9f4] px-3 py-2">
+              <li key={row.id} className="border border-[#c9c3b6] bg-[#fbf9f4] px-3 py-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[#5b574e]">
                     Row {index + 1}

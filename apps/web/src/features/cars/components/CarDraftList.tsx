@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { AlertTriangleIcon, ArrowRightIcon } from "../../../components/icons";
 import { Label } from "../../../components/ui/label";
 import { SectionCard } from "../../../components/ui/section-card";
 import type { CarDraft, ValidatedHousehold } from "../types";
@@ -34,6 +35,7 @@ export function CarDraftList({
         id="car-new-draft-heading"
         eyebrow="Start a CAR"
         title="Choose a validated household"
+        delay={240}
         description={
           <span className="text-xs leading-5">
             Only households with exactly one supported GRANTEE=Yes flag can start a CAR.
@@ -41,8 +43,12 @@ export function CarDraftList({
         }
       >
         {householdsError ? (
-          <p role="alert" className="border-l-4 border-[#7a1f1f] bg-[#f2e4e1] px-3 py-3 text-sm leading-6 text-[#7a1f1f]">
-            {householdsError}
+          <p
+            role="alert"
+            className="flex items-start gap-3 border-l-4 border-[#7a1f1f] bg-[#f6eaea] px-3 py-3 text-sm leading-6 text-[#7a1f1f]"
+          >
+            <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{householdsError}</span>
           </p>
         ) : householdsLoading ? (
           <div
@@ -51,9 +57,9 @@ export function CarDraftList({
             aria-busy="true"
             className="space-y-3"
           >
-            <div aria-hidden="true" className="h-3 w-24 animate-pulse bg-[#e6e0d4]" />
-            <div aria-hidden="true" className="h-11 w-full animate-pulse border border-[#c9c3b6] bg-[#ece7dc]" />
-            <div aria-hidden="true" className="h-11 w-full animate-pulse bg-[#e6e0d4]" />
+            <div aria-hidden="true" className="motion-safe:animate-pulse h-3 w-24 bg-[#e6e0d4]" />
+            <div aria-hidden="true" className="motion-safe:animate-pulse h-11 w-full border border-[#c9c3b6] bg-[#ece7dc]" />
+            <div aria-hidden="true" className="motion-safe:animate-pulse h-11 w-full bg-[#e6e0d4]" />
             <p className="text-xs text-[#5b574e]">Finding households ready for a CAR…</p>
           </div>
         ) : (
@@ -66,7 +72,7 @@ export function CarDraftList({
               value={householdId}
               disabled={creating || households.length === 0}
               onChange={(event) => setHouseholdId(event.target.value)}
-              className="mt-1 min-h-[44px] w-full border border-[#8c877c] bg-[#fbf9f4] px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f] disabled:cursor-not-allowed disabled:bg-[#ece7dc]"
+              className="mt-1 min-h-[44px] w-full border border-[#c9c3b6] bg-white px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f] disabled:cursor-not-allowed disabled:bg-[#ece7dc]"
             >
               <option value="">
                 {households.length === 0 ? "No validated household available" : "Select a household"}
@@ -84,18 +90,29 @@ export function CarDraftList({
                 void onCreateDraft(householdId);
                 setHouseholdId("");
               }}
-              className="mt-3 min-h-[44px] w-full border border-[#161512] bg-[#161512] px-3 py-2 text-sm font-medium text-[#f4f1ea] hover:bg-[#7a1f1f] disabled:cursor-not-allowed disabled:border-[#b5afa2] disabled:bg-[#b5afa2] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+              className="group mt-3 inline-flex min-h-[44px] w-full items-center justify-center gap-2 border border-[#161512] bg-[#161512] px-3 py-2 text-sm font-medium text-[#f4f1ea] hover:bg-[#7a1f1f] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
             >
               {creating ? "Creating draft…" : "Create draft"}
+              {!creating && householdId && (
+                <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+              )}
             </button>
             {householdsRefreshError ? (
-              <p role="status" className="mt-3 border-l-4 border-[#8a5a00] bg-[#f3ead8] px-3 py-2 text-xs leading-5 text-[#704700]">
-                {householdsRefreshError} Showing previously loaded households.
+              <p
+                role="status"
+                className="mt-3 flex items-start gap-2 border-l-4 border-[#b45309] bg-[#f3ead8] px-3 py-2 text-xs leading-5 text-[#704700]"
+              >
+                <AlertTriangleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#b45309]" />
+                <span>{householdsRefreshError} Showing previously loaded households.</span>
               </p>
             ) : null}
             {actionError ? (
-              <p role="alert" className="mt-3 border-l-4 border-[#7a1f1f] bg-[#f2e4e1] px-3 py-2 text-xs leading-5 text-[#7a1f1f]">
-                {actionError}
+              <p
+                role="alert"
+                className="mt-3 flex items-start gap-2 border-l-4 border-[#7a1f1f] bg-[#f6eaea] px-3 py-2 text-xs leading-5 text-[#7a1f1f]"
+              >
+                <AlertTriangleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>{actionError}</span>
               </p>
             ) : null}
           </>
@@ -105,6 +122,7 @@ export function CarDraftList({
       <SectionCard
         id="car-drafts-heading"
         title="Drafts"
+        delay={300}
         cardClassName="overflow-hidden"
         contentClassName="p-0"
         action={<span className="font-mono text-[10px] text-[#5b574e]">{drafts.length} records</span>}
@@ -125,7 +143,7 @@ export function CarDraftList({
                     aria-pressed={selected}
                     onClick={() => onSelectDraft(draft.id)}
                     className={`w-full border-l-4 px-3 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#7a1f1f] ${
-                      selected ? "border-[#7a1f1f] bg-[#ece7dc]" : "border-transparent hover:bg-[#f8f5ee]"
+                      selected ? "border-[#7a1f1f] bg-[#ece7dc]" : "border-transparent hover:bg-[#fbf9f4]"
                     }`}
                   >
                     <span className="flex items-center justify-between gap-2">
@@ -133,8 +151,8 @@ export function CarDraftList({
                       <span
                         className={`border px-1.5 py-0.5 text-[10px] ${
                           ready
-                            ? "border-[#244b2e] bg-[#e6efe7] text-[#244b2e]"
-                            : "border-[#8a5a00] bg-[#f3ead8] text-[#704700]"
+                            ? "border-[#161512] text-[#161512]"
+                            : "border-[#b45309] text-[#8a5a00]"
                         }`}
                       >
                         {ready ? "Ready for review" : "Draft"}

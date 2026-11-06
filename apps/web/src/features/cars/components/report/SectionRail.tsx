@@ -13,7 +13,7 @@ export function SectionRail({
   onJumpToSection: (sectionId: string) => void;
 }) {
   return (
-    <nav aria-label="Report sections" className="border border-[#c9c3b6] bg-[#f8f5ee] p-2">
+    <nav aria-label="Report sections" className="border border-[#c9c3b6] bg-[#fbf9f4] p-2">
       <p className="mb-1 px-1 font-mono text-[10px] uppercase tracking-[0.14em] text-[#5b574e]">
         Sections
       </p>
@@ -40,11 +40,11 @@ export function SectionRail({
                       static
                     </span>
                   ) : count > 0 ? (
-                    <span className="shrink-0 border border-[#8a5a00] bg-[#f3ead8] px-1.5 font-mono text-[10px] font-semibold text-[#704700]">
+                    <span className="shrink-0 border border-[#b45309] px-1.5 font-mono text-[10px] font-semibold text-[#8a5a00]">
                       {count}
                     </span>
                   ) : (
-                    <span aria-hidden="true" className="shrink-0 text-xs text-[#244b2e]">
+                    <span aria-hidden="true" className="shrink-0 text-xs text-[#7a1f1f]">
                       ✓
                     </span>
                   )}

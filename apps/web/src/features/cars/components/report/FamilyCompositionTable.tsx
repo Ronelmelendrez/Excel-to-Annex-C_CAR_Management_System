@@ -115,7 +115,7 @@ export function FamilyCompositionTable({
                             aria-label={`${column.label} ${sub} for ${member.name}`}
                             aria-pressed={selected}
                             className={`min-h-[28px] w-full text-center font-semibold ${
-                              selected ? "text-[#244b2e]" : "text-[#777166] hover:text-[#161512]"
+                              selected ? "text-[#7a1f1f]" : "text-[#777166] hover:text-[#161512]"
                             }`}
                           >
                             {selected ? "✓" : ""}
@@ -146,7 +146,7 @@ export function FamilyCompositionTable({
                           ? "tabular-nums"
                           : ""
                       } ${hasOverlay ? "border-b border-dotted border-b-[#7a1f1f]" : ""} ${
-                        derivedFromData && !hasOverlay ? "bg-[#e3f1ef]/40" : ""
+                        derivedFromData && !hasOverlay ? "bg-[#ece7dc]" : ""
                       }`}
                       title={
                         hasOverlay
@@ -162,7 +162,7 @@ export function FamilyCompositionTable({
                           onChange={(event) => setOverlay(member, column.key, event.target.value)}
                           aria-label={`${column.label} for ${member.name}`}
                           placeholder="____"
-                          className="min-h-[26px] w-full min-w-[64px] border border-transparent bg-transparent px-1 py-0.5 text-[13px] hover:border-[#c9c3b6] focus-visible:border-[#8c877c] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
+                          className="min-h-[26px] w-full min-w-[64px] border border-transparent bg-transparent px-1 py-0.5 text-[13px] hover:border-[#c9c3b6] focus-visible:border-[#161512] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
                         />
                       ) : raw ? (
                         <span className="block px-1">{raw}</span>
@@ -180,7 +180,7 @@ export function FamilyCompositionTable({
       {mode === "edit" ? (
         <div className="mt-2 space-y-1 text-xs leading-5 text-[#5b574e]">
           <p>
-            Teal cells come from the imported household columns; corrections are stored as overlays
+            Grey cells come from the imported household columns; corrections are stored as overlays
             beside the raw values. Import rows are never changed.
           </p>
           <ul className="flex flex-wrap gap-x-4">
