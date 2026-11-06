@@ -4,6 +4,7 @@ import { useHouseholdRegister } from "../hooks/useHouseholdRegister";
 import { HouseholdDetail } from "./HouseholdDetail";
 import { HouseholdFilters } from "./HouseholdFilters";
 import { HouseholdList } from "./HouseholdList";
+import { AlertTriangleIcon, CheckIcon } from "../../../components/icons";
 import { PageDataSkeleton } from "../../../components/ui/PageSkeletons";
 
 export function HouseholdsPage() {
@@ -21,12 +22,17 @@ export function HouseholdsPage() {
     return (
       <div
         role="alert"
-        className="max-w-[680px] border-l-4 border-[#7a1f1f] border-y border-r border-[#7a1f1f] bg-[#f2e4e1] px-4 py-4"
+        className="flex max-w-[680px] items-start gap-3 border-l-4 border-[#7a1f1f] bg-[#f6eaea] px-4 py-4"
       >
-        <h1 className="font-serif text-2xl">You do not have access to household records</h1>
-        <p className="mt-2 text-sm leading-6 text-[#3f3b34]">
-          Ask an administrator to review your account role. No household details are shown.
-        </p>
+        <AlertTriangleIcon className="mt-1 h-5 w-5 shrink-0 text-[#7a1f1f]" />
+        <div>
+          <h1 className="font-serif text-2xl leading-tight">
+            You do not have access to household records
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-[#3f3b34]">
+            Ask an administrator to review your account role. No household details are shown.
+          </p>
+        </div>
       </div>
     );
   }
@@ -34,19 +40,28 @@ export function HouseholdsPage() {
   return (
     <div>
       <header className="border-b border-[#161512] pb-5">
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#5b574e]">
+        <p className="motion-safe:animate-fade-up font-mono text-[10px] uppercase tracking-[0.2em] text-[#7a1f1f]">
           Household register
         </p>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="font-serif text-4xl leading-none tracking-tight sm:text-5xl">
+            <h1
+              className="motion-safe:animate-fade-up font-serif text-4xl leading-none tracking-tight sm:text-5xl"
+              style={{ animationDelay: "60ms" }}
+            >
               Households
             </h1>
-            <p className="mt-3 max-w-[62ch] text-sm leading-6 text-[#3f3b34]">
+            <p
+              className="motion-safe:animate-fade-up mt-3 max-w-[62ch] text-sm leading-6 text-[#3f3b34]"
+              style={{ animationDelay: "120ms" }}
+            >
               Review household members and check GRANTEE information against the original spreadsheet.
             </p>
           </div>
-          <span className="border border-[#2f5b3a] bg-[#e6ecdf] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[#244b2e]">
+          <span
+            className="motion-safe:animate-fade-up border border-[#161512] bg-[#fbf9f4] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[#161512]"
+            style={{ animationDelay: "180ms" }}
+          >
             Household records
           </span>
         </div>
@@ -54,10 +69,13 @@ export function HouseholdsPage() {
 
       <p
         role="status"
-        className="mt-4 border-l-4 border-[#8a5a00] bg-[#f3ead8] px-4 py-3 text-sm leading-6 text-[#704700]"
+        className="mt-4 flex items-start gap-3 border-l-4 border-[#b45309] bg-[#f3ead8] px-4 py-3 text-sm leading-6 text-[#704700]"
       >
-        Editing household details and excluding members are temporarily unavailable so every change
-        can be recorded. You can still search and review household records.
+        <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#b45309]" />
+        <span>
+          Editing household details and excluding members are temporarily unavailable so every change
+          can be recorded. You can still search and review household records.
+        </span>
       </p>
 
       {register.loading ? (
@@ -67,8 +85,9 @@ export function HouseholdsPage() {
       ) : register.loadError ? (
         <div
           role="alert"
-          className="mt-5 border-l-4 border-[#7a1f1f] border-y border-r border-[#7a1f1f] bg-[#f2e4e1] px-4 py-4"
+          className="mt-5 flex items-start gap-3 border-l-4 border-[#7a1f1f] bg-[#f6eaea] px-4 py-4"
         >
+          <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#7a1f1f]" />
           <p className="text-sm font-semibold leading-6 text-[#3f3b34]">{register.loadError}</p>
           <button
             type="button"
@@ -99,27 +118,32 @@ export function HouseholdsPage() {
           {register.searchError && (
             <p
               role="alert"
-              className="mt-4 border-l-4 border-[#7a1f1f] bg-[#f2e4e1] px-4 py-3 text-sm leading-6 text-[#3f3b34]"
+              className="mt-4 flex items-start gap-3 border-l-4 border-[#7a1f1f] bg-[#f6eaea] px-4 py-3 text-sm leading-6 text-[#3f3b34]"
             >
-              {register.searchError}
+              <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#7a1f1f]" />
+              <span>{register.searchError}</span>
             </p>
           )}
 
           {register.refreshError && (
             <p
               role="status"
-              className="mt-4 border-l-4 border-[#8a5a00] bg-[#f3ead8] px-4 py-3 text-sm leading-6 text-[#704700]"
+              className="mt-4 flex items-start gap-3 border-l-4 border-[#b45309] bg-[#f3ead8] px-4 py-3 text-sm leading-6 text-[#704700]"
             >
-              {register.refreshError} Showing the last loaded household records.
+              <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#b45309]" />
+              <span>
+                {register.refreshError} Showing the last loaded household records.
+              </span>
             </p>
           )}
 
           {register.feedback && (
             <p
               role="status"
-              className="mt-4 border-l-4 border-[#2f5b3a] bg-[#e6ecdf] px-4 py-3 text-sm leading-6 text-[#244b2e]"
+              className="mt-4 flex items-start gap-3 border-l-4 border-[#161512] bg-[#fbf9f4] px-4 py-3 text-sm leading-6 text-[#161512]"
             >
-              {register.feedback}
+              <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#7a1f1f]" />
+              <span>{register.feedback}</span>
             </p>
           )}
 

@@ -1,4 +1,5 @@
 import React from "react";
+import { ArrowRightIcon } from "../../../components/icons";
 import { Label } from "../../../components/ui/label";
 import type { HouseholdRecord, HouseholdOverlay } from "../types";
 
@@ -19,8 +20,13 @@ export function GranteeResolutionForm({
   onReasonChange: (value: string) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
+  const canSubmit = Boolean(candidateId) && reason.trim().length > 0;
+
   return (
-    <form onSubmit={onSubmit} className="border-b border-[#c9c3b6] bg-[#f3ead8] px-4 py-4 sm:px-5">
+    <form
+      onSubmit={onSubmit}
+      className="border-b border-b-[#c9c3b6] border-l-4 border-l-[#b45309] bg-[#f3ead8] px-4 py-4 sm:px-5"
+    >
       <h3 className="font-semibold">Choose the verified grantee</h3>
       <p className="mt-1 text-xs leading-5 text-[#5b574e]">
         No member is preselected. This change applies only to your current session; the imported information stays unchanged.
@@ -32,7 +38,7 @@ export function GranteeResolutionForm({
           return (
             <Label
               key={member.id}
-              className="flex min-h-[44px] items-center gap-3 border border-[#d6cdb9] bg-[#f8f5ee] px-3 py-2 text-sm"
+              className="flex min-h-[44px] items-center gap-3 border border-[#c9c3b6] bg-white px-3 py-2 text-sm"
             >
               <input
                 type="radio"
@@ -65,15 +71,18 @@ export function GranteeResolutionForm({
         onChange={(event) => onReasonChange(event.target.value)}
         required
         rows={2}
-        className="mt-1 w-full border border-[#8c877c] bg-[#f8f5ee] px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
+        className="mt-1 w-full border border-[#c9c3b6] bg-white px-3 py-2 text-sm placeholder:text-[#8c877c] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
         placeholder="Record what was checked and why this member was selected."
       />
       <button
         type="submit"
-        disabled={!candidateId || !reason.trim()}
-        className="mt-3 min-h-[44px] border border-[#161512] bg-[#161512] px-4 py-2 text-sm font-medium text-white hover:bg-[#7a1f1f] disabled:cursor-not-allowed disabled:border-[#b5afa2] disabled:bg-[#b5afa2] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+        disabled={!canSubmit}
+        className="group mt-3 inline-flex min-h-[44px] items-center gap-2 border border-[#161512] bg-[#161512] px-4 py-2 text-sm font-medium text-[#f4f1ea] transition hover:bg-[#7a1f1f] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
       >
         Record correction for this session
+        {canSubmit && (
+          <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+        )}
       </button>
     </form>
   );

@@ -17,7 +17,7 @@ export function HouseholdHistory({ overlay }: { overlay?: HouseholdOverlay }) {
             .slice()
             .reverse()
             .map((entry, index) => (
-              <li key={`${entry.at}-${index}`} className="border-l-2 border-[#8a5a00] pl-3">
+              <li key={`${entry.at}-${index}`} className="border-l-2 border-[#b45309] pl-3">
                 <p className="text-sm font-semibold">
                   {entry.action} · {entry.memberName}
                 </p>

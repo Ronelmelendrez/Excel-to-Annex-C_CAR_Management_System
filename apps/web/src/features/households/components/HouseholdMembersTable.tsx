@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { ArrowRightIcon } from "../../../components/icons";
 import { Label } from "../../../components/ui/label";
 import type { HouseholdMember, HouseholdRecord, HouseholdOverlay } from "../types";
 
@@ -16,7 +17,7 @@ function MemberExclusionForm({
   onCancel: () => void;
 }) {
   return (
-    <form onSubmit={onSubmit} className="mt-3 border-l-4 border-[#8a5a00] bg-[#f3ead8] px-3 py-3">
+    <form onSubmit={onSubmit} className="mt-3 border-l-4 border-[#b45309] bg-[#f3ead8] px-3 py-3">
       <p className="text-sm font-semibold">Exclude {member.name} from this household view?</p>
       <p className="mt-1 text-xs leading-5 text-[#5b574e]">
         This only hides the member from this view; it does not change the original spreadsheet. A reason is required.
@@ -30,16 +31,19 @@ function MemberExclusionForm({
         onChange={(event) => onReasonChange(event.target.value)}
         required
         rows={2}
-        className="mt-2 w-full border border-[#8c877c] bg-[#f8f5ee] px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
+        className="mt-2 w-full border border-[#c9c3b6] bg-white px-3 py-2 text-sm placeholder:text-[#8c877c] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
         placeholder="Reason for excluding this member"
       />
       <div className="mt-2 flex flex-wrap gap-2">
         <button
           type="submit"
           disabled={!reason.trim()}
-          className="min-h-[40px] border border-[#161512] bg-[#161512] px-3 py-2 text-xs font-medium text-white disabled:cursor-not-allowed disabled:border-[#b5afa2] disabled:bg-[#b5afa2]"
+          className="group inline-flex min-h-[40px] items-center gap-2 border border-[#161512] bg-[#161512] px-3 py-2 text-xs font-medium text-[#f4f1ea] disabled:cursor-not-allowed disabled:opacity-50"
         >
           Hide member from this view
+          {reason.trim() && (
+            <ArrowRightIcon className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+          )}
         </button>
         <button
           type="button"
@@ -116,11 +120,11 @@ export function HouseholdMembersTable({
               const isExpanded = showColumns && expandedMemberId === member.id;
               return (
                 <React.Fragment key={member.id}>
-                  <tr className={excluded ? "bg-[#ece7dc] text-[#777166]" : "odd:bg-[#fbf9f4]"}>
+                  <tr className={excluded ? "bg-[#ece7dc] text-[#777166]" : "odd:bg-[#f4f1ea]"}>
                     <th scope="row" className="border-b border-[#e2ddd1] px-2 py-3 font-medium">
                       <span className={excluded ? "line-through" : ""}>{member.name}</span>
                       {isGrantee && (
-                        <span className="ml-2 inline-block text-[10px] font-semibold text-[#244b2e]">
+                        <span className="ml-2 inline-block text-[10px] font-semibold text-[#7a1f1f]">
                           GRANTEE
                         </span>
                       )}
@@ -177,7 +181,7 @@ export function HouseholdMembersTable({
                     </td>
                   </tr>
                   {isExpanded && (
-                    <tr className="bg-[#f8f5ee]">
+                    <tr className="bg-[#ece7dc]">
                       <td colSpan={5} className="border-b border-[#e2ddd1] px-3 py-3">
                         <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[#5b574e]">
                           Spreadsheet row {member.sourceRow} · information as imported

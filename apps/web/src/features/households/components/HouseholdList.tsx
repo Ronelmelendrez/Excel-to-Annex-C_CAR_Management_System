@@ -18,6 +18,7 @@ export function HouseholdList({
     <SectionCard
       id="household-list-heading"
       title="Household list"
+      delay={360}
       className="min-w-0"
       cardClassName="overflow-hidden"
       contentClassName="p-0"
@@ -51,7 +52,7 @@ export function HouseholdList({
                   aria-pressed={isSelected}
                   onClick={() => onSelect(household.id)}
                   className={`w-full border-l-4 px-3 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#7a1f1f] ${
-                    isSelected ? "border-[#7a1f1f] bg-[#ece7dc]" : "border-transparent hover:bg-[#f8f5ee]"
+                    isSelected ? "border-[#7a1f1f] bg-[#ece7dc]" : "border-transparent hover:bg-[#fbf9f4]"
                   }`}
                 >
                   <span className="flex flex-wrap items-center justify-between gap-2">

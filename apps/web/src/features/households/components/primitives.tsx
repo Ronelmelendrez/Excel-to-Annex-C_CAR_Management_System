@@ -10,13 +10,17 @@ const statusLabels: Record<HouseholdStatus, string> = {
   resolved: "Resolved by staff",
 };
 
+// Outline chips, matching the landing page's badge treatment (e.g. the
+// "Draft" badge): a coloured 1px border and matching text, no fill.
+// Amber follows the landing page's warning colour (#b45309); text stays the
+// darker brown for contrast on tinted rows.
 const statusStyles: Record<HouseholdStatus, string> = {
-  valid: "border-[#2f5b3a] bg-[#e6ecdf] text-[#244b2e]",
-  resolved: "border-[#2f5b3a] bg-[#e6ecdf] text-[#244b2e]",
-  none: "border-[#8a5a00] bg-[#f3ead8] text-[#704700]",
-  multiple: "border-[#7a1f1f] bg-[#f2e4e1] text-[#7a1f1f]",
-  invalid: "border-[#8a5a00] bg-[#f3ead8] text-[#704700]",
-  blank: "border-[#8a5a00] bg-[#f3ead8] text-[#704700]",
+  valid: "border-[#161512] text-[#161512]",
+  resolved: "border-[#161512] text-[#161512]",
+  none: "border-[#b45309] text-[#8a5a00]",
+  multiple: "border-[#7a1f1f] text-[#7a1f1f]",
+  invalid: "border-[#b45309] text-[#8a5a00]",
+  blank: "border-[#b45309] text-[#8a5a00]",
 };
 
 export function HouseholdStatusLabel({ status }: { status: HouseholdStatus }) {
@@ -24,7 +28,9 @@ export function HouseholdStatusLabel({ status }: { status: HouseholdStatus }) {
 
   return (
     <span className={`inline-flex items-center gap-1 border px-2 py-1 text-[11px] font-medium ${statusStyles[status]}`}>
-      <span aria-hidden="true">{isValid ? "✓" : "!"}</span>
+      <span aria-hidden="true" className={isValid ? "text-[#7a1f1f]" : undefined}>
+        {isValid ? "✓" : "!"}
+      </span>
       {statusLabels[status]}
     </span>
   );
@@ -34,13 +40,19 @@ export function HouseholdStat({
   label,
   value,
   emphasis = false,
+  delay,
 }: {
   label: string;
   value: number | string;
   emphasis?: boolean;
+  /** Entrance delay (ms) for the landing-style `fade-up` animation. */
+  delay?: number;
 }) {
   return (
-    <div className="border-t border-[#161512] pt-2">
+    <div
+      className="motion-safe:animate-fade-up border border-[#c9c3b6] bg-[#fbf9f4] p-4"
+      style={delay !== undefined ? { animationDelay: `${delay}ms` } : undefined}
+    >
       <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-[#5b574e]">{label}</p>
       <p className={`mt-1 font-serif text-2xl tabular-nums ${emphasis ? "text-[#7a1f1f]" : ""}`}>{value}</p>
     </div>

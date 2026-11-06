@@ -36,14 +36,19 @@ export function HouseholdFilters({
     <>
       <section
         aria-label="Register summary"
-        className="grid grid-cols-2 gap-5 border-b border-[#c9c3b6] py-5 sm:grid-cols-4"
+        className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4"
       >
-        <HouseholdStat label="Households" value={householdCount ?? "—"} />
-        <HouseholdStat label="Members" value={memberCount ?? "—"} />
-        <HouseholdStat label="Grantee OK" value={granteeCount ?? "—"} />
-        <HouseholdStat label="Needs review" value={needsReviewCount ?? "—"} emphasis />
+        <HouseholdStat label="Households" value={householdCount ?? "—"} delay={200} />
+        <HouseholdStat label="Members" value={memberCount ?? "—"} delay={240} />
+        <HouseholdStat label="Grantee OK" value={granteeCount ?? "—"} delay={280} />
+        <HouseholdStat
+          label="Needs review"
+          value={needsReviewCount ?? "—"}
+          emphasis
+          delay={320}
+        />
       </section>
-      <div className="flex flex-wrap justify-between gap-2 py-2 text-xs text-[#5b574e]" aria-live="polite">
+      <div className="mt-3 flex flex-wrap justify-between gap-2 text-xs text-[#5b574e]" aria-live="polite">
         <span>{statsError ? statsError : "Totals update automatically every 15 seconds."}</span>
         {statsError && <span>Showing the most recently available totals.</span>}
       </div>
@@ -60,7 +65,7 @@ export function HouseholdFilters({
               value={query}
               onChange={(event) => onQueryChange(event.target.value)}
               placeholder="HH_ID, member name, or barangay"
-              className="min-h-[44px] w-full border border-[#8c877c] bg-[#f8f5ee] px-3 text-sm placeholder:text-[#777166] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#7a1f1f]"
+              className="min-h-[44px] w-full border border-[#c9c3b6] bg-white px-3 text-sm placeholder:text-[#8c877c] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#7a1f1f]"
             />
           </div>
           <div>
@@ -71,7 +76,7 @@ export function HouseholdFilters({
               id="review-filter"
               value={reviewFilter}
               onChange={(event) => onReviewFilterChange(event.target.value as ReviewFilter)}
-              className="min-h-[44px] w-full border border-[#8c877c] bg-[#f8f5ee] px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#7a1f1f]"
+              className="min-h-[44px] w-full border border-[#c9c3b6] bg-white px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#7a1f1f]"
             >
               <option value="all">All households</option>
               <option value="needs_review">Needs review</option>
@@ -87,7 +92,7 @@ export function HouseholdFilters({
               id="import-filter"
               value={versionFilter}
               onChange={(event) => onVersionFilterChange(event.target.value)}
-              className="min-h-[44px] w-full border border-[#8c877c] bg-[#f8f5ee] px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#7a1f1f]"
+              className="min-h-[44px] w-full border border-[#c9c3b6] bg-white px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#7a1f1f]"
             >
               <option value="all">All versions</option>
               {versionOptions.map((option) => (

@@ -1,6 +1,7 @@
 import React from "react";
 import { SectionCard } from "../../../components/ui/section-card";
 import type { HouseholdOverlay, HouseholdRecord, HouseholdStatus } from "../types";
+import { CheckIcon } from "../../../components/icons";
 import { GranteeResolutionForm } from "./GranteeResolutionForm";
 import { HouseholdHistory } from "./HouseholdHistory";
 import { HouseholdMembersTable } from "./HouseholdMembersTable";
@@ -53,6 +54,7 @@ export function HouseholdDetail({
       <SectionCard
         id="household-detail-heading"
         title="Select a household"
+        delay={420}
         className="min-w-0"
         contentClassName="px-5 py-6 sm:py-10"
       >
@@ -73,6 +75,7 @@ export function HouseholdDetail({
       eyebrow={`Household detail / ${household.importName} · version ${household.importVersion}`}
       description={`${household.barangay}, ${household.municipality}`}
       className="min-w-0"
+      delay={420}
       cardClassName="overflow-hidden"
       contentClassName="p-0"
       action={status && <HouseholdStatusLabel status={status} />}
@@ -83,7 +86,10 @@ export function HouseholdDetail({
           {grantee ? `${grantee.name} · spreadsheet row ${grantee.sourceRow}` : "Not confirmed"}
         </p>
         {status === "valid" && (
-          <span className="text-xs font-medium text-[#244b2e]">One confirmed grantee</span>
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#7a1f1f]">
+            <CheckIcon className="h-3.5 w-3.5 shrink-0" />
+            One confirmed grantee
+          </span>
         )}
         {canCorrect && status !== "valid" && status !== "resolved" && (
           <button
