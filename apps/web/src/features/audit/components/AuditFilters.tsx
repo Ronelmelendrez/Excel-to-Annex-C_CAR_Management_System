@@ -38,7 +38,7 @@ export function AuditFilters({
           maxLength={80}
           onChange={(event) => onFilterChange("search", event.target.value)}
           placeholder="Action or record reference"
-          className="min-h-[44px] w-full border border-[#8c877c] bg-[#fbf9f4] px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
+          className="min-h-[44px] w-full border border-[#c9c3b6] bg-white px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
         />
       </div>
       <div>
@@ -53,7 +53,7 @@ export function AuditFilters({
           placeholder="Exact account reference"
           autoComplete="off"
           onChange={(event) => onFilterChange("actor", event.target.value)}
-          className="min-h-[44px] w-full border border-[#8c877c] bg-[#fbf9f4] px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
+          className="min-h-[44px] w-full border border-[#c9c3b6] bg-white px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
         />
       </div>
       <div>
@@ -66,7 +66,7 @@ export function AuditFilters({
           onChange={(event) =>
             onEntityTypeChange(event.target.value as AuditEntityType | "all")
           }
-          className="min-h-[44px] w-full border border-[#8c877c] bg-[#fbf9f4] px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
+          className="min-h-[44px] w-full border border-[#c9c3b6] bg-white px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
         >
           <option value="all">All records</option>
           {Object.entries(auditEntityLabels).map(([value, label]) => (
@@ -86,7 +86,7 @@ export function AuditFilters({
           value={filters.dateFrom}
           max={filters.dateTo || undefined}
           onChange={(event) => onFilterChange("dateFrom", event.target.value)}
-          className="min-h-[44px] w-full border border-[#8c877c] bg-[#fbf9f4] px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
+          className="min-h-[44px] w-full border border-[#c9c3b6] bg-white px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
         />
       </div>
       <div>
@@ -99,7 +99,7 @@ export function AuditFilters({
           value={filters.dateTo}
           min={filters.dateFrom || undefined}
           onChange={(event) => onFilterChange("dateTo", event.target.value)}
-          className="min-h-[44px] w-full border border-[#8c877c] bg-[#fbf9f4] px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
+          className="min-h-[44px] w-full border border-[#c9c3b6] bg-white px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
         />
       </div>
       <div className="flex items-end justify-between gap-3 sm:col-span-2 lg:col-span-5">

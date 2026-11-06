@@ -1,5 +1,6 @@
 import { useAuth } from "../../../app/providers";
 import { useAuditLog } from "../hooks/useAuditLog";
+import { AlertTriangleIcon } from "../../../components/icons";
 import { AuditEventDetail } from "./AuditEventDetail";
 import { AuditEventList } from "./AuditEventList";
 import { AuditFilters } from "./AuditFilters";
@@ -16,12 +17,17 @@ export function AuditPage() {
     return (
       <div
         role="alert"
-        className="max-w-[680px] border-l-4 border-[#7a1f1f] border-y border-r border-[#7a1f1f] bg-[#f2e4e1] px-4 py-4"
+        className="flex max-w-[680px] items-start gap-3 border-l-4 border-[#7a1f1f] bg-[#f6eaea] px-4 py-4"
       >
-        <h1 className="font-serif text-2xl">You do not have access to audit records</h1>
-        <p className="mt-2 text-sm leading-6 text-[#3f3b34]">
-          Audit logs are available to auditors and administrators. No event details are shown.
-        </p>
+        <AlertTriangleIcon className="mt-1 h-5 w-5 shrink-0 text-[#7a1f1f]" />
+        <div>
+          <h1 className="font-serif text-2xl leading-tight">
+            You do not have access to audit records
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-[#3f3b34]">
+            Audit logs are available to auditors and administrators. No event details are shown.
+          </p>
+        </div>
       </div>
     );
   }
@@ -29,25 +35,34 @@ export function AuditPage() {
   return (
     <div>
       <header className="border-b border-[#161512] pb-5">
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#5b574e]">
+        <p className="motion-safe:animate-fade-up font-mono text-[10px] uppercase tracking-[0.2em] text-[#7a1f1f]">
           Audit logs
         </p>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="font-serif text-4xl leading-none tracking-tight sm:text-5xl">
+            <h1
+              className="motion-safe:animate-fade-up font-serif text-4xl leading-none tracking-tight sm:text-5xl"
+              style={{ animationDelay: "60ms" }}
+            >
               Audit trail
             </h1>
-            <p className="mt-3 max-w-[62ch] text-sm leading-6 text-[#3f3b34]">
+            <p
+              className="motion-safe:animate-fade-up mt-3 max-w-[62ch] text-sm leading-6 text-[#3f3b34]"
+              style={{ animationDelay: "120ms" }}
+            >
               Review sensitive actions by actor, entity, and date without exposing case details.
             </p>
           </div>
-          <span className="border border-[#2f5b3a] bg-[#e6ecdf] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[#244b2e]">
+          <span
+            className="motion-safe:animate-fade-up border border-[#161512] bg-[#fbf9f4] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[#161512]"
+            style={{ animationDelay: "180ms" }}
+          >
             Recorded audit events
           </span>
         </div>
       </header>
 
-      <p className="mt-4 border-l-4 border-[#8c877c] bg-[#ece7dc] px-3 py-2 text-xs leading-5 text-[#3f3b34]">
+      <p className="mt-4 border-l-4 border-[#161512] bg-[#ece7dc] px-3 py-2 text-xs leading-5 text-[#3f3b34]">
         This page shows recorded actions and when they occurred, without displaying sensitive
         details of each change. Times are shown in UTC.
       </p>
@@ -63,17 +78,24 @@ export function AuditPage() {
       />
 
       {invalidDateRange && (
-        <p role="alert" className="mt-3 text-sm text-[#7a1f1f]">
-          The start date must be on or before the end date.
+        <p
+          role="alert"
+          className="mt-3 flex items-start gap-3 border-l-4 border-[#7a1f1f] bg-[#f6eaea] px-3 py-2 text-sm text-[#7a1f1f]"
+        >
+          <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>The start date must be on or before the end date.</span>
         </p>
       )}
 
       {audit.error && (
         <div
           role="alert"
-          className="mt-4 flex flex-wrap items-center justify-between gap-3 border-l-4 border-[#7a1f1f] border-y border-r border-[#7a1f1f] bg-[#f2e4e1] px-4 py-3"
+          className="mt-4 flex flex-wrap items-center justify-between gap-3 border-l-4 border-[#7a1f1f] bg-[#f6eaea] px-4 py-3"
         >
-          <p className="text-sm leading-6 text-[#7a1f1f]">{audit.error}</p>
+          <span className="flex items-start gap-3">
+            <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#7a1f1f]" />
+            <span className="text-sm leading-6 text-[#7a1f1f]">{audit.error}</span>
+          </span>
           <button
             type="button"
             onClick={audit.retry}
@@ -103,7 +125,7 @@ export function AuditPage() {
             type="button"
             onClick={audit.loadMore}
             disabled={audit.loading}
-            className="min-h-[44px] border border-[#161512] px-4 text-sm font-semibold hover:bg-[#161512] hover:text-[#f4f1ea] disabled:cursor-wait disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+            className="min-h-[44px] border border-[#161512] px-4 text-sm font-semibold hover:bg-[#161512] hover:text-[#f4f1ea] disabled:cursor-wait disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
           >
             {audit.loading ? "Loading…" : "Load more audit events"}
           </button>

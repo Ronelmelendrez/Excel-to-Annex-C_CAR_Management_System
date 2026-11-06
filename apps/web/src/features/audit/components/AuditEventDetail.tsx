@@ -16,7 +16,7 @@ export function AuditEventDetail({
   if (loading) {
     return (
       <SectionCard id="audit-event-detail-heading" title="Audit entry">
-        <div role="status" aria-label="Loading audit entry" className="animate-pulse">
+        <div role="status" aria-label="Loading audit entry" className="motion-safe:animate-pulse">
           <div aria-hidden="true" className="grid gap-5 sm:grid-cols-2">
             {Array.from({ length: 4 }, (_, index) => (
               <div key={index}>
@@ -44,10 +44,11 @@ export function AuditEventDetail({
     <SectionCard
       id="audit-event-detail-heading"
       title="Audit entry"
+      delay={300}
       description="This record shows what happened and when. Sensitive details of the change are not shown."
       eyebrow={event.id}
       action={
-        <span className="border border-[#8c877c] px-2 py-1 text-[10px] font-semibold text-[#3f3b34]">
+        <span className="border border-[#161512] px-2 py-1 text-[10px] font-semibold text-[#161512]">
           Recorded
         </span>
       }
