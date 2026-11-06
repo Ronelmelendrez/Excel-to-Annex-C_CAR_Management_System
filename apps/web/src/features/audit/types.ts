@@ -1,25 +1,12 @@
-export type AuditEntityType =
-  | "import"
-  | "household"
-  | "car"
-  | "template"
-  | "export"
-  | "role";
-
-export type AuditOutcome = "success" | "failure" | "denied";
+export type AuditEntityType = string;
 
 export type AuditEvent = {
   id: string;
-  actorId: string;
-  actorRole: string;
+  actorId: string | null;
   action: string;
   entityType: AuditEntityType;
-  entityId: string;
+  entityId: string | null;
   occurredAt: string;
-  outcome: AuditOutcome;
-  summary: string;
-  before: string | null;
-  after: string | null;
 };
 
 export type AuditFilters = {
@@ -31,3 +18,10 @@ export type AuditFilters = {
 };
 
 export type AuditEntityFilter = AuditFilters["entityType"];
+
+export type AuditEventPage = {
+  events: AuditEvent[];
+  total: number;
+  limit: number;
+  offset: number;
+};

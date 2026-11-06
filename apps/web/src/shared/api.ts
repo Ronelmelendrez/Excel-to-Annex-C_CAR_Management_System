@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const API_BASE = import.meta.env.VITE_API_BASE || (SUPABASE_URL ? `${SUPABASE_URL}/functions/v1` : '/functions/v1');
 
 export class ApiError extends Error {
@@ -27,6 +28,7 @@ export async function authHeaders(extra: Record<string, string> = {}) {
   } = await supabase.auth.getSession();
   const token = session?.access_token;
   const headers: Record<string, string> = { ...extra };
+  if (SUPABASE_ANON_KEY) headers.apikey = SUPABASE_ANON_KEY;
   if (token) headers.Authorization = `Bearer ${token}`;
   return headers;
 }

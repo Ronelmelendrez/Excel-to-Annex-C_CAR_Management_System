@@ -1,15 +1,23 @@
 import { SectionCard } from "../../../components/ui/section-card";
-import { auditEntityLabels, formatAuditTimestamp } from "../lib/audit";
+import {
+  formatAuditAction,
+  formatAuditEntityType,
+  formatAuditTimestamp,
+} from "../lib/audit";
 import type { AuditEvent } from "../types";
 
 export function AuditEventList({
   events,
   selectedId,
   onSelect,
+  loading,
+  error,
 }: {
   events: AuditEvent[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  loading: boolean;
+  error: string | null;
 }) {
   return (
     <SectionCard
@@ -20,15 +28,23 @@ export function AuditEventList({
       contentClassName="p-0"
       action={
         <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[#5b574e]">
-          {events.length} shown
+          {events.length} loaded
         </span>
       }
     >
-      {events.length === 0 ? (
+      {events.length === 0 && loading ? (
+        <p role="status" className="px-4 py-8 text-sm text-[#5b574e]">
+          Loading audit events…
+        </p>
+      ) : events.length === 0 && error ? (
+        <p className="px-4 py-8 text-sm text-[#5b574e]">
+          Audit events could not be loaded.
+        </p>
+      ) : events.length === 0 ? (
         <div className="px-4 py-8">
           <p className="font-serif text-lg">No audit events match these filters.</p>
           <p className="mt-1 text-sm leading-6 text-[#5b574e]">
-            Adjust the actor, entity, or date range to search the mock log.
+            Adjust the actor, entity, or date range and try again.
           </p>
         </div>
       ) : (
@@ -48,28 +64,19 @@ export function AuditEventList({
                   }`}
                 >
                   <span className="flex flex-wrap items-start justify-between gap-2">
-                    <span className="text-sm font-semibold">{event.action}</span>
-                    <span
-                      className={`border px-2 py-1 text-[10px] font-medium ${
-                        event.outcome === "success"
-                          ? "border-[#2f5b3a] bg-[#e6ecdf] text-[#244b2e]"
-                          : event.outcome === "failure"
-                            ? "border-[#7a1f1f] bg-[#f2e4e1] text-[#7a1f1f]"
-                            : "border-[#8a5a00] bg-[#f3ead8] text-[#704700]"
-                      }`}
-                    >
-                      {event.outcome === "success"
-                        ? "✓ Success"
-                        : event.outcome === "failure"
-                          ? "! Failed"
-                          : "! Denied"}
+                    <span className="text-sm font-semibold">
+                      {formatAuditAction(event.action)}
+                    </span>
+                    <span className="border border-[#8c877c] px-2 py-1 text-[10px] font-medium text-[#3f3b34]">
+                      Recorded
                     </span>
                   </span>
                   <span className="mt-1 block text-xs text-[#5b574e]">
-                    {auditEntityLabels[event.entityType]} · {event.entityId}
+                    {formatAuditEntityType(event.entityType)}
+                    {event.entityId ? ` · ${event.entityId}` : ""}
                   </span>
                   <span className="mt-1 flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#5b574e]">
-                    <span>{event.actorId} · {event.actorRole}</span>
+                    <span>{event.actorId ?? "System actor"}</span>
                     <time dateTime={event.occurredAt}>
                       {formatAuditTimestamp(event.occurredAt)}
                     </time>

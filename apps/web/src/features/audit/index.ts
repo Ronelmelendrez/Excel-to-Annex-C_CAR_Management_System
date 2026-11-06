@@ -1,2 +1,2 @@
 export { AuditPage } from "./components/AuditPage";
-export type { AuditEvent, AuditEntityType, AuditFilters, AuditOutcome } from "./types";
+export type { AuditEvent, AuditEventPage, AuditEntityType, AuditFilters } from "./types";

@@ -1,37 +1,26 @@
-import type { AuditEntityType, AuditEvent, AuditFilters } from "../types";
+import type { AuditEntityType } from "../types";
 
-export const auditEntityLabels: Record<AuditEntityType, string> = {
-  import: "Import",
-  household: "Household",
-  car: "CAR",
-  template: "Template",
-  export: "Export",
-  role: "Role",
+export const auditEntityLabels: Record<string, string> = {
+  case_assessments: "Case assessments",
+  export_jobs: "Export jobs",
+  households: "Households",
+  imports: "Imports",
+  system_settings: "System settings",
+  templates: "Templates",
+  user_roles: "User roles",
 };
 
-export function filterAuditEvents(events: AuditEvent[], filters: AuditFilters): AuditEvent[] {
-  const search = filters.search.trim().toLocaleLowerCase();
-
-  return events
-    .filter((event) => {
-      const matchesSearch =
-        !search ||
-        [event.action, event.summary, event.actorId, event.entityId]
-          .some((value) => value.toLocaleLowerCase().includes(search));
-      const matchesActor = filters.actor === "all" || event.actorId === filters.actor;
-      const matchesEntity =
-        filters.entityType === "all" || event.entityType === filters.entityType;
-      const eventDate = event.occurredAt.slice(0, 10);
-      const matchesStart = !filters.dateFrom || eventDate >= filters.dateFrom;
-      const matchesEnd = !filters.dateTo || eventDate <= filters.dateTo;
-
-      return matchesSearch && matchesActor && matchesEntity && matchesStart && matchesEnd;
-    })
-    .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt));
+export function formatAuditEntityType(value: AuditEntityType): string {
+  return (
+    auditEntityLabels[value] ??
+    value.replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
+  );
 }
 
-export function getAuditActors(events: AuditEvent[]): string[] {
-  return [...new Set(events.map((event) => event.actorId))].sort();
+export function formatAuditAction(value: string): string {
+  return value
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 export function formatAuditTimestamp(value: string): string {
