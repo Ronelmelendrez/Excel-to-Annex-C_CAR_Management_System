@@ -9,6 +9,11 @@ import { householdListError, listHouseholds } from "../../households/api";
 import { getGranteeStatus } from "../../households/lib/households";
 import { annexCDocxFileName, downloadDocx, renderAnnexCDocx } from "../lib/annex-c-docx";
 import { synthesizeDraft } from "../lib/synthesize-draft";
+import {
+  AlertTriangleIcon,
+  ArrowRightIcon,
+  CheckIcon,
+} from "../../../components/icons";
 import { PageDataSkeleton } from "../../../components/ui/PageSkeletons";
 import {
   carDraftsCacheKey,
@@ -213,9 +218,20 @@ export function TemplatesPage() {
   if (loading) {
     return (
       <div className="mx-auto max-w-[1180px] px-4 py-8 sm:px-6">
-        <header className="border-b border-[#c9c3b6] pb-4">
-          <h1 className="font-serif text-3xl">Annex C report generator</h1>
-          <p className="mt-2 max-w-[75ch] text-sm leading-6 text-[#3f3b34]">
+        <header className="border-b border-[#161512] pb-5">
+          <p className="motion-safe:animate-fade-up font-mono text-[10px] uppercase tracking-[0.2em] text-[#7a1f1f]">
+            Report generator
+          </p>
+          <h1
+            className="motion-safe:animate-fade-up mt-2 font-serif text-4xl leading-none tracking-tight sm:text-5xl"
+            style={{ animationDelay: "60ms" }}
+          >
+            Annex C report generator
+          </h1>
+          <p
+            className="motion-safe:animate-fade-up mt-3 max-w-[75ch] text-sm leading-6 text-[#3f3b34]"
+            style={{ animationDelay: "120ms" }}
+          >
             Choose a household with a confirmed grantee, review its Annex C case study report, and
             download a Word document using the official template.
           </p>
@@ -238,17 +254,20 @@ export function TemplatesPage() {
       <div className="mx-auto max-w-[1180px] px-4 py-8 sm:px-6">
         <div
           role="alert"
-          className="max-w-[680px] border-l-4 border-[#7a1f1f] border-y border-r border-[#7a1f1f] bg-[#f2e4e1] px-4 py-4"
+          className="flex max-w-[680px] items-start gap-3 border-l-4 border-[#7a1f1f] bg-[#f6eaea] px-4 py-4"
         >
-          <h1 className="font-serif text-2xl">Report generator unavailable</h1>
-          <p className="mt-2 text-sm leading-6 text-[#3f3b34]">{loadError}</p>
-          <button
-            type="button"
-            onClick={() => setReloadToken((token) => token + 1)}
-            className="mt-3 min-h-[40px] border border-[#161512] bg-[#161512] px-4 py-2 text-sm font-medium text-[#f4f1ea] hover:bg-[#7a1f1f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
-          >
-            Retry
-          </button>
+          <AlertTriangleIcon className="mt-1 h-5 w-5 shrink-0 text-[#7a1f1f]" />
+          <div>
+            <h1 className="font-serif text-2xl leading-tight">Report generator unavailable</h1>
+            <p className="mt-2 text-sm leading-6 text-[#3f3b34]">{loadError}</p>
+            <button
+              type="button"
+              onClick={() => setReloadToken((token) => token + 1)}
+              className="mt-3 min-h-[40px] border border-[#161512] bg-[#161512] px-4 py-2 text-sm font-medium text-[#f4f1ea] hover:bg-[#7a1f1f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+            >
+              Retry
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -257,7 +276,17 @@ export function TemplatesPage() {
   if (!household || !draft) {
     return (
       <div className="mx-auto max-w-[1180px] px-4 py-8 sm:px-6">
-        <h1 className="font-serif text-3xl">Annex C report generator</h1>
+        <header className="border-b border-[#161512] pb-5">
+          <p className="motion-safe:animate-fade-up font-mono text-[10px] uppercase tracking-[0.2em] text-[#7a1f1f]">
+            Report generator
+          </p>
+          <h1
+            className="motion-safe:animate-fade-up mt-2 font-serif text-4xl leading-none tracking-tight sm:text-5xl"
+            style={{ animationDelay: "60ms" }}
+          >
+            Annex C report generator
+          </h1>
+        </header>
         <p className="mt-4 max-w-[70ch] text-sm leading-6 text-[#3f3b34]">
           No household is ready for a report yet. A household qualifies when the register
           marks exactly one member as the grantee.
@@ -265,7 +294,7 @@ export function TemplatesPage() {
         <button
           type="button"
           onClick={() => setReloadToken((token) => token + 1)}
-          className="mt-4 min-h-[40px] border border-[#161512] px-4 py-2 text-sm font-medium hover:bg-[#e8e3d7] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+          className="mt-4 min-h-[40px] border border-[#161512] px-4 py-2 text-sm font-medium hover:bg-[#ece7dc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
         >
           Reload households
         </button>
@@ -275,9 +304,20 @@ export function TemplatesPage() {
 
   return (
     <div className="mx-auto max-w-[1180px] px-4 py-8 sm:px-6">
-      <header className="border-b border-[#c9c3b6] pb-4">
-        <h1 className="font-serif text-3xl">Annex C report generator</h1>
-        <p className="mt-2 max-w-[75ch] text-sm leading-6 text-[#3f3b34]">
+      <header className="border-b border-[#161512] pb-5">
+        <p className="motion-safe:animate-fade-up font-mono text-[10px] uppercase tracking-[0.2em] text-[#7a1f1f]">
+          Report generator
+        </p>
+        <h1
+          className="motion-safe:animate-fade-up mt-2 font-serif text-4xl leading-none tracking-tight sm:text-5xl"
+          style={{ animationDelay: "60ms" }}
+        >
+          Annex C report generator
+        </h1>
+        <p
+          className="motion-safe:animate-fade-up mt-3 max-w-[75ch] text-sm leading-6 text-[#3f3b34]"
+          style={{ animationDelay: "120ms" }}
+        >
           Choose a household with a confirmed grantee, review its Annex C case study report, and
           download a Word document using the official template.
         </p>
@@ -292,7 +332,7 @@ export function TemplatesPage() {
             id="report-household"
             value={household.id}
             onChange={(event) => setSelectedId(event.target.value)}
-            className="mt-1 min-h-[40px] w-full border border-[#161512] bg-[#f4f1ea] px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+            className="mt-1 min-h-[40px] w-full border border-[#c9c3b6] bg-white px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
           >
             {households.map((item) => (
               <option key={item.id} value={item.id}>
@@ -305,23 +345,43 @@ export function TemplatesPage() {
           type="button"
           onClick={handleDownload}
           disabled={downloading}
-          className="min-h-[40px] border border-[#161512] bg-[#161512] px-5 py-2 text-sm font-medium text-[#f4f1ea] hover:bg-[#7a1f1f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f] disabled:cursor-not-allowed disabled:opacity-60"
+          className="group inline-flex min-h-[40px] items-center gap-2 border border-[#161512] bg-[#161512] px-5 py-2 text-sm font-medium text-[#f4f1ea] hover:bg-[#7a1f1f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {downloading ? "Preparing Word document…" : "Download Word document"}
+          {!downloading && (
+            <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+          )}
         </button>
       </div>
 
-      <div className="mt-3 space-y-1 text-sm text-[#3f3b34] print:hidden" role="status">
-        {householdRefreshNotice ? <p>{householdRefreshNotice}</p> : null}
-        {carsRefreshNotice ? <p>{carsRefreshNotice}</p> : null}
+      <div className="mt-3 space-y-2 text-sm text-[#3f3b34] print:hidden" role="status">
+        {householdRefreshNotice ? (
+          <p className="flex items-start gap-3 border-l-4 border-[#b45309] bg-[#f3ead8] px-3 py-2 text-[#704700]">
+            <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#b45309]" />
+            <span>{householdRefreshNotice}</span>
+          </p>
+        ) : null}
+        {carsRefreshNotice ? (
+          <p className="flex items-start gap-3 border-l-4 border-[#b45309] bg-[#f3ead8] px-3 py-2 text-[#704700]">
+            <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#b45309]" />
+            <span>{carsRefreshNotice}</span>
+          </p>
+        ) : null}
         {downloaded ? (
-          <p>
-            Annex C downloaded for {draft.granteeName} ({draft.hhId}).
+          <p className="flex items-start gap-3 border-l-4 border-[#161512] bg-[#fbf9f4] px-3 py-2 text-[#161512]">
+            <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#7a1f1f]" />
+            <span>
+              Annex C downloaded for {draft.granteeName} ({draft.hhId}).
+            </span>
           </p>
         ) : null}
         {downloadError ? (
-          <p role="alert" className="border-l-4 border-[#7a1f1f] bg-[#f2e4e1] px-3 py-2 text-[#7a1f1f]">
-            {downloadError}
+          <p
+            role="alert"
+            className="flex items-start gap-3 border-l-4 border-[#7a1f1f] bg-[#f6eaea] px-3 py-2 text-[#7a1f1f]"
+          >
+            <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{downloadError}</span>
           </p>
         ) : null}
         <p>
@@ -334,13 +394,21 @@ export function TemplatesPage() {
             ? "all required report fields present"
             : `${missing.length} required field${missing.length === 1 ? "" : "s"} still blank`}
         </p>
-        {carsNote ? <p>{carsNote}</p> : null}
+        {carsNote ? (
+          <p className="flex items-start gap-3 border-l-4 border-[#b45309] bg-[#f3ead8] px-3 py-2 text-[#704700]">
+            <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#b45309]" />
+            <span>{carsNote}</span>
+          </p>
+        ) : null}
       </div>
 
       {missing.length > 0 ? (
-        <details className="mt-3 max-w-[70ch] border-l-4 border-[#7a1f1f] bg-[#f2e4e1] px-4 py-3 text-sm print:hidden">
-          <summary className="cursor-pointer font-medium text-[#7a1f1f]">
-            Missing ({missing.length})
+        <details className="mt-3 max-w-[70ch] border-l-4 border-[#b45309] bg-[#f3ead8] px-4 py-3 text-sm print:hidden">
+          <summary className="cursor-pointer font-medium text-[#704700]">
+            <span className="inline-flex items-center gap-2">
+              <AlertTriangleIcon className="h-4 w-4 shrink-0 text-[#b45309]" />
+              Missing ({missing.length})
+            </span>
           </summary>
           <ul className="mt-2 list-inside list-disc space-y-1 text-[#3f3b34]">
             {missing.map((item) => (
