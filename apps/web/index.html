@@ -4,9 +4,102 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Excel-to-Annex C CAR Management System</title>
+    <style>
+      .startup-loading {
+        display: flex;
+        min-height: 100vh;
+        align-items: center;
+        justify-content: center;
+        padding: 1.25rem;
+        background: #f4f1ea;
+        color: #161512;
+      }
+      .startup-loading__card {
+        width: 100%;
+        max-width: 28rem;
+        border: 1px solid #161512;
+        background: #f8f5ee;
+        padding: 2rem;
+        box-shadow: 8px 8px 0 #ded8cc;
+      }
+      .startup-loading__eyebrow {
+        margin: 2rem 0 0;
+        color: #7a1f1f;
+        font: 10px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+      .startup-loading__title {
+        margin: 0.5rem 0 0;
+        font: 2rem/1.15 Georgia, "Times New Roman", serif;
+      }
+      .startup-loading__message {
+        margin: 0.75rem 0 0;
+        color: #5b574e;
+        font: 0.875rem/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .startup-loading__bar {
+        height: 0.25rem;
+        margin-top: 2rem;
+        overflow: hidden;
+        background: #e6e0d5;
+      }
+      .startup-loading__indicator {
+        width: 25%;
+        height: 100%;
+        background: #7a1f1f;
+        animation: startup-progress 1.5s ease-in-out infinite;
+      }
+      @keyframes startup-progress {
+        from {
+          transform: translateX(-110%);
+        }
+        to {
+          transform: translateX(310%);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .startup-loading__indicator {
+          animation-duration: 4s;
+        }
+      }
+      @media (min-width: 640px) {
+        .startup-loading__card {
+          padding: 2.5rem;
+        }
+        .startup-loading__title {
+          font-size: 2.5rem;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main class="startup-loading" role="status" aria-live="polite" aria-busy="true">
+        <section class="startup-loading__card">
+          <div style="border-bottom: 1px solid #c9c3b6; padding-bottom: 1.25rem">
+            <p style="margin: 0; font: 1.5rem/1 Georgia, 'Times New Roman', serif">Annex C</p>
+            <p
+              style="margin: 0.5rem 0 0; color: #5b574e; font: 10px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.16em; text-transform: uppercase"
+            >
+              CAR management system
+            </p>
+          </div>
+          <p class="startup-loading__eyebrow">One moment</p>
+          <h1 class="startup-loading__title">Preparing your workspace</h1>
+          <p class="startup-loading__message">
+            We’re getting everything ready. This should only take a moment.
+          </p>
+          <div
+            class="startup-loading__bar"
+            role="progressbar"
+            aria-label="Preparing your workspace"
+          >
+            <div class="startup-loading__indicator"></div>
+          </div>
+        </section>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

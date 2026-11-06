@@ -30,3 +30,23 @@ body {
 :focus-visible {
   outline-color: #7a1f1f;
 }
+
+@keyframes loading-progress {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(310%);
+  }
+}
+
+.loading-progress__indicator {
+  width: 25%;
+  animation: loading-progress 1.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-progress__indicator {
+    animation-duration: 4s;
+  }
+}

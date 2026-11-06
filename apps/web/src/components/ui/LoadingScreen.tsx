@@ -31,26 +31,24 @@ export function LoadingScreen() {
           </span>
         </div>
 
-        <div className="mt-8 flex items-start gap-4">
-          <span
-            aria-hidden="true"
-            className="mt-1 h-5 w-5 shrink-0 rounded-full border-2 border-[#d8d1c5] border-t-[#7a1f1f] motion-safe:animate-spin"
-          />
-          <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#7a1f1f]">
-              One moment
-            </p>
-            <h1 className="mt-2 font-serif text-3xl leading-tight tracking-tight sm:text-4xl">
-              Preparing your workspace
-            </h1>
-            <p className="mt-3 text-sm leading-6 text-[#5b574e]">
-              We’re getting everything ready. This should only take a moment.
-            </p>
-          </div>
+        <div className="mt-8">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#7a1f1f]">
+            One moment
+          </p>
+          <h1 className="mt-2 font-serif text-3xl leading-tight tracking-tight sm:text-4xl">
+            Preparing your workspace
+          </h1>
+          <p className="mt-3 text-sm leading-6 text-[#5b574e]">
+            We’re getting everything ready. This should only take a moment.
+          </p>
         </div>
 
-        <div aria-hidden="true" className="mt-8 h-1 overflow-hidden bg-[#e6e0d5]">
-          <div className="h-full w-1/3 bg-[#7a1f1f] motion-safe:animate-pulse" />
+        <div
+          role="progressbar"
+          aria-label="Preparing your workspace"
+          className="loading-progress mt-8 h-1 overflow-hidden bg-[#e6e0d5]"
+        >
+          <div aria-hidden="true" className="loading-progress__indicator h-full bg-[#7a1f1f]" />
         </div>
       </section>
     </main>

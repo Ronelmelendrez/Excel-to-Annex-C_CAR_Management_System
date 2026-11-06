@@ -1,15 +1,16 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { Router } from './app/router'
-import { RouteLoadingSkeleton } from './components/ui/PageSkeletons'
+import { LoadingScreen } from './components/ui/LoadingScreen'
 import { clearLocalImportData } from './shared/clear-local-import-data'
 import { isSupabaseConfigured } from './shared/supabase'
 import './index.css'
 
 const root = ReactDOM.createRoot(document.getElementById('root')!)
+const STARTUP_LOADING_MINIMUM_MS = 150
 
 function renderStartupLoading() {
-  root.render(<RouteLoadingSkeleton pathname={window.location.pathname} />)
+  root.render(<LoadingScreen />)
 }
 
 function renderApplication() {
@@ -34,7 +35,10 @@ function renderApplication() {
 
 renderStartupLoading()
 
-void clearLocalImportData()
+void Promise.all([
+  clearLocalImportData(),
+  new Promise<void>((resolve) => window.setTimeout(resolve, STARTUP_LOADING_MINIMUM_MS)),
+])
   .then(renderApplication)
   .catch((cause: unknown) => {
     console.error('Unable to clear saved import data before startup.', cause)
