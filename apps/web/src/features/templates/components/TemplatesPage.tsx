@@ -217,7 +217,7 @@ export function TemplatesPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-[1180px] px-4 py-8 sm:px-6">
+      <div>
         <header className="border-b border-[#161512] pb-5">
           <p className="motion-safe:animate-fade-up font-mono text-[10px] uppercase tracking-[0.2em] text-[#7a1f1f]">
             Report generator
