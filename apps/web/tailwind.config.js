@@ -47,6 +47,20 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      keyframes: {
+        "fade-up": {
+          "0%": { opacity: "0", transform: "translateY(10px)" },
+          "100%": { opacity: "1", transform: "none" },
+        },
+      },
+      animation: {
+        // Guarded with the `motion-safe:` variant at the call site so readers
+        // who prefer reduced motion never see the entrance animation.
+        // `backwards` (not `both`) so the finished element keeps its own
+        // styles — otherwise the final keyframe would freeze transforms and
+        // block hover effects such as a card lift.
+        "fade-up": "fade-up 0.5s ease-out backwards",
+      },
     },
   },
   plugins: [require("tailwindcss-animate")],

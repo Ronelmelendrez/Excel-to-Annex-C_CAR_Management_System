@@ -83,4 +83,44 @@ describe("public landing page", () => {
     fireEvent.click(screen.getByRole("link", { name: /Sign in to your workspace/ }));
     expect(screen.getByRole("heading", { name: "Sign in to your account" })).toBeTruthy();
   });
+
+  it("lays out the workspace, safeguards and closing sections as labelled regions", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <LandingPage />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole("heading", { level: 2, name: "One workspace, three jobs." }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Keep case information in its proper place." }),
+    ).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Open your workspace." })).toBeTruthy();
+    expect(
+      screen.getByRole("region", { name: "One workspace, three jobs." }),
+    ).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Keep case information in its proper place." })).toBeTruthy();
+
+    for (const title of ["Household register", "CAR workspace", "Operational oversight"]) {
+      expect(screen.getByRole("heading", { level: 3, name: title })).toBeTruthy();
+    }
+  });
+
+  it("previews the report with masked values instead of case data", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <LandingPage />
+      </MemoryRouter>,
+    );
+
+    const preview = screen.getByRole("complementary", { name: "Annex C report preview" });
+    expect(preview).toBeTruthy();
+    expect(preview.textContent).toContain("••••••");
+    expect(preview.textContent).toContain("Draft");
+    expect(
+      screen.getByRole("link", { name: "Staff sign in" }),
+    ).toBeTruthy();
+  });
 });
