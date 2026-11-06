@@ -9,6 +9,7 @@ export function DashboardActivity({ items }: { items: DashboardActivityRecord[] 
       title="Recent activity"
       description="Shows activity types only. Case details and staff names are kept private."
       eyebrow="Last 30 days"
+      delay={300}
     >
       {items.length === 0 ? (
         <p className="text-sm leading-6 text-[#5b574e]">

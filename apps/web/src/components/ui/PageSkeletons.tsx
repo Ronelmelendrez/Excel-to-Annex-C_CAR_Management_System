@@ -28,12 +28,12 @@ const pageTitles: Record<PageKey, string> = {
 };
 
 function SkeletonBlock({ className = "" }: { className?: string }) {
-  return <div aria-hidden="true" className={`animate-pulse bg-[#e6e0d4] ${className}`} />;
+  return <div aria-hidden="true" className={`motion-safe:animate-pulse bg-[#e6e0d4] ${className}`} />;
 }
 
 function SkeletonCard({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div aria-hidden="true" className={`border border-[#c9c3b6] bg-[#f8f5ee] p-4 ${className}`}>
+    <div aria-hidden="true" className={`border border-[#c9c3b6] bg-[#fbf9f4] p-4 ${className}`}>
       {children}
     </div>
   );
@@ -42,12 +42,18 @@ function SkeletonCard({ children, className = "" }: { children: ReactNode; class
 function DashboardSkeleton() {
   return (
     <>
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }, (_, index) => (
+      <div
+        aria-hidden="true"
+        className="mt-6 flex flex-wrap items-center justify-between gap-2 border-y border-[#161512] bg-[#ece7dc] px-4 py-2.5"
+      >
+        <SkeletonBlock className="h-3 w-32" />
+        <SkeletonBlock className="h-3 w-44" />
+      </div>
+      <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 6 }, (_, index) => (
           <SkeletonCard key={index} className="min-h-32">
             <SkeletonBlock className="h-3 w-24" />
             <SkeletonBlock className="mt-4 h-8 w-16" />
-            <SkeletonBlock className="mt-3 h-3 w-4/5" />
           </SkeletonCard>
         ))}
       </div>

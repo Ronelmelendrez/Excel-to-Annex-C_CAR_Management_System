@@ -9,6 +9,8 @@ type SectionCardProps = {
   eyebrow?: React.ReactNode;
   action?: React.ReactNode;
   headingAs?: "h2" | "h3";
+  /** Entrance delay (ms) for the landing-style `fade-up` animation. */
+  delay?: number;
   className?: string;
   cardClassName?: string;
   headerClassName?: string;
@@ -24,6 +26,7 @@ export function SectionCard({
   eyebrow,
   action,
   headingAs: Heading = "h2",
+  delay,
   className,
   cardClassName,
   headerClassName,
@@ -32,10 +35,14 @@ export function SectionCard({
   children,
 }: SectionCardProps) {
   return (
-    <section aria-labelledby={id} className={className}>
+    <section
+      aria-labelledby={id}
+      className={cn(delay !== undefined && "motion-safe:animate-fade-up", className)}
+      style={delay !== undefined ? { animationDelay: `${delay}ms` } : undefined}
+    >
       <Card
         className={cn(
-          "rounded-none border-[#c9c3b6] bg-[#f8f5ee] text-[#161512] shadow-none",
+          "rounded-none border-[#c9c3b6] bg-[#fbf9f4] text-[#161512] shadow-none",
           cardClassName,
         )}
       >

@@ -48,15 +48,13 @@ export function DashboardMetrics({ summary }: { summary: DashboardSummary }) {
   ];
 
   return (
-    <section
-      aria-label="Operational metrics"
-      className="grid gap-x-6 gap-y-5 border-b border-[#c9c3b6] py-5 sm:grid-cols-2 lg:grid-cols-3"
-    >
-      {metrics.map((metric) => (
+    <section aria-label="Operational metrics" className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {metrics.map((metric, index) => (
         <DashboardMetric
           key={metric.id}
           metric={metric}
           emphasis={metric.id === "grantee-issues" || metric.id === "export-failures"}
+          delay={240 + index * 40}
         />
       ))}
     </section>
