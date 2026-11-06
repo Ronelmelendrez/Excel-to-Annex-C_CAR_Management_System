@@ -8,6 +8,7 @@ export function CarDraftList({
   households,
   householdsLoading,
   householdsError,
+  householdsRefreshError,
   actionError,
   creating,
   selectedDraftId,
@@ -18,6 +19,7 @@ export function CarDraftList({
   households: ValidatedHousehold[];
   householdsLoading: boolean;
   householdsError: string | null;
+  householdsRefreshError: string | null;
   actionError: string | null;
   creating: boolean;
   selectedDraftId: string | null;
@@ -86,6 +88,11 @@ export function CarDraftList({
             >
               {creating ? "Creating draft…" : "Create draft"}
             </button>
+            {householdsRefreshError ? (
+              <p role="status" className="mt-3 border-l-4 border-[#8a5a00] bg-[#f3ead8] px-3 py-2 text-xs leading-5 text-[#704700]">
+                {householdsRefreshError} Showing previously loaded households.
+              </p>
+            ) : null}
             {actionError ? (
               <p role="alert" className="mt-3 border-l-4 border-[#7a1f1f] bg-[#f2e4e1] px-3 py-2 text-xs leading-5 text-[#7a1f1f]">
                 {actionError}

@@ -5,6 +5,7 @@ import { useAuth } from "../../../app/providers";
 import { CarsPage } from "../components/CarsPage";
 import { CAR_NOT_CONFIGURED_MESSAGE, listCars, createCar, deleteCar, updateCar, listCarTemplates, createCarRevision } from "../api";
 import { listHouseholds } from "../../households/api";
+import { serverDataCache } from "../../../shared/server-data-cache";
 import type { CarDraft } from "../types";
 import type { HouseholdRecord } from "../../households/types";
 
@@ -107,7 +108,7 @@ function makeCar(overrides: Partial<CarDraft> & { id: string; reference: string 
 function authFor(roles: string[]) {
   return {
     session: {},
-    user: { email: "worker@example.test" },
+    user: { id: "worker", email: "worker@example.test" },
     profile: { id: "worker", display_name: "Demo case worker", status: "active" as const },
     roles,
     loading: false,
@@ -124,6 +125,7 @@ async function renderLoadedPage() {
 describe("F5 CAR authoring", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    serverDataCache.clear();
     env.configured = true;
     vi.mocked(useAuth).mockReturnValue(authFor(["case_worker"]));
     vi.mocked(listCars).mockResolvedValue([makeCar({ id: "car-1", reference: "CAR-2026-023" })]);
@@ -214,6 +216,21 @@ describe("F5 CAR authoring", () => {
 
     resolveHouseholds({ households: [validHousehold, invalidHousehold], total: 2 });
     expect(await screen.findByRole("combobox", { name: "Household" })).toBeTruthy();
+  });
+
+  it("reuses CAR drafts and household choices when returning to the page", async () => {
+    const firstView = render(<CarsPage />);
+    await screen.findByRole("heading", { name: /CAR-2026-023/ });
+    expect(listCars).toHaveBeenCalledTimes(1);
+    expect(listHouseholds).toHaveBeenCalledTimes(1);
+    firstView.unmount();
+
+    render(<CarsPage />);
+
+    expect(screen.getByRole("heading", { name: /CAR-2026-023/ })).toBeTruthy();
+    expect(screen.getByRole("option", { name: /000091 · Jomar Ramos/ })).toBeTruthy();
+    expect(listCars).toHaveBeenCalledTimes(1);
+    expect(listHouseholds).toHaveBeenCalledTimes(1);
   });
 
   it("creates a draft through the API only after selecting a validated household", async () => {

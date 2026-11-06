@@ -5,9 +5,9 @@ import { AuditEventList } from "./AuditEventList";
 import { AuditFilters } from "./AuditFilters";
 
 export function AuditPage() {
-  const { roles } = useAuth();
+  const { roles, user } = useAuth();
   const canView = roles.some((role) => role === "admin" || role === "auditor");
-  const audit = useAuditLog(canView);
+  const audit = useAuditLog(canView, user?.id ?? "");
   const invalidDateRange =
     Boolean(audit.filters.dateFrom && audit.filters.dateTo) &&
     audit.filters.dateFrom > audit.filters.dateTo;

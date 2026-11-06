@@ -8,10 +8,10 @@ import { DashboardTrend } from "./DashboardTrend";
 import { PageDataSkeleton } from "../../../components/ui/PageSkeletons";
 
 export function DashboardPage() {
-  const { roles } = useAuth();
+  const { roles, user } = useAuth();
   const canView = roles.some(isDashboardRole);
   const scope = roles.includes("admin") ? "system" : "assigned";
-  const dashboard = useDashboardSummary(scope);
+  const dashboard = useDashboardSummary(scope, user?.id ?? "");
 
   if (!canView) {
     return (

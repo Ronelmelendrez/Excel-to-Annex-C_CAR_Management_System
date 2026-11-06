@@ -41,4 +41,21 @@ describe("server data memory cache", () => {
 
     expect(cache.get("user-1:households")).toBeUndefined();
   });
+
+  it("invalidates only matching keys and prevents in-flight results from restoring them", async () => {
+    const cache = new ServerDataCache();
+    let resolveRequest!: (value: string[]) => void;
+    const request = cache.fetch(
+      "households:user-1:list",
+      () => new Promise<string[]>((resolve) => (resolveRequest = resolve)),
+    );
+    cache.set("cars:user-1:drafts", ["draft"]);
+
+    cache.deletePrefix("households:user-1:");
+    resolveRequest(["stale household"]);
+    await request;
+
+    expect(cache.get("households:user-1:list")).toBeUndefined();
+    expect(cache.get("cars:user-1:drafts")?.data).toEqual(["draft"]);
+  });
 });

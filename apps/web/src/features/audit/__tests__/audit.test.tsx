@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuth } from "../../../app/providers";
 import { AppShell } from "../../../app/layout";
 import { AuditPage } from "../components/AuditPage";
+import { serverDataCache } from "../../../shared/server-data-cache";
 
 const { fetchAuditEvents } = vi.hoisted(() => ({ fetchAuditEvents: vi.fn() }));
 
@@ -52,6 +53,7 @@ function renderAudit() {
 describe("audit log", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    serverDataCache.clear();
     vi.mocked(useAuth).mockReturnValue(authFor(["auditor"]));
     fetchAuditEvents.mockResolvedValue({
       events: [event],
@@ -80,6 +82,18 @@ describe("audit log", () => {
       0,
       expect.any(AbortSignal),
     );
+  });
+
+  it("reuses cached events when returning to the audit page", async () => {
+    const firstView = renderAudit();
+    expect(await screen.findAllByText("Import Committed")).toHaveLength(2);
+    expect(fetchAuditEvents).toHaveBeenCalledTimes(1);
+    firstView.unmount();
+
+    renderAudit();
+
+    expect(screen.getAllByText("Import Committed")).toHaveLength(2);
+    expect(fetchAuditEvents).toHaveBeenCalledTimes(1);
   });
 
   it("sends actor, entity, search, and date filters to the server", async () => {

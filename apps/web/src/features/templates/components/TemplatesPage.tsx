@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useAuth } from "../../../app/providers";
 import { normalizeGrantee } from "@import-domain";
 import { CarReportDocument } from "../../cars/components/report/CarReportDocument";
 import { listCars } from "../../cars/api";
@@ -9,6 +10,13 @@ import { getGranteeStatus } from "../../households/lib/households";
 import { annexCDocxFileName, downloadDocx, renderAnnexCDocx } from "../lib/annex-c-docx";
 import { synthesizeDraft } from "../lib/synthesize-draft";
 import { PageDataSkeleton } from "../../../components/ui/PageSkeletons";
+import {
+  carDraftsCacheKey,
+  householdListCacheKey,
+  serverDataCache,
+} from "../../../shared/server-data-cache";
+
+const REPORT_DATA_STALE_TIME = 30_000;
 
 /** Households the register marks as a valid CAR source (exactly one grantee). */
 function deriveValidatedHouseholds(
@@ -30,22 +38,77 @@ function deriveValidatedHouseholds(
  * nothing here writes to the household register or creates CAR records.
  */
 export function TemplatesPage() {
-  const [households, setHouseholds] = useState<ValidatedHousehold[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const userId = user?.id ?? "";
+  const householdKey = userId ? householdListCacheKey(userId) : "";
+  const carKey = userId ? carDraftsCacheKey(userId) : "";
+  const [dataOwnerId, setDataOwnerId] = useState(userId);
+  const [households, setHouseholds] = useState<ValidatedHousehold[]>(() => {
+    if (!householdKey) return [];
+    const cached = serverDataCache.get<Awaited<ReturnType<typeof listHouseholds>>>(householdKey);
+    return cached ? deriveValidatedHouseholds(cached.data.households) : [];
+  });
+  const [loading, setLoading] = useState(
+    () => !householdKey || !serverDataCache.get(householdKey),
+  );
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [cars, setCars] = useState<CarDraft[]>([]);
+  const [cars, setCars] = useState<CarDraft[]>(
+    () => (carKey ? serverDataCache.get<CarDraft[]>(carKey)?.data : undefined) ?? [],
+  );
   const [carsNote, setCarsNote] = useState<string | null>(null);
+  const [householdRefreshNotice, setHouseholdRefreshNotice] = useState<string | null>(null);
+  const [carsRefreshNotice, setCarsRefreshNotice] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloaded, setDownloaded] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
 
+  const ownerMatches = dataOwnerId === userId;
+
+  useLayoutEffect(() => {
+    if (ownerMatches) return;
+    setDataOwnerId(userId);
+    const householdCache = householdKey
+      ? serverDataCache.get<Awaited<ReturnType<typeof listHouseholds>>>(householdKey)
+      : undefined;
+    setHouseholds(householdCache ? deriveValidatedHouseholds(householdCache.data.households) : []);
+    setLoading(!householdCache);
+    setLoadError(null);
+    setCars(carKey ? serverDataCache.get<CarDraft[]>(carKey)?.data ?? [] : []);
+    setCarsNote(null);
+    setHouseholdRefreshNotice(null);
+    setCarsRefreshNotice(null);
+    setSelectedId(null);
+  }, [carKey, householdKey, ownerMatches, userId]);
+
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    if (!ownerMatches) return;
+    const key = householdKey || null;
+    const cached = key
+      ? serverDataCache.get<Awaited<ReturnType<typeof listHouseholds>>>(key)
+      : undefined;
+    if (cached) {
+      const validated = deriveValidatedHouseholds(cached.data.households);
+      setHouseholds(validated);
+      setSelectedId((current) =>
+        current && validated.some((household) => household.id === current)
+          ? current
+          : validated[0]?.id ?? null,
+      );
+    }
+    setLoading(!cached);
     setLoadError(null);
-    listHouseholds()
+    const current = key
+      ? serverDataCache.get<Awaited<ReturnType<typeof listHouseholds>>>(key)
+      : undefined;
+    const shouldFetch =
+      reloadToken > 0 ||
+      !current ||
+      !serverDataCache.isFresh(current, REPORT_DATA_STALE_TIME);
+
+    if (shouldFetch) void (key ? serverDataCache.fetch(key, listHouseholds) : listHouseholds())
       .then((response) => {
         if (cancelled) return;
         const validated = deriveValidatedHouseholds(response.households);
@@ -56,48 +119,71 @@ export function TemplatesPage() {
             : (validated[0]?.id ?? null),
         );
         setLoading(false);
+        setHouseholdRefreshNotice(null);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
-        setLoadError(householdListError(error));
+        if (!current) setLoadError(householdListError(error));
+        else setHouseholdRefreshNotice("Household records could not be refreshed. Showing the last loaded records.");
         setLoading(false);
       });
+    else setLoading(false);
+
     return () => {
       cancelled = true;
     };
-  }, [reloadToken]);
+  }, [householdKey, ownerMatches, reloadToken]);
 
   /** Saved CARs make the preview reflect the case worker's slot edits; the
    *  register alone still produces a full synthesized preview. */
   useEffect(() => {
     let cancelled = false;
-    listCars()
+    if (!ownerMatches) return;
+    const key = carKey || null;
+    const cached = key ? serverDataCache.get<CarDraft[]>(key) : undefined;
+    if (cached) setCars(cached.data);
+    const shouldFetch =
+      reloadToken > 0 ||
+      !cached ||
+      !serverDataCache.isFresh(cached, REPORT_DATA_STALE_TIME);
+
+    if (shouldFetch) void (key ? serverDataCache.fetch(key, listCars) : listCars())
       .then((saved) => {
-        if (!cancelled) setCars(saved);
+        if (!cancelled) {
+          setCars(saved);
+          setCarsNote(null);
+          setCarsRefreshNotice(null);
+        }
       })
       .catch(() => {
         if (!cancelled) {
-          setCars([]);
-          setCarsNote(
-            "Saved CAR drafts could not be loaded. This preview uses the imported household information.",
-          );
+          if (!cached) {
+            setCars([]);
+            setCarsNote(
+              "Saved CAR drafts could not be loaded. This preview uses the imported household information.",
+            );
+          } else {
+            setCarsRefreshNotice("Saved CAR drafts could not be refreshed. Showing the last loaded records.");
+          }
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [reloadToken]);
+  }, [carKey, ownerMatches, reloadToken]);
 
+  const ownedHouseholds = ownerMatches ? households : [];
+  const ownedCars = ownerMatches ? cars : [];
   const household = useMemo(
-    () => households.find((item) => item.id === selectedId) ?? households[0] ?? null,
-    [households, selectedId],
+    () => ownedHouseholds.find((item) => item.id === selectedId) ?? ownedHouseholds[0] ?? null,
+    [ownedHouseholds, selectedId],
   );
 
   const draft = useMemo(() => {
     if (!household) return null;
-    const saved = cars.find((car) => car.householdId === household.id);
+    const saved = ownedCars.find((car) => car.householdId === household.id);
     return saved ?? synthesizeDraft(household);
-  }, [household, cars]);
+  }, [household, ownedCars]);
 
   const checklist = useMemo(
     () => (draft && household ? getCarChecklist(draft, household) : []),
@@ -134,6 +220,14 @@ export function TemplatesPage() {
             download a Word document using the official template.
           </p>
         </header>
+        <PageDataSkeleton page="reports" />
+      </div>
+    );
+  }
+
+  if (!ownerMatches) {
+    return (
+      <div className="mx-auto max-w-[1180px] px-4 py-8 sm:px-6">
         <PageDataSkeleton page="reports" />
       </div>
     );
@@ -218,6 +312,8 @@ export function TemplatesPage() {
       </div>
 
       <div className="mt-3 space-y-1 text-sm text-[#3f3b34] print:hidden" role="status">
+        {householdRefreshNotice ? <p>{householdRefreshNotice}</p> : null}
+        {carsRefreshNotice ? <p>{carsRefreshNotice}</p> : null}
         {downloaded ? (
           <p>
             Annex C downloaded for {draft.granteeName} ({draft.hhId}).
@@ -230,7 +326,7 @@ export function TemplatesPage() {
         ) : null}
         <p>
           Report based on:{" "}
-          {cars.find((car) => car.householdId === household.id)
+          {ownedCars.find((car) => car.householdId === household.id)
             ? `saved CAR ${draft.reference}`
             : "preview created from imported household information"}
           {" · "}template {draft.templateVersion}{" · "}

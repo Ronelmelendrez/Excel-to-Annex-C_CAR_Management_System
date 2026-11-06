@@ -1,9 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { normalizeGrantee } from "@import-domain";
 import { householdListError, listHouseholds } from "../../households/api";
 import { getGranteeStatus } from "../../households/lib/households";
 import type { HouseholdRecord } from "../../households/types";
 import { isSupabaseConfigured } from "../../../shared/supabase";
+import {
+  carDraftsCacheKey,
+  carTemplatesCacheKey,
+  householdListCacheKey,
+  serverDataCache,
+} from "../../../shared/server-data-cache";
 import {
   carErrorMessage,
   createCar,
@@ -26,6 +32,8 @@ import type {
 
 /** How long a burst of edits waits before it is written to Supabase. */
 const AUTOSAVE_DELAY_MS = 700;
+const CAR_DATA_STALE_TIME = 30_000;
+const HOUSEHOLD_DATA_STALE_TIME = 30_000;
 
 const LOAD_ERROR_FALLBACK =
   "CAR drafts could not be loaded. Check your internet connection and try again.";
@@ -67,18 +75,38 @@ function householdFromDraft(draft: CarDraft): ValidatedHousehold {
   };
 }
 
-export function useCarAuthoring(enabled = true) {
-  const [drafts, setDrafts] = useState<CarDraft[]>([]);
-  const [loading, setLoading] = useState(isSupabaseConfigured && enabled);
+export function useCarAuthoring(enabled = true, userId = "") {
+  const [drafts, setDrafts] = useState<CarDraft[]>(
+    () => (userId ? serverDataCache.get<CarDraft[]>(carDraftsCacheKey(userId))?.data : undefined) ?? [],
+  );
+  const [dataOwnerId, setDataOwnerId] = useState(userId);
+  const [loading, setLoading] = useState(
+    () => isSupabaseConfigured && enabled && !(userId && serverDataCache.get<CarDraft[]>(carDraftsCacheKey(userId))),
+  );
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
 
-  const [households, setHouseholds] = useState<ValidatedHousehold[]>([]);
-  const [householdsLoading, setHouseholdsLoading] = useState(isSupabaseConfigured && enabled);
+  const [households, setHouseholds] = useState<ValidatedHousehold[]>(() => {
+    if (!userId) return [];
+    const cached = serverDataCache.get<Awaited<ReturnType<typeof listHouseholds>>>(
+      householdListCacheKey(userId),
+    );
+    return cached ? deriveValidatedHouseholds(cached.data.households) : [];
+  });
+  const [householdsLoading, setHouseholdsLoading] = useState(() => {
+    if (!isSupabaseConfigured || !enabled || !userId) return false;
+    return !serverDataCache.get(householdListCacheKey(userId));
+  });
   const [householdsError, setHouseholdsError] = useState<string | null>(null);
-  const [templateVersions, setTemplateVersions] = useState<CarTemplateOption[]>([]);
+  const [householdsRefreshError, setHouseholdsRefreshError] = useState<string | null>(null);
+  const [templateVersions, setTemplateVersions] = useState<CarTemplateOption[]>(
+    () => (userId ? serverDataCache.get<CarTemplateOption[]>(carTemplatesCacheKey(userId))?.data : undefined) ?? [],
+  );
 
-  const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
+  const [selectedDraftId, setSelectedDraftId] = useState<string | null>(
+    () => (userId ? serverDataCache.get<CarDraft[]>(carDraftsCacheKey(userId))?.data[0]?.id : null) ?? null,
+  );
   const [saveState, setSaveState] = useState<CarSaveState>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
   /** Failures from the create-draft form (shown in the left panel). */
@@ -95,7 +123,48 @@ export function useCarAuthoring(enabled = true) {
   const pendingRef = useRef<CarDraft | null>(null);
   const saveSeqRef = useRef(0);
 
-  const selectedDraft = drafts.find((draft) => draft.id === selectedDraftId) ?? null;
+  const cacheOwner = dataOwnerId === userId ? userId : "";
+  const ownerMatches = dataOwnerId === userId;
+  const ownedDrafts = ownerMatches ? drafts : [];
+  const ownedHouseholds = ownerMatches ? households : [];
+  const selectedDraft = ownedDrafts.find((draft) => draft.id === selectedDraftId) ?? null;
+
+  useLayoutEffect(() => {
+    if (dataOwnerId === userId) return;
+    setDataOwnerId(userId);
+    setDrafts(userId ? serverDataCache.get<CarDraft[]>(carDraftsCacheKey(userId))?.data ?? [] : []);
+    setSelectedDraftId(
+      userId ? serverDataCache.get<CarDraft[]>(carDraftsCacheKey(userId))?.data[0]?.id ?? null : null,
+    );
+    setLoading(
+      Boolean(
+        isSupabaseConfigured &&
+          enabled &&
+          (!userId || !serverDataCache.get<CarDraft[]>(carDraftsCacheKey(userId))),
+      ),
+    );
+    setLoadError(null);
+    setRefreshError(null);
+    const householdCache = userId
+      ? serverDataCache.get<Awaited<ReturnType<typeof listHouseholds>>>(householdListCacheKey(userId))
+      : undefined;
+    setHouseholds(householdCache ? deriveValidatedHouseholds(householdCache.data.households) : []);
+    setHouseholdsLoading(Boolean(isSupabaseConfigured && enabled && userId && !householdCache));
+    setHouseholdsError(null);
+    setHouseholdsRefreshError(null);
+    setTemplateVersions(userId ? serverDataCache.get<CarTemplateOption[]>(carTemplatesCacheKey(userId))?.data ?? [] : []);
+  }, [dataOwnerId, enabled, userId]);
+
+  const updateDrafts = useCallback(
+    (update: (current: CarDraft[]) => CarDraft[]) => {
+      setDrafts((current) => {
+        const next = update(current);
+        if (cacheOwner) serverDataCache.set(carDraftsCacheKey(cacheOwner), next);
+        return next;
+      });
+    },
+    [cacheOwner],
+  );
 
   const household = useMemo(() => {
     if (!selectedDraft) return null;
@@ -133,7 +202,7 @@ export function useCarAuthoring(enabled = true) {
         setSaveState("saving");
         return;
       }
-      setDrafts((current) => current.map((item) => (item.id === saved.id ? saved : item)));
+      updateDrafts((current) => current.map((item) => (item.id === saved.id ? saved : item)));
       setSaveState("saved");
       setSaveError(null);
     } catch (error) {
@@ -142,7 +211,7 @@ export function useCarAuthoring(enabled = true) {
       setSaveState("error");
       setSaveError(carErrorMessage(error, SAVE_ERROR_FALLBACK));
     }
-  }, []);
+  }, [updateDrafts]);
 
   const scheduleSave = useCallback(
     (draft: CarDraft) => {
@@ -170,69 +239,134 @@ export function useCarAuthoring(enabled = true) {
         void updateCar({
           ...pending,
           history: appendHistoryEntry(pending.history, "Changes saved"),
-        }).catch(() => undefined);
+        })
+          .then(async (saved) => {
+            if (!userId) return;
+            const key = carDraftsCacheKey(userId);
+            const cachedSnapshot = serverDataCache.get<CarDraft[]>(key);
+            if (!cachedSnapshot) {
+              await serverDataCache.fetch(key, listCars);
+              return;
+            }
+            const cached = cachedSnapshot.data;
+            serverDataCache.set(
+              key,
+              cached.some((draft) => draft.id === saved.id)
+                ? cached.map((draft) => (draft.id === saved.id ? saved : draft))
+                : [saved, ...cached],
+            );
+          })
+          .catch((error: unknown) => {
+            console.error("Unable to save pending CAR changes before leaving the page.", error);
+          });
       }
     };
-  }, []);
+  }, [userId]);
 
   // Users without Supabase configuration or an authoring role never reach the network.
   useEffect(() => {
     if (!isSupabaseConfigured || !enabled) return;
     let cancelled = false;
-    setLoading(true);
+    const key = userId ? carDraftsCacheKey(userId) : null;
+    const cached = key ? serverDataCache.get<CarDraft[]>(key) : undefined;
+    if (cached) {
+      setDrafts(cached.data);
+      setSelectedDraftId((current) =>
+        current && cached.data.some((car) => car.id === current)
+          ? current
+          : cached.data[0]?.id ?? null,
+      );
+    }
+    setLoading(!cached);
     setLoadError(null);
-    listCars()
+    setRefreshError(null);
+    const current = key ? serverDataCache.get<CarDraft[]>(key) : undefined;
+    const shouldFetch = reloadToken > 0 || !current || !serverDataCache.isFresh(current, CAR_DATA_STALE_TIME);
+
+    if (shouldFetch) void (key ? serverDataCache.fetch(key, listCars) : listCars())
       .then((cars) => {
         if (cancelled) return;
-        setDrafts(cars);
+        if (key) serverDataCache.set(key, cars);
+        updateDrafts(() => cars);
         setSelectedDraftId((current) =>
           current && cars.some((car) => car.id === current) ? current : cars[0]?.id ?? null,
         );
         setLoading(false);
+        setLoadError(null);
+        setRefreshError(null);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
-        setLoadError(carErrorMessage(error, LOAD_ERROR_FALLBACK));
+        if (current) setRefreshError(carErrorMessage(error, LOAD_ERROR_FALLBACK));
+        else setLoadError(carErrorMessage(error, LOAD_ERROR_FALLBACK));
         setLoading(false);
       });
+    else setLoading(false);
+
     return () => {
       cancelled = true;
     };
-  }, [enabled, reloadToken]);
+  }, [enabled, reloadToken, userId]);
 
   // Source households (create-draft dropdown) and template versions.
   useEffect(() => {
     if (!isSupabaseConfigured || !enabled) return;
     let cancelled = false;
-    setHouseholdsLoading(true);
+    const key = userId ? householdListCacheKey(userId) : null;
+    const cached = key
+      ? serverDataCache.get<Awaited<ReturnType<typeof listHouseholds>>>(key)
+      : undefined;
+    if (cached) setHouseholds(deriveValidatedHouseholds(cached.data.households));
+    setHouseholdsLoading(!cached);
+    setHouseholdsError(null);
+    setHouseholdsRefreshError(null);
+    const current = key
+      ? serverDataCache.get<Awaited<ReturnType<typeof listHouseholds>>>(key)
+      : undefined;
+    const shouldFetch =
+      reloadToken > 0 ||
+      !current ||
+      !serverDataCache.isFresh(current, HOUSEHOLD_DATA_STALE_TIME);
 
-    listHouseholds()
+    if (shouldFetch) void (key ? serverDataCache.fetch(key, listHouseholds) : listHouseholds())
       .then((result) => {
         if (cancelled) return;
         setHouseholds(deriveValidatedHouseholds(result.households));
         setHouseholdsError(null);
+        setHouseholdsRefreshError(null);
         setHouseholdsLoading(false);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
-        setHouseholds([]);
-        setHouseholdsError(householdListError(error));
+        if (!current) {
+          setHouseholds([]);
+          setHouseholdsError(householdListError(error));
+        } else {
+          setHouseholdsRefreshError(householdListError(error));
+        }
         setHouseholdsLoading(false);
       });
 
     // Template versions are a convenience: the editor stays usable without them.
-    listCarTemplates()
-      .then((options) => {
-        if (!cancelled) setTemplateVersions(options);
-      })
-      .catch(() => {
-        if (!cancelled) setTemplateVersions([]);
-      });
+    const templateKey = userId ? carTemplatesCacheKey(userId) : null;
+    const cachedTemplates = templateKey ? serverDataCache.get<CarTemplateOption[]>(templateKey) : undefined;
+    if (cachedTemplates) setTemplateVersions(cachedTemplates.data);
+    const shouldFetchTemplates =
+      !cachedTemplates || !serverDataCache.isFresh(cachedTemplates, CAR_DATA_STALE_TIME);
+    if (shouldFetchTemplates) {
+      void (templateKey ? serverDataCache.fetch(templateKey, listCarTemplates) : listCarTemplates())
+        .then((options) => {
+          if (!cancelled) setTemplateVersions(options);
+        })
+        .catch(() => {
+          if (!cancelled && !cachedTemplates) setTemplateVersions([]);
+        });
+    }
 
     return () => {
       cancelled = true;
     };
-  }, [enabled, reloadToken]);
+  }, [enabled, reloadToken, userId]);
 
   function reload() {
     setActionError(null);
@@ -336,7 +470,7 @@ export function useCarAuthoring(enabled = true) {
     try {
       const draft = await createCar(householdId);
       if (!mountedRef.current) return;
-      setDrafts((current) => [draft, ...current]);
+      updateDrafts((current) => [draft, ...current]);
       setSelectedDraftId(draft.id);
       setModeState("edit");
       setSaveState("saved");
@@ -360,7 +494,7 @@ export function useCarAuthoring(enabled = true) {
       await deleteCar(target.id);
       if (!mountedRef.current) return;
       const remaining = drafts.filter((draft) => draft.id !== target.id);
-      setDrafts(remaining);
+      updateDrafts(() => remaining);
       setSelectedDraftId(remaining[0]?.id ?? null);
       setModeState("edit");
       setSaveState("idle");
@@ -384,7 +518,7 @@ export function useCarAuthoring(enabled = true) {
       await flushSave();
       const revision = await createCarRevision(target.id);
       if (!mountedRef.current) return;
-      setDrafts((current) => [revision, ...current]);
+      updateDrafts((current) => [revision, ...current]);
       setSelectedDraftId(revision.id);
       setModeState("edit");
       setSaveState("saved");
@@ -400,14 +534,16 @@ export function useCarAuthoring(enabled = true) {
   }
 
   return {
-    drafts,
+    drafts: ownedDrafts,
     loading,
     loadError,
+    refreshError,
     notConfigured: !isSupabaseConfigured,
     reload,
-    households,
+    households: ownedHouseholds,
     householdsLoading,
     householdsError,
+    householdsRefreshError,
     templateVersions,
     selectedDraft,
     household,

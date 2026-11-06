@@ -10,6 +10,7 @@ import { DOCX_MIME_TYPE } from "../lib/annex-c-docx";
 import { listHouseholds } from "../../households/api";
 import { listCars } from "../../cars/api";
 import type { HouseholdRecord } from "../../households/types";
+import { serverDataCache } from "../../../shared/server-data-cache";
 
 /* ------------------------------------------------------------------ *
  * Annex C report generator: pick a validated household → live preview *
@@ -100,6 +101,7 @@ const households: HouseholdRecord[] = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  serverDataCache.clear();
   env.configured = true;
   vi.mocked(useAuth).mockReturnValue(authFor(["case_worker"]));
   vi.mocked(listHouseholds).mockResolvedValue({ households, total: households.length });
@@ -114,6 +116,20 @@ afterEach(() => {
 /* ----------------------------------------------------------------- */
 
 describe("Annex C report generator page", () => {
+  it("reuses cached households and saved CARs when returning to the report generator", async () => {
+    const firstView = render(<TemplatesPage />);
+    await screen.findByRole("combobox", { name: "Household" });
+    expect(listHouseholds).toHaveBeenCalledTimes(1);
+    expect(listCars).toHaveBeenCalledTimes(1);
+    firstView.unmount();
+
+    render(<TemplatesPage />);
+
+    expect(screen.getByRole("combobox", { name: "Household" })).toBeTruthy();
+    expect(listHouseholds).toHaveBeenCalledTimes(1);
+    expect(listCars).toHaveBeenCalledTimes(1);
+  });
+
   it("offers only validated households and previews the fixed template wording with the grantee", async () => {
     render(<TemplatesPage />);
 

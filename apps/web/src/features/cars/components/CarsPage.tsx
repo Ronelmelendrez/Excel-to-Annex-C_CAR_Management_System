@@ -29,9 +29,9 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
 }
 
 export function CarsPage() {
-  const { roles } = useAuth();
+  const { roles, user } = useAuth();
   const canAuthor = roles.includes("admin") || roles.includes("case_worker");
-  const authoring = useCarAuthoring(canAuthor);
+  const authoring = useCarAuthoring(canAuthor, user?.id ?? "");
 
   if (!canAuthor) {
     return (
@@ -89,6 +89,7 @@ export function CarsPage() {
           households={authoring.households}
           householdsLoading={authoring.householdsLoading}
           householdsError={authoring.householdsError}
+          householdsRefreshError={authoring.householdsRefreshError}
           actionError={authoring.createError}
           creating={authoring.creating}
           selectedDraftId={authoring.selectedDraft?.id ?? null}
@@ -150,6 +151,12 @@ export function CarsPage() {
           )}
         </div>
       </header>
+
+      {authoring.refreshError && (
+        <p role="status" className="mt-4 border-l-4 border-[#8a5a00] bg-[#f3ead8] px-4 py-3 text-sm leading-6 text-[#704700]">
+          {authoring.refreshError} Showing the last loaded CAR records.
+        </p>
+      )}
 
       {body}
     </div>

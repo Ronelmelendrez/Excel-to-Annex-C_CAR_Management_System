@@ -1,6 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { normalizeGrantee } from "@import-domain";
-import { serverDataCache } from "../../../shared/server-data-cache";
+import {
+  householdListCacheKey,
+  householdStatsCacheKey,
+  serverDataCache,
+} from "../../../shared/server-data-cache";
 import {
   getHouseholdRegisterStats,
   householdListError,
@@ -21,16 +25,8 @@ const HOUSEHOLD_STALE_TIME = 30_000;
 const STATS_STALE_TIME = 15_000;
 const HOUSEHOLD_REFRESH_INTERVAL = 30_000;
 
-function householdListKey(userId: string) {
-  return `households:${userId}:list`;
-}
-
 function householdSearchKey(userId: string, hhId: string) {
   return `households:${userId}:search:${hhId}`;
-}
-
-function householdStatsKey(userId: string) {
-  return `households:${userId}:stats`;
 }
 
 export function useHouseholdRegister(actor: string, enabled = true, userId = "") {
@@ -47,18 +43,18 @@ export function useHouseholdRegister(actor: string, enabled = true, userId = "")
   const [feedback, setFeedback] = useState("");
 
   const [households, setHouseholds] = useState<HouseholdRecord[]>(
-    () => (userId ? serverDataCache.get<HouseholdListResponse>(householdListKey(userId))?.data.households : undefined) ?? [],
+    () => (userId ? serverDataCache.get<HouseholdListResponse>(householdListCacheKey(userId))?.data.households : undefined) ?? [],
   );
   const [searchedHouseholds, setSearchedHouseholds] = useState<HouseholdRecord[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [loading, setLoading] = useState(
-    () => !userId || !serverDataCache.get<HouseholdListResponse>(householdListKey(userId)),
+    () => !userId || !serverDataCache.get<HouseholdListResponse>(householdListCacheKey(userId)),
   );
   const [dataOwnerId, setDataOwnerId] = useState(userId);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [registerStats, setRegisterStats] = useState<HouseholdRegisterStats | null>(
-    () => (userId ? serverDataCache.get<HouseholdRegisterStats>(householdStatsKey(userId))?.data : undefined) ?? null,
+    () => (userId ? serverDataCache.get<HouseholdRegisterStats>(householdStatsCacheKey(userId))?.data : undefined) ?? null,
   );
   const [statsError, setStatsError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
@@ -81,17 +77,17 @@ export function useHouseholdRegister(actor: string, enabled = true, userId = "")
     setFeedback("");
     setHouseholds(
       userId
-        ? serverDataCache.get<HouseholdListResponse>(householdListKey(userId))?.data.households ?? []
+        ? serverDataCache.get<HouseholdListResponse>(householdListCacheKey(userId))?.data.households ?? []
         : [],
     );
     setSearchedHouseholds([]);
     setRegisterStats(
       userId
-        ? serverDataCache.get<HouseholdRegisterStats>(householdStatsKey(userId))?.data ?? null
+        ? serverDataCache.get<HouseholdRegisterStats>(householdStatsCacheKey(userId))?.data ?? null
         : null,
     );
     setSelectedId("");
-    setLoading(!userId || !serverDataCache.get<HouseholdListResponse>(householdListKey(userId)));
+    setLoading(!userId || !serverDataCache.get<HouseholdListResponse>(householdListCacheKey(userId)));
     setLoadError(null);
     setRefreshError(null);
     setSearchError(null);
@@ -116,7 +112,7 @@ export function useHouseholdRegister(actor: string, enabled = true, userId = "")
 
     let cancelled = false;
     let refreshing = false;
-    const key = householdListKey(userId);
+    const key = householdListCacheKey(userId);
     const cached = serverDataCache.get<HouseholdListResponse>(key);
     setHouseholds(cached?.data.households ?? []);
     setLoading(!cached);
@@ -171,7 +167,7 @@ export function useHouseholdRegister(actor: string, enabled = true, userId = "")
     if (!enabled || !userId) return;
     let cancelled = false;
     let refreshing = false;
-    const key = householdStatsKey(userId);
+    const key = householdStatsCacheKey(userId);
     const cached = serverDataCache.get<HouseholdRegisterStats>(key);
     setRegisterStats(cached?.data ?? null);
 
@@ -461,7 +457,7 @@ export function useHouseholdRegister(actor: string, enabled = true, userId = "")
   }
 
   function reload() {
-    serverDataCache.clear();
+    serverDataCache.deletePrefix(`households:${userId}:`);
     setReloadToken((token) => token + 1);
   }
 
