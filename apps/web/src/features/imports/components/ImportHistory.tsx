@@ -6,7 +6,11 @@ import { downloadText, safeFilename } from "../lib/download";
 import { Notice, quietButton, secondaryButton } from "./primitives";
 
 function StatusTag({ record }: { record: ImportRecord }) {
-  const label = record.is_duplicate ? "Re-import" : record.status;
+  const label = record.is_duplicate
+    ? "Re-import"
+    : record.status === "committed"
+      ? "Saved"
+      : record.status;
   const tone = record.is_duplicate
     ? "border-[#8a5a00] text-[#8a5a00]"
     : record.status === "committed"
@@ -68,8 +72,9 @@ export function ImportHistory({
         `${safeFilename(record.file_name ?? "import")}-errors-v${record.version}.csv`,
         csv,
       );
-    } catch (e: any) {
-      setDownloadError(e?.message ?? "The error report could not be downloaded.");
+    } catch (error: unknown) {
+      console.error("Unable to download the import issue report.", error);
+      setDownloadError("The issue report could not be downloaded. Check your internet connection and try again.");
     } finally {
       setDownloadingId(null);
     }
@@ -80,7 +85,7 @@ export function ImportHistory({
       <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-[#161512] pb-3">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#5b574e]">
-            Register / committed imports
+            Register / saved imports
           </p>
           <h2 id="history-heading" className="mt-1 font-serif text-2xl leading-tight tracking-tight">
             Import history
@@ -88,7 +93,7 @@ export function ImportHistory({
         </div>
         <div className="flex items-center gap-4">
           <p className="text-xs text-[#5b574e]">
-            {loading ? "Loading…" : `${total.toLocaleString()} version${total === 1 ? "" : "s"}`}
+            {loading ? "Loading…" : `${total.toLocaleString()} import${total === 1 ? "" : "s"}`}
           </p>
           <button
             type="button"
@@ -130,10 +135,9 @@ export function ImportHistory({
           <HistorySkeleton />
         ) : items.length === 0 ? (
           <div className="border border-[#c9c3b6] bg-[#f8f5ee] px-5 py-10">
-            <p className="font-serif text-xl">No workbook has been committed yet.</p>
+            <p className="font-serif text-xl">No workbook has been saved yet.</p>
             <p className="mt-2 max-w-[60ch] text-sm leading-6 text-[#3f3b34]">
-              The register is empty. Use the importer above to validate a workbook. An import appears
-              here only after you commit it; previews and failed validations leave no record.
+              Use the importer above to check and save a workbook. Only completed imports appear here.
             </p>
           </div>
         ) : (
@@ -148,8 +152,8 @@ export function ImportHistory({
                     "Rows",
                     "Review",
                     "Households",
-                    "Committed",
-                    "By",
+                    "Saved",
+                    "Saved by",
                     "Report",
                   ].map((label) => (
                     <th
@@ -174,9 +178,6 @@ export function ImportHistory({
                     <td className="max-w-[240px] border-b border-[#e2ddd1] px-3 py-3 align-top">
                       <p className="truncate font-mono text-xs" title={record.file_name ?? undefined}>
                         {record.file_name ?? "—"}
-                      </p>
-                      <p className="mt-1 font-mono text-[10px] text-[#5b574e]" title={record.file_hash}>
-                        {record.file_hash.slice(0, 12)}…
                       </p>
                     </td>
                     <td className="border-b border-[#e2ddd1] px-3 py-3 align-top text-xs">

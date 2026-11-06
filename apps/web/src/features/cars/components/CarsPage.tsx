@@ -47,30 +47,24 @@ export function CarsPage() {
   }
 
   const badge = authoring.notConfigured
-    ? { text: "Supabase not configured", tone: "warn" as const }
+    ? { text: "Temporarily unavailable", tone: "warn" as const }
     : authoring.loading
       ? { text: "Loading CARs…", tone: "muted" as const }
       : authoring.loadError
         ? { text: "CARs unavailable", tone: "warn" as const }
-        : { text: "Saved in Supabase", tone: "ok" as const };
+        : { text: "CAR records ready", tone: "ok" as const };
 
   let body: React.ReactNode;
   if (authoring.notConfigured) {
     body = (
-      <Panel title="CAR data comes from Supabase">
+      <Panel title="CAR records are temporarily unavailable">
         <p>{CAR_NOT_CONFIGURED_MESSAGE}</p>
-        <p className="mt-2">
-          Until then this page stays empty — it never falls back to sample records. Set the two
-          environment variables in <code className="font-mono text-xs">apps/web/.env.local</code>,
-          apply <code className="font-mono text-xs">supabase/migrations</code>, and deploy the{" "}
-          <code className="font-mono text-xs">cars</code> function.
-        </p>
       </Panel>
     );
   } else if (authoring.loading) {
     body = (
       <Panel title="Loading CARs">
-        <p role="status">Reading case assessment records from Supabase…</p>
+        <p role="status">Loading CAR drafts…</p>
       </Panel>
     );
   } else if (authoring.loadError) {

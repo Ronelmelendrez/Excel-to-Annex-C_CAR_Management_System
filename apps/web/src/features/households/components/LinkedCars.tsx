@@ -13,7 +13,7 @@ export function LinkedCars({ household }: { household: HouseholdRecord }) {
             <span className="ml-2 text-xs text-[#5b574e]">{household.car.status}</span>
           </summary>
           <p className="border-t border-[#e2ddd1] px-3 py-2 text-xs leading-5 text-[#5b574e]">
-            Linked from the case assessment stored for this household in Supabase.
+            Linked from the case assessment for this household.
           </p>
         </details>
       ) : (

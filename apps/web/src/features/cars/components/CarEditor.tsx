@@ -23,9 +23,9 @@ function SaveStatus({ state, message }: { state: CarSaveState; message: string |
   }
   const label =
     state === "saving"
-      ? "Saving to Supabase…"
+      ? "Saving changes…"
       : state === "saved"
-        ? "Saved to Supabase"
+        ? "Changes saved"
         : "No changes yet";
   return (
     <span role="status" aria-live="polite" className="text-xs text-[#5b574e]">
@@ -130,10 +130,9 @@ export function CarEditor({
       const bytes = await renderAnnexCDocx(currentDraft, currentHousehold);
       downloadDocx(bytes, annexCDocxFileName(currentDraft));
     } catch (error) {
+      console.error("Unable to prepare the Annex C Word document.", error);
       setDownloadError(
-        error instanceof Error && error.message
-          ? error.message
-          : "The Annex C document could not be generated. Try again.",
+        "The Annex C Word document could not be prepared. Try again. If the problem continues, contact your system administrator.",
       );
     } finally {
       setDownloading(false);
@@ -193,7 +192,7 @@ export function CarEditor({
             disabled={downloading}
             className="min-h-[40px] border border-[#161512] px-4 text-sm font-medium hover:bg-[#ece7dc] disabled:cursor-not-allowed disabled:border-[#b5afa2] disabled:text-[#777166] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
           >
-            {downloading ? "Preparing DOCX…" : "Download DOCX"}
+            {downloading ? "Preparing Word document…" : "Download Word document"}
           </button>
 
           {mode === "print" ? (

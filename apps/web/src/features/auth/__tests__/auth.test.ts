@@ -170,7 +170,8 @@ describe('F1 Authentication API', () => {
     });
     expect(outcome.ok).toBe(false);
     expect(outcome.disabled).toBe(false);
-    expect(outcome.error).toContain('Invalid login credentials');
+    expect(outcome.error).toContain('Email or password is incorrect');
+    expect(outcome.error).not.toContain('Invalid login credentials');
     expect(mockSignOut).not.toHaveBeenCalled();
   });
 
@@ -229,7 +230,8 @@ describe('F1 usePasswordReset hook', () => {
       outcome = await result.current.sendReset('worker@example.com');
     });
     expect(outcome.ok).toBe(false);
-    expect(outcome.error).toContain('Too many requests');
+    expect(outcome.error).toContain('We could not send a reset link');
+    expect(outcome.error).not.toContain('Too many requests');
     expect(result.current.sent).toBe(false);
   });
 });

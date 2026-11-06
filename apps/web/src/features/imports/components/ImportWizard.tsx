@@ -16,9 +16,9 @@ const REQUIRED = new Set<CanonicalField>(DEFAULT_REQUIRED_COLUMNS);
 
 const STEPS = [
   { key: "choose", label: "Choose" },
-  { key: "shape", label: "Shape" },
-  { key: "preview", label: "Save" },
-  { key: "committed", label: "Commit" },
+  { key: "shape", label: "Prepare" },
+  { key: "preview", label: "Review" },
+  { key: "committed", label: "Save" },
 ] as const;
 
 const GRANTEE_STATUS_LABEL: Record<string, string> = {
@@ -91,15 +91,15 @@ function ChoosePanel({ wizard }: { wizard: ImportWizardState }) {
           aria-busy={wizard.busy === "reading"}
         >
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#5b574e]">
-            Step 01 / source workbook
+            Step 01 / Excel workbook
           </p>
           <h2 className="mt-3 font-serif text-3xl leading-tight tracking-tight">
-            Drop a workbook here, or pick one from disk.
+            Drop a workbook here, or choose one from your computer.
           </h2>
           <p className="mt-3 max-w-[48ch] text-sm leading-6 text-[#3f3b34]">
-            The browser reads the worksheet names first — if the workbook has several, you choose
-            which one to parse. Nothing is uploaded or saved until you press{" "}
-            <span className="font-semibold">Save to Supabase</span>.
+            The system checks the worksheet names first. If the workbook has several, choose the
+            one to use. Nothing is saved until you press{" "}
+            <span className="font-semibold">Save import</span>.
           </p>
 
           <div className="mt-6 flex flex-wrap items-center gap-4">
@@ -142,18 +142,17 @@ function ChoosePanel({ wizard }: { wizard: ImportWizardState }) {
             row that holds the headers.
           </li>
           <li>
-            <span className="font-mono text-xs text-[#7a1f1f]">02</span> Confirm the column map.
-            Required targets must be explicit; nothing is guessed.
+            <span className="font-mono text-xs text-[#7a1f1f]">02</span> Match the spreadsheet
+            columns. The system will not guess required information.
           </li>
           <li>
-            <span className="font-mono text-xs text-[#7a1f1f]">03</span> One click on Save to
-            Supabase uploads the file, re-runs every rule on the server, and writes the rows to the
-            register.
+            <span className="font-mono text-xs text-[#7a1f1f]">03</span> Select Save import. The
+            workbook is checked again before accepted rows are added to the household register.
           </li>
           <li>
-            <span className="font-mono text-xs text-[#7a1f1f]">04</span> The same file and worksheet
-            imported before always stops for a second, explicit confirmation — nothing is ever
-            written twice.
+            <span className="font-mono text-xs text-[#7a1f1f]">04</span> If this workbook and
+            worksheet were already imported, you will be asked to confirm before another copy is
+            added.
           </li>
         </ol>
         <dl className="mt-6 space-y-3 border-t border-[#c9c3b6] pt-4 text-xs leading-5">
@@ -189,12 +188,7 @@ function SheetPickPanel({ wizard }: { wizard: ImportWizardState }) {
       <div className="flex flex-wrap items-end justify-between gap-4 border-t border-[#161512] pt-3">
         <div>
           <p className="font-mono text-sm break-all">{bundle.file.name}</p>
-          <p className="mt-1 text-xs text-[#5b574e]">
-            {formatBytes(bundle.size)} · SHA-256{" "}
-            <span className="font-mono" title={bundle.fileHash}>
-              {bundle.fileHash.slice(0, 16)}…
-            </span>
-          </p>
+          <p className="mt-1 text-xs text-[#5b574e]">{formatBytes(bundle.size)}</p>
         </div>
         <button
           type="button"
@@ -402,12 +396,7 @@ function ShapePanel({ wizard }: { wizard: ImportWizardState }) {
       <div className="flex flex-wrap items-end justify-between gap-4 border-t border-[#161512] pt-3">
         <div>
           <p className="font-mono text-sm break-all">{bundle.file.name}</p>
-          <p className="mt-1 text-xs text-[#5b574e]">
-            {formatBytes(bundle.size)} · SHA-256{" "}
-            <span className="font-mono" title={bundle.fileHash}>
-              {bundle.fileHash.slice(0, 16)}…
-            </span>
-          </p>
+          <p className="mt-1 text-xs text-[#5b574e]">{formatBytes(bundle.size)}</p>
         </div>
         <button type="button" className={quietButton} disabled={wizard.busy !== null} onClick={wizard.reset}>
           Replace file
@@ -539,15 +528,15 @@ function ShapePanel({ wizard }: { wizard: ImportWizardState }) {
           disabled={wizard.busy !== null || wizard.coverage.missing.length > 0}
         >
           {wizard.busy === "validating"
-            ? "Validating on the server…"
+            ? "Checking the workbook…"
             : wizard.busy === "committing"
-              ? "Saving to Supabase…"
-              : "Save to Supabase"}
+            ? "Saving import…"
+            : "Save import"}
         </button>
         <p className="max-w-[52ch] text-xs leading-5 text-[#5b574e]">
-          One click: the workbook is uploaded, every rule re-runs on the server, and valid rows are
-          saved to Supabase. If the server blocks the write (structural errors) or finds a duplicate
-          fingerprint, you stop on the review screen instead — nothing is written twice.
+          When you save, the workbook is checked again and accepted rows are added to the register.
+          If required information is missing or this workbook was already imported, you will be
+          asked to review it before anything is saved. The same workbook will not be added twice.
         </p>
       </div>
     </div>
@@ -705,9 +694,9 @@ function PreviewPanel({ wizard }: { wizard: ImportWizardState }) {
       )}
 
       {preview.duplicate && (
-        <Notice tone="warning" title="Same fingerprint and sheet already committed">
+        <Notice tone="warning" title="This workbook and worksheet were already imported">
           <p>
-            Version {preview.duplicate.version} was committed{" "}
+            Import version {preview.duplicate.version} was saved{" "}
             {formatDateTime(preview.duplicate.committed_at)}
             {preview.duplicate.uploaded_by_name ? ` by ${preview.duplicate.uploaded_by_name}` : ""} with{" "}
             {preview.duplicate.row_count.toLocaleString()} rows. Nothing was overwritten.
@@ -721,7 +710,7 @@ function PreviewPanel({ wizard }: { wizard: ImportWizardState }) {
             />
             <span>
               Store this as a new version. I understand the register will contain two imports with the
-              same fingerprint, and the new version is the only one with this confirmation.
+              same workbook again as a separate version, and this new import will be marked as a re-import.
             </span>
           </label>
         </Notice>
@@ -779,7 +768,7 @@ function PreviewPanel({ wizard }: { wizard: ImportWizardState }) {
           Row preview
         </h3>
         <p className="mt-1 text-xs text-[#5b574e]">
-          First {Math.min(preview.rows.length, 25)} rows, normalized as the server read them.
+          First {Math.min(preview.rows.length, 25)} rows, shown as they will appear in the register.
         </p>
         <div className="mt-3">
           <RowPreviewTable wizard={wizard} />
@@ -797,7 +786,7 @@ function PreviewPanel({ wizard }: { wizard: ImportWizardState }) {
         </div>
         <p className="mt-1 text-xs text-[#5b574e]">
           {preview.issues.length} issue{preview.issues.length === 1 ? "" : "s"} shown
-          {preview.issues_truncated ? " (first 200; the committed report contains all)" : ""}. The CSV
+          {preview.issues_truncated ? " (first 200; the saved report contains all)" : ""}. The CSV
           carries row numbers and guidance, not raw personal values.
         </p>
         <div className="mt-3">
@@ -819,12 +808,11 @@ function PreviewPanel({ wizard }: { wizard: ImportWizardState }) {
             (Boolean(preview.duplicate) && !wizard.duplicateConfirmed)
           }
         >
-          {wizard.busy === "committing" ? "Saving to Supabase…" : "Save to Supabase"}
+          {wizard.busy === "committing" ? "Saving import…" : "Save import"}
         </button>
         <p className="max-w-[52ch] text-xs leading-5 text-[#5b574e]">
-          Saving freezes the raw rows, normalized values, and review flags as one immutable version
-          in Supabase. To correct data later, import a corrected workbook; the source of this
-          version stays intact.
+          Saving adds these spreadsheet rows and review results as a new import. Existing imports
+          are not changed. To correct information later, import a corrected workbook.
         </p>
       </div>
     </div>
@@ -855,14 +843,14 @@ function CommittedPanel({ wizard }: { wizard: ImportWizardState }) {
     <div className="space-y-8">
       <div className="border-t border-[#2f5b3a] pt-5">
         <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#2f5b3a]">
-          Committed · version {record.version}
+          Saved · version {record.version}
         </p>
         <h2 className="mt-2 font-serif text-4xl leading-tight tracking-tight">
           {record.file_name ?? "Workbook"} is in the register.
         </h2>
         <p className="mt-3 max-w-[66ch] text-sm leading-6 text-[#3f3b34]">
-          The source file, raw row values, normalized fields, household groups, and review flags are
-          traceable to import{" "}
+          The workbook, its spreadsheet rows, household groups, and review results are recorded as
+          import{" "}
           <span className="font-mono text-xs" title={record.id}>
             {record.id.slice(0, 8)}…
           </span>
@@ -934,23 +922,23 @@ export function ImportWizard({ wizard }: { wizard: ImportWizardState }) {
         : wizard.stage === "shape"
         ? "Choose the sheet, header, and columns"
         : wizard.stage === "preview"
-          ? "What the server found"
+          ? "What we found"
           : "Import complete";
 
   const busyText =
     wizard.busy === "reading"
       ? wizard.readStage === "hashing"
-        ? "Hashing workbook in the browser…"
+      ? "Preparing workbook…"
         : wizard.readStage === "parsing"
-          ? "Reading worksheet names in a background thread…"
+        ? "Reading worksheet names…"
           : wizard.readStage === "sheet"
-            ? "Reading the selected worksheet in a background thread…"
+          ? "Reading the selected worksheet…"
             : wizard.readStage === "ready"
               ? "Workbook ready."
-              : "Reading workbook in the browser…"
+              : "Reading workbook…"
       : wizard.busy === "validating"
-        ? "Uploading the workbook and validating on the server…"
-        : "Saving the import to Supabase…";
+        ? "Checking the workbook…"
+        : "Saving import…";
 
   return (
     <section aria-labelledby="wizard-heading" className="border border-[#161512] bg-[#f8f5ee] p-5 sm:p-7">
@@ -964,7 +952,7 @@ export function ImportWizard({ wizard }: { wizard: ImportWizardState }) {
           </h1>
         </div>
         <p className="max-w-[34ch] text-xs leading-5 text-[#5b574e]">
-          Raw rows are immutable. Corrections belong in overlays, not in a rewritten import.
+          Saved spreadsheet information cannot be edited. To correct it, import a corrected workbook.
         </p>
       </div>
 

@@ -18,7 +18,7 @@ export function UpdatePasswordForm() {
   useEffect(() => {
     if (!accessToken || !refreshToken || type !== 'recovery') {
       setError(
-        'Invalid or expired reset link. Request a new one at /forgot-password.',
+        'This password-reset link is invalid or has expired. Request a new link and try again.',
       );
     }
   }, [accessToken, type]);
@@ -44,15 +44,12 @@ export function UpdatePasswordForm() {
           password,
         );
         if (err) {
-          setError(
-            err.message ||
-              'Could not update your password. The link may have expired.',
-          );
+          setError('We could not update your password. The reset link may have expired. Request a new link and try again.');
           return;
         }
         setDone(true);
-      } catch (err: any) {
-        setError(err.message || 'Could not update your password. Try again.');
+      } catch {
+        setError('We could not update your password. Check your internet connection and try again.');
       } finally {
         setLoading(false);
       }

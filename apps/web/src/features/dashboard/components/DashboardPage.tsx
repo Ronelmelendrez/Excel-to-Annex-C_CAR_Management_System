@@ -38,18 +38,18 @@ export function DashboardPage() {
               Operations at a glance
             </h1>
             <p className="mt-3 max-w-[62ch] text-sm leading-6 text-[#3f3b34]">
-              Follow import volume, household review work, CAR progress, and document failures.
+              Track completed imports, household review needs, CAR progress, and report issues.
             </p>
           </div>
           <span className="border border-[#2f5b3a] bg-[#e6ecdf] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[#244b2e]">
-            Live Supabase data · refreshes every 15 seconds
+            Updates automatically every 15 seconds
           </span>
         </div>
       </header>
 
       {dashboard.loading && !dashboard.summary ? (
         <p role="status" className="mt-5 border-l-4 border-[#4a5a72] bg-[#e9edf3] px-4 py-4 text-sm">
-          Loading live dashboard metrics from Supabase…
+          Loading dashboard information…
         </p>
       ) : dashboard.error && !dashboard.summary ? (
         <div role="alert" className="mt-5 border-l-4 border-[#7a1f1f] bg-[#f2e4e1] px-4 py-4">
@@ -61,7 +61,9 @@ export function DashboardPage() {
       ) : dashboard.summary ? (
         <>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs">
-            <p className="font-semibold">{dashboard.summary.scopeLabel}</p>
+            <p className="font-semibold">
+              {dashboard.summary.scope === "system" ? "Across the system" : "Your assigned work"}
+            </p>
             <p className="text-[#5b574e]">Import trend · last 5 weeks</p>
           </div>
           {dashboard.error && (

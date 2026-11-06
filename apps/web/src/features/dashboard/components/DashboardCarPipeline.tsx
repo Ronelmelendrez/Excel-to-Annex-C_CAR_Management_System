@@ -17,7 +17,7 @@ export function DashboardCarPipeline({ summary }: { summary: DashboardSummary })
     <SectionCard
       id="dashboard-car-pipeline"
       title="CAR pipeline"
-      description="Latest revision per CAR in the selected scope"
+      description="Current status of each CAR in the selected area"
       eyebrow="Case assessments"
     >
       <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2">
@@ -28,7 +28,7 @@ export function DashboardCarPipeline({ summary }: { summary: DashboardSummary })
               id: `car-${status}`,
               label,
               value: summary.carPipeline[status],
-              definition: `Count of latest CAR revisions currently in ${label.toLowerCase()} status in the selected scope.`,
+              definition: `Number of CARs currently marked ${label.toLowerCase()} in the selected area.`,
             }}
           />
         ))}

@@ -42,14 +42,14 @@ export function AuditPage() {
             </p>
           </div>
           <span className="border border-[#2f5b3a] bg-[#e6ecdf] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[#244b2e]">
-            Persisted audit records
+            Recorded audit events
           </span>
         </div>
       </header>
 
       <p className="mt-4 border-l-4 border-[#8c877c] bg-[#ece7dc] px-3 py-2 text-xs leading-5 text-[#3f3b34]">
-        Events are loaded from protected server-side audit records. Before/after payload values are
-        withheld from this view. Timestamps are UTC.
+        This page shows recorded actions and when they occurred, without displaying sensitive
+        details of each change. Times are shown in UTC.
       </p>
 
       <AuditFilters
@@ -79,7 +79,7 @@ export function AuditPage() {
             onClick={audit.retry}
             className="min-h-[40px] border border-[#7a1f1f] px-3 text-xs font-semibold text-[#7a1f1f] hover:bg-[#7a1f1f] hover:text-[#f4f1ea] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
           >
-            Retry
+            Try again
           </button>
         </div>
       )}

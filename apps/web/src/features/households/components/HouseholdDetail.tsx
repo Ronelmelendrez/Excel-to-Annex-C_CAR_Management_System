@@ -57,7 +57,7 @@ export function HouseholdDetail({
         contentClassName="px-5 py-6 sm:py-10"
       >
         <p className="text-sm leading-6 text-[#5b574e]">
-          Choose a row to inspect member details and source references.
+          Choose a household to review its members and original spreadsheet details.
         </p>
       </SectionCard>
     );
@@ -80,10 +80,10 @@ export function HouseholdDetail({
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#e2ddd1] px-4 py-3 sm:px-5">
         <p className="text-sm">
           <span className="font-semibold">Grantee:</span>{" "}
-          {grantee ? `${grantee.name} · source row ${grantee.sourceRow}` : "Not validated"}
+          {grantee ? `${grantee.name} · spreadsheet row ${grantee.sourceRow}` : "Not confirmed"}
         </p>
         {status === "valid" && (
-          <span className="text-xs font-medium text-[#244b2e]">Exactly one supported Yes flag</span>
+          <span className="text-xs font-medium text-[#244b2e]">One confirmed grantee</span>
         )}
         {canCorrect && status !== "valid" && status !== "resolved" && (
           <button

@@ -55,7 +55,7 @@ export function useAuditLog(enabled = true) {
       })
       .catch((cause: unknown) => {
         if (!controller.signal.aborted) {
-          setError(cause instanceof Error ? cause.message : "Audit records could not be loaded.");
+          setError("Audit records could not be loaded. Check your internet connection and try again.");
         }
       })
       .finally(() => {

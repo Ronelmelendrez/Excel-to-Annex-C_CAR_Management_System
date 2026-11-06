@@ -118,7 +118,7 @@ describe("import recovery session controls", () => {
 
     expect(screen.getByText(session.fileName)).toBeInTheDocument();
     expect(screen.getByText("Sheet and columns selected")).toBeInTheDocument();
-    expect(screen.getByText(/250 source rows/)).toBeInTheDocument();
+    expect(screen.getByText(/250 spreadsheet rows/)).toBeInTheDocument();
     expect(screen.getByText(/Oct 30, 2026/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Resume" }));

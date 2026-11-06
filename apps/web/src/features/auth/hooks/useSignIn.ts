@@ -23,11 +23,7 @@ export function useSignIn() {
           password,
         );
         if (supabaseError) {
-          // Supabase returns "Invalid login credentials" — it never reveals
-          // whether the account exists, so no role hints leak here.
-          const message =
-            supabaseError.message ||
-            'Sign-in failed. Check your email and password.';
+          const message = 'Email or password is incorrect. Check your details and try again.';
           setError(message);
           return { ok: false, error: message, disabled: false };
         }
@@ -49,8 +45,8 @@ export function useSignIn() {
         }
 
         return { ok: true, error: null, disabled: false };
-      } catch (err: any) {
-        const message = err.message || 'Sign-in failed. Try again.';
+      } catch {
+        const message = 'We could not sign you in. Check your internet connection and try again.';
         setError(message);
         return { ok: false, error: message, disabled: false };
       } finally {

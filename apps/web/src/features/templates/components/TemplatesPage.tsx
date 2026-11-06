@@ -78,7 +78,7 @@ export function TemplatesPage() {
         if (!cancelled) {
           setCars([]);
           setCarsNote(
-            "Saved CAR drafts could not be loaded; the preview is synthesized from import data.",
+            "Saved CAR drafts could not be loaded. This preview uses the imported household information.",
           );
         }
       });
@@ -114,10 +114,9 @@ export function TemplatesPage() {
       downloadDocx(bytes, annexCDocxFileName(draft));
       setDownloaded(true);
     } catch (error) {
+      console.error("Unable to prepare the Annex C Word document.", error);
       setDownloadError(
-        error instanceof Error && error.message
-          ? error.message
-          : "The Annex C document could not be generated. Try again.",
+        "The Annex C Word document could not be prepared. Try again. If the problem continues, contact your system administrator.",
       );
     } finally {
       setDownloading(false);
@@ -177,9 +176,8 @@ export function TemplatesPage() {
       <header className="border-b border-[#c9c3b6] pb-4">
         <h1 className="font-serif text-3xl">Annex C report generator</h1>
         <p className="mt-2 max-w-[75ch] text-sm leading-6 text-[#3f3b34]">
-          Pick a validated household to preview the CASE STUDY REPORT rendered from the
-          versioned template, then download it as a Word document filled from the real
-          Annex C template — letterhead, fonts and table borders preserved.
+          Choose a household with a confirmed grantee, review its Annex C case study report, and
+          download a Word document using the official template.
         </p>
       </header>
 
@@ -207,7 +205,7 @@ export function TemplatesPage() {
           disabled={downloading}
           className="min-h-[40px] border border-[#161512] bg-[#161512] px-5 py-2 text-sm font-medium text-[#f4f1ea] hover:bg-[#7a1f1f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {downloading ? "Generating…" : "Download DOCX"}
+          {downloading ? "Preparing Word document…" : "Download Word document"}
         </button>
       </div>
 
@@ -223,10 +221,10 @@ export function TemplatesPage() {
           </p>
         ) : null}
         <p>
-          Source:{" "}
+          Report based on:{" "}
           {cars.find((car) => car.householdId === household.id)
             ? `saved CAR ${draft.reference}`
-            : "preview synthesized from import data"}
+            : "preview created from imported household information"}
           {" · "}template {draft.templateVersion}{" · "}
           {missing.length === 0
             ? "all required report fields present"

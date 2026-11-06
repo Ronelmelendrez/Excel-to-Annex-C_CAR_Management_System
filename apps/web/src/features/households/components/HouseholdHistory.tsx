@@ -10,7 +10,7 @@ export function HouseholdHistory({ overlay }: { overlay?: HouseholdOverlay }) {
         Correction history
       </HouseholdSectionHeading>
       {(overlay?.events.length ?? 0) === 0 ? (
-        <p className="mt-2 text-sm text-[#5b574e]">No local overlays recorded for this household.</p>
+        <p className="mt-2 text-sm text-[#5b574e]">No corrections recorded for this household.</p>
       ) : (
         <ol className="mt-2 space-y-3">
           {overlay?.events

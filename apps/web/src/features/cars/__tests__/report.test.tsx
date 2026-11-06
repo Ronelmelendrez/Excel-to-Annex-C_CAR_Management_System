@@ -685,7 +685,7 @@ describe("report page modes and audit behaviour", () => {
     expect(reportParagraphs.some((text) => text.startsWith("Untitled row —"))).toBe(false);
 
     // ---- download and unzip ------------------------------------------
-    fireEvent.click(screen.getByRole("button", { name: "Download DOCX" }));
+    fireEvent.click(screen.getByRole("button", { name: "Download Word document" }));
     await waitFor(() => expect(downloadDocx).toHaveBeenCalledTimes(1), { timeout: 20000 });
 
     const [bytes, filename] = vi.mocked(downloadDocx).mock.calls[0];

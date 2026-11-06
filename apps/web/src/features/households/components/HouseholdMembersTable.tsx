@@ -19,7 +19,7 @@ function MemberExclusionForm({
     <form onSubmit={onSubmit} className="mt-3 border-l-4 border-[#8a5a00] bg-[#f3ead8] px-3 py-3">
       <p className="text-sm font-semibold">Exclude {member.name} from this household view?</p>
       <p className="mt-1 text-xs leading-5 text-[#5b574e]">
-        This local overlay does not delete the source row. A reason is required.
+        This only hides the member from this view; it does not change the original spreadsheet. A reason is required.
       </p>
       <Label htmlFor="exclusion-reason" className="sr-only">
         Reason for exclusion
@@ -39,7 +39,7 @@ function MemberExclusionForm({
           disabled={!reason.trim()}
           className="min-h-[40px] border border-[#161512] bg-[#161512] px-3 py-2 text-xs font-medium text-white disabled:cursor-not-allowed disabled:border-[#b5afa2] disabled:bg-[#b5afa2]"
         >
-          Record local exclusion
+          Hide member from this view
         </button>
         <button
           type="button"
@@ -90,7 +90,7 @@ export function HouseholdMembersTable({
           Household members
         </h3>
         <p className="text-xs text-[#5b574e]">
-          Source row links are retained; no imported row is removed.
+          Original spreadsheet rows are kept; no imported information is removed.
         </p>
       </div>
       <div className="mt-3 overflow-x-auto">
@@ -126,7 +126,7 @@ export function HouseholdMembersTable({
                       )}
                       {excluded && (
                         <span className="ml-2 inline-block border border-[#777166] px-1 text-[9px] uppercase">
-                          Excluded overlay
+                          Hidden from this view
                         </span>
                       )}
                     </th>
@@ -180,7 +180,7 @@ export function HouseholdMembersTable({
                     <tr className="bg-[#f8f5ee]">
                       <td colSpan={5} className="border-b border-[#e2ddd1] px-3 py-3">
                         <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[#5b574e]">
-                          Excel row {member.sourceRow} · every column as imported
+                          Spreadsheet row {member.sourceRow} · information as imported
                         </p>
                         <dl className="mt-2 grid gap-x-5 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
                           {(household.headers ?? []).map((header, index) => {

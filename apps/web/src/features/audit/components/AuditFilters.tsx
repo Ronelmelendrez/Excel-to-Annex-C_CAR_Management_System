@@ -29,7 +29,7 @@ export function AuditFilters({
     >
       <div>
         <Label htmlFor="audit-search" className="mb-1 block text-xs font-semibold">
-          Search action or entity
+          Search action or record
         </Label>
         <input
           id="audit-search"
@@ -37,20 +37,20 @@ export function AuditFilters({
           value={filters.search}
           maxLength={80}
           onChange={(event) => onFilterChange("search", event.target.value)}
-          placeholder="Action or record ID"
+          placeholder="Action or record reference"
           className="min-h-[44px] w-full border border-[#8c877c] bg-[#fbf9f4] px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
         />
       </div>
       <div>
         <Label htmlFor="audit-actor" className="mb-1 block text-xs font-semibold">
-          Actor ID
+          Account reference
         </Label>
         <input
           id="audit-actor"
           type="text"
           value={filters.actor}
           maxLength={36}
-          placeholder="Exact actor UUID"
+          placeholder="Exact account reference"
           autoComplete="off"
           onChange={(event) => onFilterChange("actor", event.target.value)}
           className="min-h-[44px] w-full border border-[#8c877c] bg-[#fbf9f4] px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
@@ -58,7 +58,7 @@ export function AuditFilters({
       </div>
       <div>
         <Label htmlFor="audit-entity-type" className="mb-1 block text-xs font-semibold">
-          Entity type
+          Record type
         </Label>
         <select
           id="audit-entity-type"
@@ -68,7 +68,7 @@ export function AuditFilters({
           }
           className="min-h-[44px] w-full border border-[#8c877c] bg-[#fbf9f4] px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
         >
-          <option value="all">All entities</option>
+          <option value="all">All records</option>
           {Object.entries(auditEntityLabels).map(([value, label]) => (
             <option key={value} value={value}>
               {label}
@@ -106,7 +106,7 @@ export function AuditFilters({
         <p className="text-xs text-[#5b574e]" aria-live="polite">
           {loading
             ? "Loading audit records…"
-            : `Showing ${resultCount} of ${totalCount} matching audit events`}
+            : `Showing ${resultCount} of ${totalCount} matching entries`}
         </p>
         <button
           type="button"

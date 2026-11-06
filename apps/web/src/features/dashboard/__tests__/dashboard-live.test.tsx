@@ -39,8 +39,8 @@ describe("live dashboard", () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText("Assigned staff live data")).toBeTruthy();
-    expect(screen.getByText("Live Supabase data · refreshes every 15 seconds")).toBeTruthy();
+    expect(await screen.findByText("Your assigned work")).toBeTruthy();
+    expect(screen.getByText("Updates automatically every 15 seconds")).toBeTruthy();
     expect(screen.getByText("5,200")).toBeTruthy();
     expect(screen.getByText("1,600")).toBeTruthy();
     expect(screen.queryByText(/Mock aggregates|Sample figures only|October 2026 sample/)).toBeNull();

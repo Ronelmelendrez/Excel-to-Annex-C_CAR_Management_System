@@ -168,7 +168,7 @@ describe("F5 CAR authoring", () => {
     await renderLoadedPage();
 
     expect(listCars).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("Saved in Supabase")).toBeTruthy();
+    expect(screen.getByText("CAR records ready")).toBeTruthy();
     expect(screen.queryByText(/Mock drafts/)).toBeNull();
     expect(screen.getByText("1 records")).toBeTruthy();
     expect(screen.getAllByText(/Jomar Ramos/).length).toBeGreaterThan(0);
@@ -226,7 +226,7 @@ describe("F5 CAR authoring", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(screen.getByText("Saving to Supabase…")).toBeTruthy();
+    expect(screen.getByText("Saving changes…")).toBeTruthy();
 
     await waitFor(() => expect(updateCar).toHaveBeenCalledTimes(1), { timeout: 4000 });
     const payload = updateCar.mock.calls[0][0];
@@ -236,11 +236,11 @@ describe("F5 CAR authoring", () => {
       source: "manual",
     });
 
-    await screen.findByText("Saved to Supabase");
+    await screen.findAllByText("Changes saved");
 
     // The save is recorded in the draft history shown in the context panel.
     fireEvent.click(screen.getByRole("tab", { name: "History" }));
-    await screen.findByText("Changes saved");
+    expect(await screen.findAllByText("Changes saved")).toHaveLength(2);
   });
 
   it("deletes a draft through the API after an explicit confirmation", async () => {
@@ -270,7 +270,7 @@ describe("F5 CAR authoring", () => {
     render(<CarsPage />);
 
     expect(screen.getByText(CAR_NOT_CONFIGURED_MESSAGE)).toBeTruthy();
-    expect(screen.getByText("Supabase not configured")).toBeTruthy();
+    expect(screen.getByText("Temporarily unavailable")).toBeTruthy();
     expect(listCars).not.toHaveBeenCalled();
     expect(screen.queryByRole("heading", { name: /CAR-2026-023/ })).toBeNull();
     expect(screen.queryByRole("option", { name: /000091/ })).toBeNull();

@@ -11,11 +11,9 @@ function renderApplication() {
   if (!isSupabaseConfigured) {
     root.render(
       <main className="mx-auto mt-12 max-w-xl border border-[#7a1f1f] p-6 text-[#161512]">
-        <h1 className="font-serif text-2xl">Supabase configuration required</h1>
+        <h1 className="font-serif text-2xl">The system is temporarily unavailable</h1>
         <p className="mt-3 text-sm leading-6">
-          This production application requires a configured Supabase project. Set
-          VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the deployment environment, then rebuild
-          and redeploy the web app.
+          Please try again later. If the problem continues, contact your system administrator.
         </p>
       </main>,
     )
@@ -32,20 +30,20 @@ function renderApplication() {
 void clearLocalImportData()
   .then(renderApplication)
   .catch((cause: unknown) => {
+    console.error('Unable to clear saved import data before startup.', cause)
     root.render(
       <main role="alert" className="mx-auto mt-12 max-w-xl border border-[#7a1f1f] p-6 text-[#7a1f1f]">
-        <h1 className="font-serif text-2xl">Secure cleanup is blocked</h1>
+        <h1 className="font-serif text-2xl">The system could not complete a security check</h1>
         <p className="mt-3 text-sm leading-6">
-          {cause instanceof Error
-            ? cause.message
-            : "Local import recovery data could not be cleared."}
+          The system could not safely open your workspace. Refresh the page to try again. If the
+          problem continues, contact your system administrator.
         </p>
         <button
           type="button"
           onClick={() => window.location.reload()}
           className="mt-4 border border-[#7a1f1f] px-4 py-2 text-sm font-semibold"
         >
-          Retry cleanup
+          Refresh and try again
         </button>
       </main>,
     )

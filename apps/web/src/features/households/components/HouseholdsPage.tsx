@@ -42,11 +42,11 @@ export function HouseholdsPage() {
               Households
             </h1>
             <p className="mt-3 max-w-[62ch] text-sm leading-6 text-[#3f3b34]">
-              Check household members and resolve GRANTEE conflicts against the imported source rows.
+              Review household members and check GRANTEE information against the original spreadsheet.
             </p>
           </div>
           <span className="border border-[#2f5b3a] bg-[#e6ecdf] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[#244b2e]">
-            Supabase household records
+            Household records
           </span>
         </div>
       </header>
@@ -55,8 +55,8 @@ export function HouseholdsPage() {
         role="status"
         className="mt-4 border-l-4 border-[#8a5a00] bg-[#f3ead8] px-4 py-3 text-sm leading-6 text-[#704700]"
       >
-        Household corrections and member exclusions are paused until changes can be saved and
-        audited by the server. You can still search and inspect source records.
+        Editing household details and excluding members are temporarily unavailable so every change
+        can be recorded. You can still search and review household records.
       </p>
 
       {register.loading ? (
@@ -64,7 +64,7 @@ export function HouseholdsPage() {
           role="status"
           className="mt-5 border-l-4 border-[#4a5a72] bg-[#e9edf3] px-4 py-4 text-sm leading-6 text-[#31405a]"
         >
-          Loading household records from Supabase…
+          Loading household records…
         </p>
       ) : register.loadError ? (
         <div

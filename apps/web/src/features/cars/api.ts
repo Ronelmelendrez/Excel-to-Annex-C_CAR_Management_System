@@ -32,9 +32,9 @@ export class CarApiError extends Error {
   }
 }
 
-/** Shown when Supabase credentials are missing. */
+/** Shown when CAR records are unavailable. */
 export const CAR_NOT_CONFIGURED_MESSAGE =
-  "CAR data requires Supabase. Configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, then apply the Supabase migrations and deploy the cars function.";
+  "CAR records are temporarily unavailable. Please try again later or contact your system administrator.";
 
 function assertConfigured(): void {
   if (!isSupabaseConfigured) {
@@ -279,12 +279,8 @@ export function carErrorMessage(error: unknown, fallback: string): string {
     case "revision_exists":
       return "A newer revision of this CAR already exists. Refresh the page and try again.";
     case "reference_failed":
-      return "A CAR reference could not be generated. Apply the latest Supabase migration, then try again.";
+      return "A CAR reference number could not be created. Try again. If the problem continues, contact your system administrator.";
     default: {
-      // Keep the user-facing sentence but name the actual failure, so a
-      // generic message can never hide the cause again.
-      if (error instanceof ApiError) return `${fallback} [HTTP ${error.status}: ${error.code}]`;
-      if (error instanceof Error && error.message) return `${fallback} [${error.message}]`;
       return fallback;
     }
   }

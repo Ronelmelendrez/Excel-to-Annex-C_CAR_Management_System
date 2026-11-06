@@ -134,7 +134,7 @@ describe("Annex C report generator page", () => {
     expect(within(preview).getAllByText("Jomar Ramos").length).toBeGreaterThan(0);
 
     // Source note + completeness summary.
-    expect(screen.getByRole("status")).toHaveTextContent("preview synthesized from import data");
+    expect(screen.getByRole("status")).toHaveTextContent("preview created from imported household information");
     expect(screen.getByText(/required fields? still blank/)).toBeTruthy();
     expect(listHouseholds).toHaveBeenCalledOnce();
   });
@@ -151,7 +151,7 @@ describe("Annex C report generator page", () => {
     // The name lands in several slots (grantee, provider, family row).
     expect((await within(preview).findAllByText("Lorna Bautista")).length).toBeGreaterThan(0);
     expect(within(preview).queryByText("Jomar Ramos")).toBeNull();
-    expect(screen.getByRole("status")).toHaveTextContent("preview synthesized from import data");
+    expect(screen.getByRole("status")).toHaveTextContent("preview created from imported household information");
   });
 
   it("downloads a real Annex C .docx built from the committed template", async () => {
@@ -172,7 +172,7 @@ describe("Annex C report generator page", () => {
       render(<TemplatesPage />);
       await screen.findByRole("combobox", { name: "Household" });
 
-      fireEvent.click(screen.getByRole("button", { name: "Download DOCX" }));
+      fireEvent.click(screen.getByRole("button", { name: "Download Word document" }));
 
       await waitFor(() => expect(createObjectURL).toHaveBeenCalledOnce(), { timeout: 10_000 });
       const blob = createObjectURL.mock.calls[0][0] as Blob;
@@ -199,7 +199,7 @@ describe("Annex C report generator page", () => {
     render(<TemplatesPage />);
 
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("household register could not be loaded");
+    expect(alert).toHaveTextContent("Household information could not be loaded");
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(await screen.findByRole("combobox", { name: "Household" })).toBeTruthy();
     expect(listHouseholds).toHaveBeenCalledTimes(2);

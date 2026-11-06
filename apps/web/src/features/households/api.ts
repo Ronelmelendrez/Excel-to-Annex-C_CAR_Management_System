@@ -131,5 +131,5 @@ export function householdListError(error: unknown): string {
   if (code === "forbidden") {
     return "You do not have access to household records.";
   }
-  return "The household register could not be loaded. Check your connection and try again.";
+  return "Household information could not be loaded. Check your internet connection and try again.";
 }

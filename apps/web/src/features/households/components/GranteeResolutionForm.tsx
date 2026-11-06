@@ -23,7 +23,7 @@ export function GranteeResolutionForm({
     <form onSubmit={onSubmit} className="border-b border-[#c9c3b6] bg-[#f3ead8] px-4 py-4 sm:px-5">
       <h3 className="font-semibold">Choose the verified grantee</h3>
       <p className="mt-1 text-xs leading-5 text-[#5b574e]">
-        No member is preselected. This records a local correction for this session; imported flags stay as recorded.
+        No member is preselected. This change applies only to your current session; the imported information stays unchanged.
       </p>
       <fieldset className="mt-3 space-y-2">
         <legend className="sr-only">Select one household member as the grantee</legend>
@@ -47,7 +47,7 @@ export function GranteeResolutionForm({
               <span className="min-w-0 flex-1">
                 <span className="block font-medium">{member.name}</span>
                 <span className="text-xs text-[#5b574e]">
-                  {member.relationship} · source row {member.sourceRow} · imported flag:{" "}
+                  {member.relationship} · spreadsheet row {member.sourceRow} · imported grantee value:{" "}
                   {member.granteeFlag || "Blank"}
                   {isExcluded ? " · excluded from this household" : ""}
                 </span>
@@ -73,7 +73,7 @@ export function GranteeResolutionForm({
         disabled={!candidateId || !reason.trim()}
         className="mt-3 min-h-[44px] border border-[#161512] bg-[#161512] px-4 py-2 text-sm font-medium text-white hover:bg-[#7a1f1f] disabled:cursor-not-allowed disabled:border-[#b5afa2] disabled:bg-[#b5afa2] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
       >
-        Record local correction
+        Record correction for this session
       </button>
     </form>
   );

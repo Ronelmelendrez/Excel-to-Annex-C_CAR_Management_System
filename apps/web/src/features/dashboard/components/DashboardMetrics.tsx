@@ -5,45 +5,45 @@ export function DashboardMetrics({ summary }: { summary: DashboardSummary }) {
   const metrics = [
     {
       id: "imports",
-      label: "Imports committed",
+      label: "Completed imports",
       value: summary.importsCommitted,
       definition:
-        "Count of committed import batches in your assigned scope or across the system. Failed and uncommitted imports are excluded.",
+        "Number of successful imports in your assigned area or across the system. Unfinished and unsuccessful imports are not included.",
     },
     {
       id: "rows",
-      label: "Rows processed",
+      label: "Rows included",
       value: summary.rowsProcessed,
       definition:
-        "Sum of source rows in committed import batches in the selected scope.",
+        "Number of spreadsheet rows included in completed imports in the selected area.",
     },
     {
       id: "households",
-      label: "Households detected",
+      label: "Household records",
       value: summary.householdsDetected,
       definition:
-        "Household records in committed imports. A household in a later import version is counted again.",
+        "Number of household entries in completed imports. The same household may appear more than once if included in separate imports.",
     },
     {
       id: "grantee-issues",
-      label: "Grantee issues",
+      label: "Households needing grantee review",
       value: summary.granteeIssues,
       definition:
-        "Household records in committed imports without a valid grantee status.",
+        "Households in completed imports without a confirmed grantee.",
     },
     {
       id: "awaiting-review",
-      label: "Awaiting CAR review",
+      label: "CARs awaiting review",
       value: summary.awaitingReview,
       definition:
-        "Latest CAR revisions currently in submitted status in the selected scope.",
+        "Most recent CAR versions submitted for review in the selected area.",
     },
     {
       id: "export-failures",
-      label: "Export failures",
+      label: "Report generation issues",
       value: summary.exportFailures,
       definition:
-        "Document export jobs currently in failed status in the selected scope.",
+        "Reports that could not be generated in the selected area.",
     },
   ];
 

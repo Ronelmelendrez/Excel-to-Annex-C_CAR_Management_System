@@ -8,7 +8,7 @@ describe("CAR review availability", () => {
     render(<ReviewPage />);
 
     expect(screen.getByRole("heading", { name: "CAR review is paused" })).toBeTruthy();
-    expect(screen.getByText(/No sample submissions or simulated approvals are shown/)).toBeTruthy();
+    expect(screen.getByText(/You cannot record or change a decision here at this time/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Approve/ })).toBeNull();
   });
 });

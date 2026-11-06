@@ -27,7 +27,7 @@ export function useDashboardSummary(scope: DashboardScope) {
         }
       } catch {
         if (!cancelled) {
-          setError("Live dashboard data could not be loaded. Check your connection and try again.");
+          setError("Dashboard information could not be loaded. Check your internet connection and try again.");
           setLoading(false);
         }
       } finally {

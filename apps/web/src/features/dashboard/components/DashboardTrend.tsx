@@ -11,18 +11,18 @@ export function DashboardTrend({ points }: { points: DashboardTrendPoint[] }) {
     <SectionCard
       id="dashboard-import-trend"
       title="Import activity"
-      description="Rows in committed imports by week"
+      description="Spreadsheet rows included in completed imports each week"
       eyebrow="Volume"
     >
       {points.length === 0 ? (
         <p className="text-sm leading-6 text-[#5b574e]">
-          No committed import activity is available in this scope yet.
+          No import activity is available for this period yet.
         </p>
       ) : (
         <>
           <div
             role="img"
-            aria-label={`Committed import row trend. ${accessibleSummary}`}
+            aria-label={`Import activity. ${accessibleSummary}`}
             className="flex min-h-40 items-end justify-around gap-3 border-b border-[#8c877c] pb-2"
           >
             {points.map((point) => (
@@ -38,7 +38,7 @@ export function DashboardTrend({ points }: { points: DashboardTrendPoint[] }) {
             ))}
           </div>
           <p className="mt-3 text-xs leading-5 text-[#5b574e]">
-            Only committed rows are included. Uncommitted imports are excluded.
+            Only completed imports are included.
           </p>
         </>
       )}

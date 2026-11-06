@@ -22,17 +22,15 @@ export function usePasswordReset() {
           redirectTo,
         );
         if (supabaseError) {
-          const message =
-            supabaseError.message ||
-            'Could not send the reset link. Try again.';
+          const message = 'We could not send a reset link. Check your email and try again.';
           setError(message);
           return { ok: false, error: message };
         }
         setSent(true);
         return { ok: true, error: null };
-      } catch (err: any) {
+      } catch {
         const message =
-          err.message || 'Could not send the reset link. Try again.';
+          'We could not send a reset link. Check your internet connection and try again.';
         setError(message);
         return { ok: false, error: message };
       } finally {

@@ -7,12 +7,12 @@ export function DashboardActivity({ items }: { items: DashboardActivityRecord[] 
     <SectionCard
       id="dashboard-recent-activity"
       title="Recent activity"
-      description="Activity categories only; no case references or staff names."
+      description="Shows activity types only. Case details and staff names are kept private."
       eyebrow="Last 30 days"
     >
       {items.length === 0 ? (
         <p className="text-sm leading-6 text-[#5b574e]">
-          No recent activity is available in this scope.
+          No recent activity was found for this area.
         </p>
       ) : (
         <ol className="divide-y divide-[#c9c3b6]">

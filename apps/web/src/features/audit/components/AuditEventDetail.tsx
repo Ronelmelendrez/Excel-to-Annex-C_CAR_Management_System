@@ -9,9 +9,9 @@ import type { AuditEvent } from "../types";
 export function AuditEventDetail({ event }: { event: AuditEvent | null }) {
   if (!event) {
     return (
-      <SectionCard id="audit-event-detail-heading" title="Event details">
+      <SectionCard id="audit-event-detail-heading" title="Audit entry">
         <p className="text-sm leading-6 text-[#5b574e]">
-          Select an audit event to inspect its operational metadata.
+          Choose an entry to see what happened.
         </p>
       </SectionCard>
     );
@@ -20,8 +20,8 @@ export function AuditEventDetail({ event }: { event: AuditEvent | null }) {
   return (
     <SectionCard
       id="audit-event-detail-heading"
-      title="Event details"
-      description="Only operational metadata is shown. Stored before/after values are not exposed here."
+      title="Audit entry"
+      description="This record shows what happened and when. Sensitive details of the change are not shown."
       eyebrow={event.id}
       action={
         <span className="border border-[#8c877c] px-2 py-1 text-[10px] font-semibold text-[#3f3b34]">
@@ -35,18 +35,18 @@ export function AuditEventDetail({ event }: { event: AuditEvent | null }) {
           <dd className="mt-1 text-sm font-semibold">{formatAuditAction(event.action)}</dd>
         </div>
         <div>
-          <dt className="text-xs text-[#5b574e]">Actor ID</dt>
+          <dt className="text-xs text-[#5b574e]">Account reference</dt>
           <dd className="mt-1 text-sm">{event.actorId ?? "System actor"}</dd>
         </div>
         <div>
-          <dt className="text-xs text-[#5b574e]">Entity</dt>
+          <dt className="text-xs text-[#5b574e]">Record</dt>
           <dd className="mt-1 text-sm">
             {formatAuditEntityType(event.entityType)}
             {event.entityId && <> · <span className="font-mono">{event.entityId}</span></>}
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-[#5b574e]">Timestamp</dt>
+          <dt className="text-xs text-[#5b574e]">Time</dt>
           <dd className="mt-1 text-sm">
             <time dateTime={event.occurredAt}>{formatAuditTimestamp(event.occurredAt)}</time>
           </dd>
@@ -55,7 +55,7 @@ export function AuditEventDetail({ event }: { event: AuditEvent | null }) {
 
       <div className="mt-5 border-t border-[#c9c3b6] pt-4">
         <p className="mt-4 text-xs leading-5 text-[#5b574e]">
-          Before/after payload values are intentionally omitted from the audit view.
+          Sensitive before-and-after details are not displayed here.
         </p>
       </div>
     </SectionCard>

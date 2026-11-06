@@ -378,7 +378,7 @@ function importRecord(overrides: Partial<ImportRecord> = {}): ImportRecord {
 describe("F3 import history states", () => {
   it("shows the first-use empty state before anything is committed", () => {
     render(React.createElement(ImportHistory, { ...baseHistoryProps, items: [] }));
-    expect(screen.getByText(/No workbook has been committed yet/i)).toBeTruthy();
+    expect(screen.getByText(/No workbook has been saved yet/i)).toBeTruthy();
   });
 
   it("renders the history error state without dropping prior rows", () => {

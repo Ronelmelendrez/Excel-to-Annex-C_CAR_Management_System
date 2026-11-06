@@ -61,9 +61,9 @@ describe("F4 household register", () => {
   it("shows loaded household records and grantee validation states", async () => {
     render(<HouseholdsPage />);
 
-    expect(await screen.findByText("Supabase household records")).toBeTruthy();
+    expect(await screen.findByText("Household records")).toBeTruthy();
     expect(screen.getAllByText("Multiple Yes flags").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Grantee OK").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Confirmed grantee").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Blank flag").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Unsupported value").length).toBeGreaterThan(0);
     expect(screen.getAllByText("No Yes flag").length).toBeGreaterThan(0);
@@ -71,12 +71,12 @@ describe("F4 household register", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /HH_ID 000091/ }));
     expect(screen.getByRole("heading", { name: "HH_ID 000091" })).toBeTruthy();
-    expect(screen.getByText("Jomar Ramos · source row 44")).toBeTruthy();
+    expect(screen.getByText("Jomar Ramos · spreadsheet row 44")).toBeTruthy();
   });
 
   it("keeps local-only household corrections disabled", async () => {
     render(<HouseholdsPage />);
-    expect(await screen.findByText(/corrections and member exclusions are paused/i)).toBeTruthy();
+    expect(await screen.findByText(/editing household details and excluding members are temporarily unavailable/i)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Resolve grantee" })).toBeNull();
     expect(screen.queryByRole("button", { name: /Exclude member/ })).toBeNull();
   });
@@ -104,7 +104,7 @@ describe("F4 household register", () => {
     view.rerender(<HouseholdsPage />);
 
     expect((await screen.findByRole("alert")).textContent).toContain(
-      "The household register could not be loaded.",
+      "Household information could not be loaded.",
     );
     expect(screen.queryByRole("button", { name: /HH_ID 000091/ })).toBeNull();
   });
@@ -193,7 +193,7 @@ describe("F4 household register", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Columns" }));
 
-    expect(screen.getByText("Excel row 7 · every column as imported")).toBeTruthy();
+    expect(screen.getByText("Spreadsheet row 7 · information as imported")).toBeTruthy();
     expect(screen.getByText("HH_ID")).toBeTruthy();
     expect(screen.getByText("000777")).toBeTruthy();
     expect(screen.getByText("LRN-998877")).toBeTruthy();

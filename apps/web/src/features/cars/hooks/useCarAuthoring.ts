@@ -28,9 +28,9 @@ import type {
 const AUTOSAVE_DELAY_MS = 700;
 
 const LOAD_ERROR_FALLBACK =
-  "CAR drafts could not be loaded. Check your connection and that the cars function is deployed.";
+  "CAR drafts could not be loaded. Check your internet connection and try again.";
 const SAVE_ERROR_FALLBACK =
-  "Your changes could not be saved to Supabase. Check your connection and try again.";
+  "Your changes could not be saved. Check your internet connection and try again.";
 
 /** Households the register marks as a valid CAR source (exactly one grantee). */
 function deriveValidatedHouseholds(households: HouseholdRecord[]): ValidatedHousehold[] {

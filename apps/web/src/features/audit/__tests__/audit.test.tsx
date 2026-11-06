@@ -72,7 +72,7 @@ describe("audit log", () => {
     expect(screen.getByRole("heading", { name: "Audit trail" })).toBeTruthy();
     expect(screen.getAllByText(event.actorId)).toHaveLength(2);
     expect(screen.getByText(event.entityId)).toBeTruthy();
-    expect(screen.getByText("Before/after payload values are intentionally omitted from the audit view."))
+    expect(screen.getByText("Sensitive before-and-after details are not displayed here."))
       .toBeTruthy();
     expect(screen.queryByText("Status: Submitted")).toBeNull();
     expect(fetchAuditEvents).toHaveBeenCalledWith(
@@ -86,13 +86,13 @@ describe("audit log", () => {
     renderAudit();
     await screen.findAllByText("Import Committed");
 
-    fireEvent.change(screen.getByRole("searchbox", { name: "Search action or entity" }), {
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search action or record" }), {
       target: { value: "commit" },
     });
-    fireEvent.change(screen.getByRole("textbox", { name: "Actor ID" }), {
+    fireEvent.change(screen.getByRole("textbox", { name: "Account reference" }), {
       target: { value: event.actorId },
     });
-    fireEvent.change(screen.getByRole("combobox", { name: "Entity type" }), {
+    fireEvent.change(screen.getByRole("combobox", { name: "Record type" }), {
       target: { value: "imports" },
     });
     fireEvent.change(screen.getByLabelText("From date"), {
@@ -152,9 +152,9 @@ describe("audit log", () => {
     renderAudit();
 
     expect((await screen.findByRole("alert")).textContent).toContain(
-      "Audit service unavailable.",
+      "Audit records could not be loaded. Check your internet connection and try again.",
     );
-    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findAllByText("Import Committed")).toHaveLength(2);
   });
 

@@ -16,7 +16,7 @@ const CHECKPOINT_LABELS: Record<StoredImportSession["checkpoint"], string> = {
   processed: "Rows processed",
   uploaded: "Workbook uploaded",
   validated: "Validation saved",
-  committing: "Commit in progress",
+  committing: "Saving import…",
   committed: "Import complete",
 };
 
@@ -30,7 +30,8 @@ function RecoverySessions({ wizard }: { wizard: ReturnType<typeof useImportWizar
     try {
       await action();
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "The local import session could not be updated.");
+      console.error("Unable to update the saved import session.", error);
+      setActionError("The saved import session could not be updated. Try again.");
     } finally {
       setActionId(null);
     }
@@ -127,7 +128,7 @@ function RecoverySessions({ wizard }: { wizard: ReturnType<typeof useImportWizar
                       <dd className="mt-1" aria-live="polite">
                         {CHECKPOINT_LABELS[session.checkpoint]}
                         {session.rowCount !== null
-                          ? ` · ${session.rowCount.toLocaleString()} source rows`
+                          ? ` · ${session.rowCount.toLocaleString()} spreadsheet rows`
                           : ""}
                       </dd>
                     </div>

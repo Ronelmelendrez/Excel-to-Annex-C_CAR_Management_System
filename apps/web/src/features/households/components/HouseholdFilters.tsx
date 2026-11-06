@@ -44,8 +44,8 @@ export function HouseholdFilters({
         <HouseholdStat label="Needs review" value={needsReviewCount ?? "—"} emphasis />
       </section>
       <div className="flex flex-wrap justify-between gap-2 py-2 text-xs text-[#5b574e]" aria-live="polite">
-        <span>{statsError ? statsError : "Live Supabase counts · refreshed every 15 seconds"}</span>
-        {statsError && <span>Last successful counts remain visible.</span>}
+        <span>{statsError ? statsError : "Totals update automatically every 15 seconds."}</span>
+        {statsError && <span>Showing the most recently available totals.</span>}
       </div>
 
       <section aria-label="Household search and filters" className="border-b border-[#c9c3b6] py-5">
@@ -75,7 +75,7 @@ export function HouseholdFilters({
             >
               <option value="all">All households</option>
               <option value="needs_review">Needs review</option>
-              <option value="ok">Grantee OK</option>
+              <option value="ok">              Confirmed grantee</option>
               <option value="resolved">Resolved by staff</option>
             </select>
           </div>

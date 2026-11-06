@@ -43,7 +43,7 @@ describe("F9 dashboard", () => {
     useDashboardSummary.mockImplementation((scope: "assigned" | "system") => ({
       summary: {
         scope,
-        scopeLabel: scope === "system" ? "System-wide live data" : "Assigned staff live data",
+        scopeLabel: scope === "system" ? "Across the system" : "Your assigned work",
         importsCommitted: 2,
         rowsProcessed: 618,
         householdsDetected: 191,
@@ -72,23 +72,23 @@ describe("F9 dashboard", () => {
     const dashboardText = container.textContent ?? "";
 
     expect(screen.getByRole("heading", { name: "Operations at a glance" })).toBeTruthy();
-    expect(dashboardText).toContain("Assigned staff live data");
-    expect(dashboardText).toContain("Live Supabase data");
-    expect(dashboardText).toContain("Rows processed");
+    expect(dashboardText).toContain("Your assigned work");
+    expect(dashboardText).toContain("Updates automatically every 15 seconds");
+    expect(dashboardText).toContain("Rows included");
     expect(dashboardText).toContain("618");
-    expect(dashboardText).toContain("Grantee issues");
+    expect(dashboardText).toContain("Households needing grantee review");
     expect(dashboardText).toContain("12");
-    expect(dashboardText).toContain("Export failures");
+    expect(dashboardText).toContain("Report generation issues");
     expect(dashboardText).toContain("CAR pipeline");
     expect(dashboardText).toContain("Recent activity");
     expect(
       screen.getByRole("img", {
-        name: /Committed import row trend\. Oct 5: 258 rows; Oct 12: 360 rows/,
+        name: /Import activity\. Oct 5: 258 rows; Oct 12: 360 rows/,
       }),
     ).toBeTruthy();
 
     fireEvent.click(screen.getAllByText("Definition")[0]);
-    expect(screen.getByText(/Sum of source rows in committed import batches/)).toBeTruthy();
+    expect(screen.getByText(/Number of spreadsheet rows included in completed imports/)).toBeTruthy();
 
     const text = document.body.textContent ?? "";
     expect(text).not.toMatch(/LRN|PCN|pregnancy|disability|CAR-2026-\d+/i);
@@ -101,7 +101,7 @@ describe("F9 dashboard", () => {
     const { container } = renderDashboard();
     const dashboardText = container.textContent ?? "";
 
-    expect(dashboardText).toContain("System-wide live data");
+    expect(dashboardText).toContain("Across the system");
   });
 
   it("does not display metrics for an unrecognized role", () => {
