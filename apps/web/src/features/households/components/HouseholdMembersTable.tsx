@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { Label } from "../../../components/ui/label";
-import { isDemoMode } from "../../../shared/supabase";
 import type { HouseholdMember, HouseholdRecord, HouseholdOverlay } from "../types";
 
 function MemberExclusionForm({
@@ -20,9 +19,7 @@ function MemberExclusionForm({
     <form onSubmit={onSubmit} className="mt-3 border-l-4 border-[#8a5a00] bg-[#f3ead8] px-3 py-3">
       <p className="text-sm font-semibold">Exclude {member.name} from this household view?</p>
       <p className="mt-1 text-xs leading-5 text-[#5b574e]">
-        {isDemoMode
-          ? "This mock overlay does not delete the source row. A reason is required."
-          : "This local overlay does not delete the source row. A reason is required."}
+        This local overlay does not delete the source row. A reason is required.
       </p>
       <Label htmlFor="exclusion-reason" className="sr-only">
         Reason for exclusion

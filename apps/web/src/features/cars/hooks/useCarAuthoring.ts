@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { normalizeGrantee } from "@import-domain";
 import { householdListError, listHouseholds } from "../../households/api";
 import { getGranteeStatus } from "../../households/lib/households";
-import type { HouseholdRecord } from "../../households/mock-data";
-import { isDemoMode } from "../../../shared/supabase";
+import type { HouseholdRecord } from "../../households/types";
+import { isSupabaseConfigured } from "../../../shared/supabase";
 import {
   carErrorMessage,
   createCar,
@@ -69,7 +69,7 @@ function householdFromDraft(draft: CarDraft): ValidatedHousehold {
 
 export function useCarAuthoring(enabled = true) {
   const [drafts, setDrafts] = useState<CarDraft[]>([]);
-  const [loading, setLoading] = useState(!isDemoMode && enabled);
+  const [loading, setLoading] = useState(isSupabaseConfigured && enabled);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
 
@@ -174,10 +174,9 @@ export function useCarAuthoring(enabled = true) {
     };
   }, []);
 
-  // CAR list. Demo mode (no Supabase credentials) and users without an
-  // authoring role never reach the network.
+  // Users without Supabase configuration or an authoring role never reach the network.
   useEffect(() => {
-    if (isDemoMode || !enabled) return;
+    if (!isSupabaseConfigured || !enabled) return;
     let cancelled = false;
     setLoading(true);
     setLoadError(null);
@@ -202,7 +201,7 @@ export function useCarAuthoring(enabled = true) {
 
   // Source households (create-draft dropdown) and template versions.
   useEffect(() => {
-    if (isDemoMode || !enabled) return;
+    if (!isSupabaseConfigured || !enabled) return;
     let cancelled = false;
 
     listHouseholds()
@@ -400,7 +399,7 @@ export function useCarAuthoring(enabled = true) {
     drafts,
     loading,
     loadError,
-    notConfigured: isDemoMode,
+    notConfigured: !isSupabaseConfigured,
     reload,
     households,
     householdsError,

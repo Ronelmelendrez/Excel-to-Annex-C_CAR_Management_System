@@ -6,13 +6,14 @@ import { AppShell } from './layout';
 import { LoginForm } from '../features/auth';
 import { PasswordResetForm } from '../features/auth/components/PasswordResetForm';
 import { UpdatePasswordForm } from '../features/auth/components/UpdatePasswordForm';
-import { ImportsPage } from '../features/imports';
 import { HouseholdsPage } from '../features/households';
 import { CarsPage } from '../features/cars';
 import { ReviewPage } from '../features/review';
 import { TemplatesPage, REPORT_GENERATOR_ROLES } from '../features/templates';
 import { DashboardPage } from '../features/dashboard';
 import { AuditPage } from '../features/audit';
+import { ImportsUnavailablePage } from '../features/imports/components/ImportsUnavailablePage';
+import { LandingPage } from '../features/landing';
 
 export function Router() {
   return (
@@ -38,7 +39,7 @@ export function Router() {
               <AuthGuard>
                 <RoleGuard roles={['admin', 'operator']}>
                   <AppShell>
-                    <ImportsPage />
+                    <ImportsUnavailablePage />
                   </AppShell>
                 </RoleGuard>
               </AuthGuard>
@@ -103,7 +104,7 @@ export function Router() {
             }
           />
           <Route path="/documents" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<LandingPage />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

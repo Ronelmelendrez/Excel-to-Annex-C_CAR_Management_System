@@ -1,11 +1,7 @@
 import { apiCall } from "../../shared/api";
-import { isDemoMode } from "../../shared/supabase";
-import { getDashboardSummary } from "./lib/dashboard";
 import type { DashboardScope, DashboardSummary } from "./types";
 
 export async function fetchDashboardSummary(scope: DashboardScope): Promise<DashboardSummary> {
-  if (isDemoMode) return getDashboardSummary(scope);
-
   const data = (await apiCall(
     `/dashboard?action=summary&scope=${encodeURIComponent(scope)}`,
   )) as Partial<DashboardSummary>;

@@ -4,10 +4,16 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuth } from "../../../app/providers";
 import { DashboardPage } from "../components/DashboardPage";
-import { getDashboardSummary } from "../lib/dashboard";
+
+const { useDashboardSummary } = vi.hoisted(() => ({
+  useDashboardSummary: vi.fn(),
+}));
 
 vi.mock("../../../app/providers", () => ({
   useAuth: vi.fn(),
+}));
+vi.mock("../hooks/useDashboardSummary", () => ({
+  useDashboardSummary,
 }));
 
 function authFor(roles: string[]) {
@@ -34,35 +40,40 @@ describe("F9 dashboard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(useAuth).mockReturnValue(authFor(["case_worker"]));
+    useDashboardSummary.mockImplementation((scope: "assigned" | "system") => ({
+      summary: {
+        scope,
+        scopeLabel: scope === "system" ? "System-wide live data" : "Assigned staff live data",
+        importsCommitted: 2,
+        rowsProcessed: 618,
+        householdsDetected: 191,
+        granteeIssues: 12,
+        awaitingReview: 2,
+        exportFailures: 1,
+        carPipeline: { draft: 3, submitted: 2, changes_requested: 1, approved: 5 },
+        importTrend: [
+          { label: "Oct 5", value: 258 },
+          { label: "Oct 12", value: 360 },
+        ],
+        recentActivity: [],
+      },
+      loading: false,
+      error: null,
+      reload: vi.fn(),
+    }));
   });
 
   afterEach(() => {
     cleanup();
   });
 
-  it("calculates staff metrics only from the assigned mock scope", () => {
-    const summary = getDashboardSummary("assigned");
-
-    expect(summary.importsCommitted).toBe(2);
-    expect(summary.rowsProcessed).toBe(618);
-    expect(summary.householdsDetected).toBe(191);
-    expect(summary.granteeIssues).toBe(12);
-    expect(summary.awaitingReview).toBe(2);
-    expect(summary.exportFailures).toBe(1);
-    expect(summary.carPipeline).toEqual({
-      draft: 3,
-      submitted: 2,
-      changes_requested: 1,
-      approved: 5,
-    });
-  });
-
-  it("shows staff-safe metrics, trend, pipeline, definitions, and anonymous activity", () => {
+  it("shows live metrics, trend, pipeline, definitions, and anonymous activity", () => {
     const { container } = renderDashboard();
     const dashboardText = container.textContent ?? "";
 
     expect(screen.getByRole("heading", { name: "Operations at a glance" })).toBeTruthy();
-    expect(dashboardText).toContain("Assigned staff sample");
+    expect(dashboardText).toContain("Assigned staff live data");
+    expect(dashboardText).toContain("Live Supabase data");
     expect(dashboardText).toContain("Rows processed");
     expect(dashboardText).toContain("618");
     expect(dashboardText).toContain("Grantee issues");
@@ -70,7 +81,11 @@ describe("F9 dashboard", () => {
     expect(dashboardText).toContain("Export failures");
     expect(dashboardText).toContain("CAR pipeline");
     expect(dashboardText).toContain("Recent activity");
-    expect(screen.getByRole("img", { name: /Oct 5-11: 258 rows; Oct 12-18: 360 rows/ })).toBeTruthy();
+    expect(
+      screen.getByRole("img", {
+        name: /Committed import row trend\. Oct 5: 258 rows; Oct 12: 360 rows/,
+      }),
+    ).toBeTruthy();
 
     fireEvent.click(screen.getAllByText("Definition")[0]);
     expect(screen.getByText(/Sum of source rows in committed import batches/)).toBeTruthy();
@@ -81,22 +96,12 @@ describe("F9 dashboard", () => {
     expect(text).not.toContain("staff@example.test");
   }, 15000);
 
-  it("aggregates the wider mock system scope for admins", () => {
+  it("uses the live dashboard scope for admins", () => {
     vi.mocked(useAuth).mockReturnValue(authFor(["admin"]));
     const { container } = renderDashboard();
     const dashboardText = container.textContent ?? "";
 
-    expect(dashboardText).toContain("System-wide sample");
-    expect(dashboardText).toContain("Imports committed");
-    expect(dashboardText).toContain("1,036");
-    expect(dashboardText).toContain("Households detected");
-    expect(dashboardText).toContain("321");
-    expect(dashboardText).toContain("Grantee issues");
-    expect(dashboardText).toContain("21");
-    expect(dashboardText).toContain("Awaiting CAR review");
-    expect(dashboardText).toContain("4");
-    expect(dashboardText).toContain("Export failures");
-    expect(dashboardText).toContain("2");
+    expect(dashboardText).toContain("System-wide live data");
   });
 
   it("does not display metrics for an unrecognized role", () => {

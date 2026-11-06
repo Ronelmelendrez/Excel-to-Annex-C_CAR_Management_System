@@ -3,7 +3,7 @@ import { fetchAuditEvents } from "../api";
 
 const { apiCall } = vi.hoisted(() => ({ apiCall: vi.fn() }));
 
-vi.mock("../../../shared/supabase", () => ({ isDemoMode: false }));
+vi.mock("../../../shared/supabase", () => ({ isSupabaseConfigured: true }));
 vi.mock("../../../shared/api", () => ({ apiCall }));
 
 const event = {

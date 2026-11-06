@@ -11,14 +11,22 @@ export function withCors(headers: Record<string, string> = {}) {
 export function json(res: unknown, status = 200) {
   return new Response(JSON.stringify(res), {
     status,
-    headers: withCors({ "content-type": "application/json" }),
+    headers: withCors({
+      "cache-control": "no-store",
+      "content-type": "application/json",
+      vary: "Authorization",
+    }),
   });
 }
 
 export function text(body: string, status = 200, contentType = "text/plain; charset=utf-8") {
   return new Response(body, {
     status,
-    headers: withCors({ "content-type": contentType }),
+    headers: withCors({
+      "cache-control": "no-store",
+      "content-type": contentType,
+      vary: "Authorization",
+    }),
   });
 }
 
@@ -27,7 +35,10 @@ export function error(status: number, msg: string) {
 }
 
 export function preflight() {
-  return new Response(null, { status: 204, headers: withCors() });
+  return new Response(null, {
+    status: 204,
+    headers: withCors({ "cache-control": "no-store" }),
+  });
 }
 
 /**

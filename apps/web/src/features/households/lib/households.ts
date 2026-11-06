@@ -1,5 +1,5 @@
 import { normalizeGrantee } from "@import-domain";
-import type { HouseholdRecord } from "../mock-data";
+import type { HouseholdRecord } from "../types";
 import type { GranteeStatus } from "../types";
 
 export function getGranteeStatus(

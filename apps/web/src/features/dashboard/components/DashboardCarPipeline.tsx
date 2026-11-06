@@ -28,7 +28,7 @@ export function DashboardCarPipeline({ summary }: { summary: DashboardSummary })
               id: `car-${status}`,
               label,
               value: summary.carPipeline[status],
-              definition: `Count of latest CAR revisions currently in ${label.toLowerCase()} status in this sample scope.`,
+              definition: `Count of latest CAR revisions currently in ${label.toLowerCase()} status in the selected scope.`,
             }}
           />
         ))}

@@ -1,6 +1,5 @@
 import React from "react";
 import { useAuth } from "../../../app/providers";
-import { isDemoMode } from "../../../shared/supabase";
 import { useHouseholdRegister } from "../hooks/useHouseholdRegister";
 import { HouseholdDetail } from "./HouseholdDetail";
 import { HouseholdFilters } from "./HouseholdFilters";
@@ -9,11 +8,13 @@ import { HouseholdList } from "./HouseholdList";
 export function HouseholdsPage() {
   const { user, profile, roles } = useAuth();
   const actor = profile?.display_name || user?.email || "Signed-in staff";
-  const canCorrect = roles.some((role) => ["admin", "case_worker", "reviewer"].includes(role));
   const canView = roles.some((role) =>
     ["admin", "operator", "case_worker", "reviewer", "auditor"].includes(role),
   );
-  const register = useHouseholdRegister(actor, canView);
+  const cacheOwner = user?.id
+    ? `${user.id}:${[...roles].sort().join(",")}`
+    : "";
+  const register = useHouseholdRegister(actor, canView, cacheOwner);
 
   if (!canView) {
     return (
@@ -44,19 +45,19 @@ export function HouseholdsPage() {
               Check household members and resolve GRANTEE conflicts against the imported source rows.
             </p>
           </div>
-          <span
-            className={`border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] ${
-              isDemoMode
-                ? "border-[#8a5a00] bg-[#f3ead8] text-[#704700]"
-                : "border-[#2f5b3a] bg-[#e6ecdf] text-[#244b2e]"
-            }`}
-          >
-            {isDemoMode
-              ? "Mock records · local changes reset on reload"
-              : "Live Supabase records · imported from Excel"}
+          <span className="border border-[#2f5b3a] bg-[#e6ecdf] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[#244b2e]">
+            Supabase household records
           </span>
         </div>
       </header>
+
+      <p
+        role="status"
+        className="mt-4 border-l-4 border-[#8a5a00] bg-[#f3ead8] px-4 py-3 text-sm leading-6 text-[#704700]"
+      >
+        Household corrections and member exclusions are paused until changes can be saved and
+        audited by the server. You can still search and inspect source records.
+      </p>
 
       {register.loading ? (
         <p
@@ -106,6 +107,15 @@ export function HouseholdsPage() {
             </p>
           )}
 
+          {register.refreshError && (
+            <p
+              role="status"
+              className="mt-4 border-l-4 border-[#8a5a00] bg-[#f3ead8] px-4 py-3 text-sm leading-6 text-[#704700]"
+            >
+              {register.refreshError} Showing the last loaded household records.
+            </p>
+          )}
+
           {register.feedback && (
             <p
               role="status"
@@ -127,7 +137,7 @@ export function HouseholdsPage() {
               overlay={register.selectedOverlay}
               status={register.selectedStatus}
               granteeId={register.activeGrantee?.id}
-              canCorrect={canCorrect}
+              canCorrect={false}
               showResolveForm={register.showResolveForm}
               candidateId={register.candidateId}
               resolutionReason={register.resolutionReason}

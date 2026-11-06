@@ -1,4 +1,27 @@
-import type { HouseholdMember, HouseholdRecord } from "./mock-data";
+export type GranteeFlag = string;
+
+export type HouseholdMember = {
+  id: string;
+  entryId: string;
+  name: string;
+  relationship: string;
+  age: number | null;
+  granteeFlag: GranteeFlag;
+  sourceRow: number;
+  raw?: (string | null)[];
+};
+
+export type HouseholdRecord = {
+  id: string;
+  hhId: string;
+  barangay: string;
+  municipality: string;
+  importName: string;
+  importVersion: number;
+  headers?: string[];
+  members: HouseholdMember[];
+  car: { reference: string; status: string } | null;
+};
 
 export type GranteeStatus = "valid" | "none" | "multiple" | "invalid" | "blank";
 export type HouseholdStatus = GranteeStatus | "resolved";
@@ -24,5 +47,3 @@ export type HouseholdListItem = {
   household: HouseholdRecord;
   status: HouseholdStatus;
 };
-
-export type { HouseholdMember, HouseholdRecord };

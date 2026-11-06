@@ -18,6 +18,7 @@ import { analyzeWorkbook, sha256Hex, type WorkbookAnalysisResult } from "./workb
 import { buildErrorReportCsv } from "./report.ts";
 
 const IMPORT_ROLES = ["admin", "operator"];
+const IMPORTS_ENABLED = false;
 const BUCKET = "imports";
 const MAX_LIST_LIMIT = 50;
 
@@ -497,6 +498,9 @@ async function errorReport(supabase: any, url: URL) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return preflight();
+  if (!IMPORTS_ENABLED) {
+    return error(503, "imports_temporarily_unavailable");
+  }
 
   try {
     const user = await verifyJwt(req);

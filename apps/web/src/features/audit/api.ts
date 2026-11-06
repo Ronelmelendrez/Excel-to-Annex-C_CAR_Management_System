@@ -1,5 +1,4 @@
 import { apiCall } from "../../shared/api";
-import { isDemoMode } from "../../shared/supabase";
 import type { AuditEvent, AuditEventPage, AuditFilters } from "./types";
 
 export const AUDIT_PAGE_SIZE = 50;
@@ -23,10 +22,6 @@ export async function fetchAuditEvents(
   offset: number,
   signal?: AbortSignal,
 ): Promise<AuditEventPage> {
-  if (isDemoMode) {
-    throw new Error("Connect Supabase to view persisted audit records. Sample audit data is disabled.");
-  }
-
   const query = new URLSearchParams({
     action: "list",
     limit: String(AUDIT_PAGE_SIZE),

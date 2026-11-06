@@ -2,13 +2,14 @@ import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HouseholdsPage } from "../components/HouseholdsPage";
+import { serverDataCache } from "../../../shared/server-data-cache";
 
 const { getHouseholdRegisterStats, listHouseholds } = vi.hoisted(() => ({
   getHouseholdRegisterStats: vi.fn(),
   listHouseholds: vi.fn(),
 }));
 
-vi.mock("../../../shared/supabase", () => ({ isDemoMode: false }));
+vi.mock("../../../shared/supabase", () => ({ isSupabaseConfigured: true }));
 vi.mock("../api", () => ({
   getHouseholdRegisterStats,
   listHouseholds,
@@ -16,7 +17,7 @@ vi.mock("../api", () => ({
 }));
 vi.mock("../../../app/providers", () => ({
   useAuth: () => ({
-    user: { email: "worker@example.test" },
+    user: { id: "worker", email: "worker@example.test" },
     profile: { display_name: "Case worker" },
     roles: ["case_worker"],
   }),
@@ -25,8 +26,8 @@ vi.mock("../../../app/providers", () => ({
 const household = {
   id: "household-700007993656",
   hhId: "700007993656",
-  barangay: "Sample Barangay",
-  municipality: "Sample Municipality",
+  barangay: "Test Barangay",
+  municipality: "Test Municipality",
   importName: "households.xlsx",
   importVersion: 1,
   members: [],
@@ -36,6 +37,7 @@ const household = {
 describe("household ID search", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    serverDataCache.clear();
     getHouseholdRegisterStats.mockResolvedValue({
       householdCount: 1758,
       memberCount: 6200,

@@ -7,16 +7,27 @@ import { HouseholdList } from "../components/HouseholdList";
 import { HouseholdMembersTable } from "../components/HouseholdMembersTable";
 import type { HouseholdRecord } from "../types";
 import { asHousehold } from "../api";
+import { mockHouseholds } from "./fixtures";
+import { serverDataCache } from "../../../shared/server-data-cache";
+
+const { getHouseholdRegisterStats, listHouseholds } = vi.hoisted(() => ({
+  getHouseholdRegisterStats: vi.fn(),
+  listHouseholds: vi.fn(),
+}));
 
 vi.mock("../../../app/providers", () => ({
   useAuth: vi.fn(),
 }));
+vi.mock("../api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../api")>();
+  return { ...actual, getHouseholdRegisterStats, listHouseholds };
+});
 
-function authFor(roles: string[]) {
+function authFor(roles: string[], userId = "worker") {
   return {
     session: {},
-    user: { email: "worker@example.test" },
-    profile: { id: "worker", display_name: "Demo case worker", status: "active" as const },
+    user: { id: userId, email: `${userId}@example.test` },
+    profile: { id: userId, display_name: "Case worker", status: "active" as const },
     roles,
     loading: false,
     signIn: async () => ({}),
@@ -27,17 +38,30 @@ function authFor(roles: string[]) {
 describe("F4 household register", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    serverDataCache.clear();
     vi.mocked(useAuth).mockReturnValue(authFor(["case_worker"]));
+    getHouseholdRegisterStats.mockResolvedValue({
+      householdCount: mockHouseholds.length,
+      memberCount: mockHouseholds.reduce((count, item) => count + item.members.length, 0),
+      granteeCount: 1,
+      needsReviewCount: 4,
+    });
+    listHouseholds.mockImplementation((hhId?: string) => {
+      const households = hhId
+        ? mockHouseholds.filter((item) => item.hhId === hhId)
+        : mockHouseholds;
+      return Promise.resolve({ households, total: households.length });
+    });
   });
 
   afterEach(() => {
     cleanup();
   });
 
-  it("shows imported member rows and all grantee validation states", () => {
+  it("shows loaded household records and grantee validation states", async () => {
     render(<HouseholdsPage />);
 
-    expect(screen.getByText("Mock records · local changes reset on reload")).toBeTruthy();
+    expect(await screen.findByText("Supabase household records")).toBeTruthy();
     expect(screen.getAllByText("Multiple Yes flags").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Grantee OK").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Blank flag").length).toBeGreaterThan(0);
@@ -50,36 +74,51 @@ describe("F4 household register", () => {
     expect(screen.getByText("Jomar Ramos · source row 44")).toBeTruthy();
   });
 
-  it("requires a deliberate member choice and reason before recording a local correction", () => {
+  it("keeps local-only household corrections disabled", async () => {
     render(<HouseholdsPage />);
-    fireEvent.click(screen.getByRole("button", { name: "Resolve grantee" }));
-
-    const candidates = screen.getAllByRole("radio");
-    expect(candidates).toHaveLength(5);
-    expect(candidates.some((candidate) => (candidate as HTMLInputElement).checked)).toBe(false);
-
-    fireEvent.click(screen.getByRole("radio", { name: /Rosa Dela Cruz/ }));
-    fireEvent.change(screen.getByLabelText("Reason for correction"), {
-      target: { value: "Verified against the signed household record." },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Record local correction" }));
-
-    expect(screen.getAllByText("Resolved by staff").length).toBeGreaterThan(0);
-    expect(screen.getByRole("status").textContent).toContain("Imported GRANTEE values remain unchanged");
-    expect(screen.getByText(/Before: Rosa Dela Cruz: Yes, Mario Dela Cruz: Yes/)).toBeTruthy();
-    expect(screen.getByText(/Verified against the signed household record/)).toBeTruthy();
+    expect(await screen.findByText(/corrections and member exclusions are paused/i)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Resolve grantee" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Exclude member/ })).toBeNull();
   });
 
-  it("filters by household ID and provides a useful no-results state", () => {
+  it("reuses the user-scoped in-memory household data when returning to the page", async () => {
+    const firstRender = render(<HouseholdsPage />);
+    expect(await screen.findByRole("button", { name: /HH_ID 000091/ })).toBeTruthy();
+    expect(listHouseholds).toHaveBeenCalledTimes(1);
+    expect(getHouseholdRegisterStats).toHaveBeenCalledTimes(1);
+    firstRender.unmount();
+
     render(<HouseholdsPage />);
-    const search = screen.getByRole("searchbox", { name: "Search households" });
+
+    expect(screen.getByRole("button", { name: /HH_ID 000091/ })).toBeTruthy();
+    expect(listHouseholds).toHaveBeenCalledTimes(1);
+    expect(getHouseholdRegisterStats).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not show one user's cached household data to another user", async () => {
+    const view = render(<HouseholdsPage />);
+    expect(await screen.findByRole("button", { name: /HH_ID 000091/ })).toBeTruthy();
+
+    listHouseholds.mockRejectedValueOnce(new Error("network unavailable"));
+    vi.mocked(useAuth).mockReturnValue(authFor(["case_worker"], "worker-2"));
+    view.rerender(<HouseholdsPage />);
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "The household register could not be loaded.",
+    );
+    expect(screen.queryByRole("button", { name: /HH_ID 000091/ })).toBeNull();
+  });
+
+  it("filters by household ID and provides a useful no-results state", async () => {
+    render(<HouseholdsPage />);
+    const search = await screen.findByRole("searchbox", { name: "Search households" });
 
     fireEvent.change(search, { target: { value: "000091" } });
-    expect(screen.getByRole("heading", { name: "HH_ID 000091" })).toBeTruthy();
-    expect(screen.getByText("Showing 1 of 5 sample households")).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "HH_ID 000091" })).toBeTruthy();
+    expect(screen.getByText(/Showing 1 of 5/)).toBeTruthy();
 
     fireEvent.change(search, { target: { value: "not-in-the-register" } });
-    expect(screen.getByText("No households match those filters.")).toBeTruthy();
+    expect(await screen.findByText("No households match those filters.")).toBeTruthy();
     expect(screen.getByText("Select a household")).toBeTruthy();
   });
 

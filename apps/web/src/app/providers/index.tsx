@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../shared/supabase';
+import { serverDataCache } from '../../shared/server-data-cache';
 
 type Profile = {
   id: string;
@@ -25,6 +26,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [roles, setRoles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const cacheIdentity = useRef<string | null>(null);
+
+  function syncCacheIdentity(userId: string | null, status?: Profile['status'], userRoles: string[] = []) {
+    const nextIdentity = userId
+      ? `${userId}:${status ?? 'unknown'}:${[...userRoles].sort().join(',')}`
+      : null;
+    if (cacheIdentity.current !== nextIdentity) serverDataCache.clear();
+    cacheIdentity.current = nextIdentity;
+  }
 
   // Fetch profile + roles without committing them to state.
   // Returns raw data so the caller can decide whether to accept the session
@@ -61,17 +71,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // CRITICAL: a disabled account must not get a session, even a
           // pre-existing one restored from storage on page load.
           await supabase.auth.signOut();
+          syncCacheIdentity(null);
           setSession(null);
           setUser(null);
           setProfile(null);
           setRoles([]);
         } else {
+          syncCacheIdentity(session.user.id, p?.status, r);
           setSession(session);
           setUser(session?.user ?? null);
           setProfile(p);
           setRoles(r);
         }
       } else {
+        syncCacheIdentity(null);
         setSession(null);
         setUser(null);
         setProfile(null);
@@ -91,15 +104,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           // CRITICAL: block disabled accounts on every auth state change.
           if (p?.status === 'disabled') {
+            syncCacheIdentity(null);
             await supabase.auth.signOut();
             return; // Do NOT persist the session in state.
           }
 
+          syncCacheIdentity(session.user.id, p?.status, r);
           setSession(session);
           setUser(session?.user ?? null);
           setProfile(p);
           setRoles(r);
         } else {
+          syncCacheIdentity(null);
           setSession(null);
           setUser(null);
           setProfile(null);

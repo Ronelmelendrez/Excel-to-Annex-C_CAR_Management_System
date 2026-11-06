@@ -1,5 +1,4 @@
 import { useAuth } from "../../../app/providers";
-import { isDemoMode } from "../../../shared/supabase";
 import { useDashboardSummary } from "../hooks/useDashboardSummary";
 import { isDashboardRole } from "../lib/dashboard";
 import { DashboardActivity } from "./DashboardActivity";
@@ -42,14 +41,8 @@ export function DashboardPage() {
               Follow import volume, household review work, CAR progress, and document failures.
             </p>
           </div>
-          <span
-            className={`border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] ${
-              isDemoMode
-                ? "border-[#8a5a00] bg-[#f3ead8] text-[#704700]"
-                : "border-[#2f5b3a] bg-[#e6ecdf] text-[#244b2e]"
-            }`}
-          >
-            {isDemoMode ? "Sample data · demo mode" : "Live Supabase data · refreshes every 15 seconds"}
+          <span className="border border-[#2f5b3a] bg-[#e6ecdf] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[#244b2e]">
+            Live Supabase data · refreshes every 15 seconds
           </span>
         </div>
       </header>

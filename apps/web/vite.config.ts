@@ -46,9 +46,7 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
-    // The suite always runs against the local mock backend. A developer's
-    // .env.local may point at a live Supabase project, so the credentials are
-    // cleared here: tests must never read or write real data.
+    // Clear developer credentials so tests never read or write live Supabase data.
     env: {
       VITE_SUPABASE_URL: '',
       VITE_SUPABASE_ANON_KEY: '',
@@ -59,10 +57,12 @@ export default defineConfig({
       'src/features/households/__tests__/*.test.{ts,tsx}',
       'src/features/cars/__tests__/*.test.tsx',
       'src/features/review/__tests__/*.test.tsx',
+      'src/features/landing/__tests__/*.test.tsx',
       'src/features/templates/__tests__/*.test.{ts,tsx}',
       'src/features/dashboard/__tests__/*.test.tsx',
       'src/features/dashboard/__tests__/api.test.ts',
       'src/features/audit/__tests__/*.test.{ts,tsx}',
+      'src/shared/__tests__/*.test.{ts,tsx}',
     ],
     globals: true,
     // Rendering the full Annex C document (60+ slots, three tables) in jsdom

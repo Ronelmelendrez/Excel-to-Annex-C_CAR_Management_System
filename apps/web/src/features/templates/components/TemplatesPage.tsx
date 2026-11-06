@@ -6,7 +6,6 @@ import { getCarChecklist } from "../../cars/lib/car-draft";
 import type { CarDraft, ValidatedHousehold } from "../../cars/types";
 import { householdListError, listHouseholds } from "../../households/api";
 import { getGranteeStatus } from "../../households/lib/households";
-import { isDemoMode } from "../../../shared/supabase";
 import { annexCDocxFileName, downloadDocx, renderAnnexCDocx } from "../lib/annex-c-docx";
 import { synthesizeDraft } from "../lib/synthesize-draft";
 
@@ -71,10 +70,6 @@ export function TemplatesPage() {
    *  register alone still produces a full synthesized preview. */
   useEffect(() => {
     let cancelled = false;
-    if (isDemoMode) {
-      setCarsNote("Demo mode: preview is synthesized from the sample import data.");
-      return;
-    }
     listCars()
       .then((saved) => {
         if (!cancelled) setCars(saved);

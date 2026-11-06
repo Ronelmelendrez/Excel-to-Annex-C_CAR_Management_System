@@ -38,7 +38,11 @@ export async function apiCall(path: string, options: RequestInit = {}) {
     'Content-Type': 'application/json',
     ...((options.headers as Record<string, string>) || {}),
   });
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    cache: 'no-store',
+    headers,
+  });
   if (!res.ok) {
     let payload: Record<string, any> = {};
     let msg = `api_error_${res.status}`;

@@ -1,13 +1,6 @@
-import { isDemoMode, supabase } from '../../shared/supabase';
+import { supabase } from '../../shared/supabase';
 import { apiBase, apiCall, authHeaders, ApiError } from '../../shared/api';
 import { IMPORT_MAX_MB } from './lib/import-limits';
-import {
-  demoCommit,
-  demoErrorReportCsv,
-  demoListImports,
-  demoPreview,
-  demoUploadWorkbook,
-} from './lib/demo-backend';
 import type {
   CommitRequest,
   CommitResponse,
@@ -47,10 +40,6 @@ export async function uploadWorkbook(params: {
   fileHash: string;
 }): Promise<{ path: string }> {
   const path = storagePathFor(params.userId, params.fileHash, params.file.name);
-  if (isDemoMode) {
-    // Demo mode keeps the file in memory; no storage bucket is touched.
-    return demoUploadWorkbook(path, params.file);
-  }
   const { error } = await supabase.storage.from(BUCKET).upload(path, params.file, {
     upsert: false,
     contentType: params.file.type || 'application/octet-stream',
@@ -80,13 +69,6 @@ export async function uploadWorkbook(params: {
 }
 
 export async function previewImport(payload: PreviewRequest): Promise<ImportPreview> {
-  if (isDemoMode) {
-    try {
-      return await demoPreview(payload);
-    } catch (error) {
-      throw normalizeImportError(error, 'Validation could not run');
-    }
-  }
   try {
     return (await apiCall('/imports', {
       method: 'POST',
@@ -98,13 +80,6 @@ export async function previewImport(payload: PreviewRequest): Promise<ImportPrev
 }
 
 export async function commitImport(payload: CommitRequest): Promise<CommitResponse> {
-  if (isDemoMode) {
-    try {
-      return await demoCommit(payload);
-    } catch (error) {
-      throw normalizeImportError(error, 'The import could not be committed');
-    }
-  }
   try {
     return (await apiCall('/imports', {
       method: 'POST',
@@ -118,9 +93,6 @@ export async function commitImport(payload: CommitRequest): Promise<CommitRespon
 export async function listImports(params: { limit?: number; offset?: number } = {}): Promise<ImportListResponse> {
   const limit = params.limit ?? 20;
   const offset = params.offset ?? 0;
-  if (isDemoMode) {
-    return demoListImports(limit, offset);
-  }
   try {
     return (await apiCall(`/imports?action=list&limit=${limit}&offset=${offset}`)) as ImportListResponse;
   } catch (error) {
@@ -129,13 +101,6 @@ export async function listImports(params: { limit?: number; offset?: number } = 
 }
 
 export async function fetchErrorReportCsv(importId: string): Promise<string> {
-  if (isDemoMode) {
-    try {
-      return demoErrorReportCsv(importId);
-    } catch (error) {
-      throw error instanceof Error ? error : new Error('The error report could not be downloaded.');
-    }
-  }
   const headers = await authHeaders();
   const res = await fetch(`${apiBase()}/imports?action=errors&id=${encodeURIComponent(importId)}`, {
     headers,

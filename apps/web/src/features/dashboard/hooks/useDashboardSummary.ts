@@ -1,23 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
-import { isDemoMode } from "../../../shared/supabase";
 import { fetchDashboardSummary } from "../api";
-import { getDashboardSummary } from "../lib/dashboard";
 import type { DashboardScope } from "../types";
 
 export function useDashboardSummary(scope: DashboardScope) {
-  const [summary, setSummary] = useState(() =>
-    isDemoMode ? getDashboardSummary(scope) : null,
-  );
-  const [loading, setLoading] = useState(!isDemoMode);
+  const [summary, setSummary] = useState<Awaited<ReturnType<typeof fetchDashboardSummary>> | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
-    if (isDemoMode) {
-      setSummary(getDashboardSummary(scope));
-      setLoading(false);
-      return;
-    }
     let cancelled = false;
     let refreshing = false;
     setSummary((current) => (current?.scope === scope ? current : null));

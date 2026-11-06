@@ -8,7 +8,7 @@ const { fetchDashboardSummary } = vi.hoisted(() => ({
   fetchDashboardSummary: vi.fn(),
 }));
 
-vi.mock("../../../shared/supabase", () => ({ isDemoMode: false }));
+vi.mock("../../../shared/supabase", () => ({ isSupabaseConfigured: true }));
 vi.mock("../../../app/providers", () => ({
   useAuth: () => ({ roles: ["case_worker"] }),
 }));

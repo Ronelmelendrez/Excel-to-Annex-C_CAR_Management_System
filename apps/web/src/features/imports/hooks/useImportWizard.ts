@@ -19,7 +19,6 @@ import {
   storageHashFromPath,
   uploadWorkbook,
 } from "../api";
-import { isDemoMode } from "../../../shared/supabase";
 import {
   LOCK_RENEW_MS,
   acquireLease,
@@ -857,9 +856,7 @@ export function useImportWizard(params: {
         const nextBundle = await readWorkbookFile(file, stored.bytes);
         if (!mountedRef.current) return;
 
-        // Demo uploads live in an in-memory bucket that a refresh clears, so a
-        // resumed demo session must re-upload before validating again.
-        const restoredPath = isDemoMode ? null : record.storagePath;
+        const restoredPath = record.storagePath;
 
         // The operator never picked a worksheet (the session was saved while
         // the sheet-name picker was open): return to the picker instead of

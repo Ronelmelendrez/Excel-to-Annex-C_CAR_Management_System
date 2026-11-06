@@ -1,5 +1,5 @@
 import type { SlotValues } from "@report-template";
-import type { HouseholdMember, HouseholdRecord } from "../households/mock-data";
+import type { HouseholdMember, HouseholdRecord } from "../households/types";
 
 export type CarDraftStatus = "draft_incomplete" | "draft_ready_for_review";
 

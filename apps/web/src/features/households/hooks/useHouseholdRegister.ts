@@ -1,23 +1,39 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { normalizeGrantee } from "@import-domain";
+import { serverDataCache } from "../../../shared/server-data-cache";
 import {
   getHouseholdRegisterStats,
   householdListError,
   listHouseholds,
+  type HouseholdListResponse,
   type HouseholdRegisterStats,
 } from "../api";
-import { isDemoMode } from "../../../shared/supabase";
-import { mockHouseholds } from "../mock-data";
-import type { HouseholdRecord } from "../mock-data";
+import { getGranteeStatus } from "../lib/households";
+import type { HouseholdRecord } from "../types";
 import type {
   HouseholdOverlay,
   HouseholdStatus,
   OverlayEvent,
   ReviewFilter,
 } from "../types";
-import { getGranteeStatus } from "../lib/households";
 
-export function useHouseholdRegister(actor: string, enabled = true) {
+const HOUSEHOLD_STALE_TIME = 30_000;
+const STATS_STALE_TIME = 15_000;
+const HOUSEHOLD_REFRESH_INTERVAL = 30_000;
+
+function householdListKey(userId: string) {
+  return `households:${userId}:list`;
+}
+
+function householdSearchKey(userId: string, hhId: string) {
+  return `households:${userId}:search:${hhId}`;
+}
+
+function householdStatsKey(userId: string) {
+  return `households:${userId}:stats`;
+}
+
+export function useHouseholdRegister(actor: string, enabled = true, userId = "") {
   const [query, setQuery] = useState("");
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>("all");
   const [versionFilter, setVersionFilter] = useState("all");
@@ -30,65 +46,146 @@ export function useHouseholdRegister(actor: string, enabled = true) {
   const [exclusionReason, setExclusionReason] = useState("");
   const [feedback, setFeedback] = useState("");
 
-  // Demo mode seeds the sample synchronously so the first render is complete;
-  // real mode starts empty and loads from Supabase below.
-  const [households, setHouseholds] = useState<HouseholdRecord[]>(() =>
-    isDemoMode ? mockHouseholds : [],
+  const [households, setHouseholds] = useState<HouseholdRecord[]>(
+    () => (userId ? serverDataCache.get<HouseholdListResponse>(householdListKey(userId))?.data.households : undefined) ?? [],
   );
   const [searchedHouseholds, setSearchedHouseholds] = useState<HouseholdRecord[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(!isDemoMode);
+  const [loading, setLoading] = useState(
+    () => !userId || !serverDataCache.get<HouseholdListResponse>(householdListKey(userId)),
+  );
+  const [dataOwnerId, setDataOwnerId] = useState(userId);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [registerStats, setRegisterStats] = useState<HouseholdRegisterStats | null>(() => {
-    if (!isDemoMode) return null;
-    const householdCount = mockHouseholds.length;
-    const granteeCount = mockHouseholds.filter(
-      (household) => getGranteeStatus(household) === "valid",
-    ).length;
-    return {
-      householdCount,
-      memberCount: mockHouseholds.reduce(
-        (total, household) => total + household.members.length,
-        0,
-      ),
-      granteeCount,
-      needsReviewCount: householdCount - granteeCount,
-    };
-  });
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [registerStats, setRegisterStats] = useState<HouseholdRegisterStats | null>(
+    () => (userId ? serverDataCache.get<HouseholdRegisterStats>(householdStatsKey(userId))?.data : undefined) ?? null,
+  );
   const [statsError, setStatsError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  const ownedHouseholds = dataOwnerId === userId ? households : [];
+  const ownedSearchedHouseholds = dataOwnerId === userId ? searchedHouseholds : [];
+  const ownedRegisterStats = dataOwnerId === userId ? registerStats : null;
+
+  useLayoutEffect(() => {
+    if (dataOwnerId === userId) return;
+    setDataOwnerId(userId);
+    setQuery("");
+    setReviewFilter("all");
+    setVersionFilter("all");
+    setOverlays({});
+    setShowResolveForm(false);
+    setCandidateId("");
+    setResolutionReason("");
+    setExcludeMemberId(null);
+    setExclusionReason("");
+    setFeedback("");
+    setHouseholds(
+      userId
+        ? serverDataCache.get<HouseholdListResponse>(householdListKey(userId))?.data.households ?? []
+        : [],
+    );
+    setSearchedHouseholds([]);
+    setRegisterStats(
+      userId
+        ? serverDataCache.get<HouseholdRegisterStats>(householdStatsKey(userId))?.data ?? null
+        : null,
+    );
+    setSelectedId("");
+    setLoading(!userId || !serverDataCache.get<HouseholdListResponse>(householdListKey(userId)));
+    setLoadError(null);
+    setRefreshError(null);
+    setSearchError(null);
+    setStatsError(null);
+  }, [dataOwnerId, userId]);
 
   useEffect(() => {
-    if (isDemoMode || !enabled) return;
+    if (!enabled) {
+      setHouseholds([]);
+      setRegisterStats(null);
+      setLoading(false);
+      return;
+    }
+
+    if (!userId) {
+      setHouseholds([]);
+      setRegisterStats(null);
+      setLoading(false);
+      setLoadError("Your signed-in user could not be identified. Sign in again to view household records.");
+      return;
+    }
+
     let cancelled = false;
-    setLoading(true);
+    let refreshing = false;
+    const key = householdListKey(userId);
+    const cached = serverDataCache.get<HouseholdListResponse>(key);
+    setHouseholds(cached?.data.households ?? []);
+    setLoading(!cached);
     setLoadError(null);
-    listHouseholds()
-      .then((result) => {
+    setRefreshError(null);
+
+    async function refreshHouseholds(force = false) {
+      if (refreshing) return;
+      const current = serverDataCache.get<HouseholdListResponse>(key);
+      if (!force && current && serverDataCache.isFresh(current, HOUSEHOLD_STALE_TIME)) {
+        setHouseholds(current.data.households);
+        setLoading(false);
+        return;
+      }
+
+      refreshing = true;
+      if (!current) setLoading(true);
+      try {
+        const result = await serverDataCache.fetch(key, () => listHouseholds());
         if (cancelled) return;
         setHouseholds(result.households);
         setLoading(false);
-      })
-      .catch((error: unknown) => {
+        setLoadError(null);
+        setRefreshError(null);
+      } catch (error: unknown) {
         if (cancelled) return;
-        setLoadError(householdListError(error));
         setLoading(false);
-      });
+        if (current) setRefreshError(householdListError(error));
+        else setLoadError(householdListError(error));
+      } finally {
+        refreshing = false;
+      }
+    }
+
+    void refreshHouseholds();
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refreshHouseholds();
+    }, HOUSEHOLD_REFRESH_INTERVAL);
+    const handleResume = () => void refreshHouseholds();
+    window.addEventListener("focus", handleResume);
+    window.addEventListener("online", handleResume);
+
     return () => {
       cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", handleResume);
+      window.removeEventListener("online", handleResume);
     };
-  }, [enabled, reloadToken]);
+  }, [enabled, reloadToken, userId]);
 
   useEffect(() => {
-    if (isDemoMode || !enabled) return;
+    if (!enabled || !userId) return;
     let cancelled = false;
     let refreshing = false;
+    const key = householdStatsKey(userId);
+    const cached = serverDataCache.get<HouseholdRegisterStats>(key);
+    setRegisterStats(cached?.data ?? null);
 
     async function refreshStats() {
       if (refreshing) return;
+      const current = serverDataCache.get<HouseholdRegisterStats>(key);
+      if (current && serverDataCache.isFresh(current, STATS_STALE_TIME)) {
+        setRegisterStats(current.data);
+        setStatsError(null);
+        return;
+      }
       refreshing = true;
       try {
-        const stats = await getHouseholdRegisterStats();
+        const stats = await serverDataCache.fetch(key, getHouseholdRegisterStats);
         if (!cancelled) {
           setRegisterStats(stats);
           setStatsError(null);
@@ -102,14 +199,19 @@ export function useHouseholdRegister(actor: string, enabled = true) {
 
     void refreshStats();
     const interval = window.setInterval(() => {
-      void refreshStats();
-    }, 15_000);
+      if (document.visibilityState === "visible") void refreshStats();
+    }, STATS_STALE_TIME);
+    const handleResume = () => void refreshStats();
+    window.addEventListener("focus", handleResume);
+    window.addEventListener("online", handleResume);
 
     return () => {
       cancelled = true;
       window.clearInterval(interval);
+      window.removeEventListener("focus", handleResume);
+      window.removeEventListener("online", handleResume);
     };
-  }, [enabled, reloadToken]);
+  }, [enabled, reloadToken, userId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,18 +221,27 @@ export function useHouseholdRegister(actor: string, enabled = true) {
     const hhId = query.trim();
     const isIdLike = /^[\p{L}\p{N}_-]{4,}$/u.test(hhId);
     if (
-      isDemoMode ||
       !enabled ||
+      !userId ||
       !isIdLike ||
-      households.some((household) => household.hhId === hhId)
+      ownedHouseholds.some((household) => household.hhId === hhId)
     ) {
       return () => {
         cancelled = true;
       };
     }
 
+    const key = householdSearchKey(userId, hhId);
+    const cached = serverDataCache.get<HouseholdListResponse>(key);
+    if (cached) setSearchedHouseholds(cached.data.households);
+    if (cached && serverDataCache.isFresh(cached, HOUSEHOLD_STALE_TIME)) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
     const timer = window.setTimeout(() => {
-      listHouseholds(hhId)
+      serverDataCache.fetch(key, () => listHouseholds(hhId))
         .then((result) => {
           if (!cancelled) setSearchedHouseholds(result.households);
         })
@@ -143,15 +254,15 @@ export function useHouseholdRegister(actor: string, enabled = true) {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [enabled, households, query]);
+  }, [enabled, ownedHouseholds, query, userId]);
 
   const searchableHouseholds = useMemo(() => {
-    const loadedIds = new Set(households.map((household) => household.id));
+    const loadedIds = new Set(ownedHouseholds.map((household) => household.id));
     return [
-      ...households,
-      ...searchedHouseholds.filter((household) => !loadedIds.has(household.id)),
+      ...ownedHouseholds,
+      ...ownedSearchedHouseholds.filter((household) => !loadedIds.has(household.id)),
     ];
-  }, [households, searchedHouseholds]);
+  }, [ownedHouseholds, ownedSearchedHouseholds]);
 
   const versionOptions = useMemo(() => {
     const options = new Map<string, string>();
@@ -207,20 +318,20 @@ export function useHouseholdRegister(actor: string, enabled = true) {
   const activeGrantee = selectedOverlay?.selectedGranteeId
     ? selected?.members.find((member) => member.id === selectedOverlay.selectedGranteeId)
     : selected?.members.find((member) => normalizeGrantee(member.granteeFlag) === true);
-  const needsReviewCount = households.filter((household) => {
+  const needsReviewCount = ownedHouseholds.filter((household) => {
     const overlay = overlays[household.id];
     return overlay?.selectedGranteeId
       ? false
       : getGranteeStatus(household, overlay?.excludedMemberIds) !== "valid";
   }).length;
-  const granteeCount = households.filter((household) => {
+  const granteeCount = ownedHouseholds.filter((household) => {
     const overlay = overlays[household.id];
     return (
       Boolean(overlay?.selectedGranteeId) ||
       getGranteeStatus(household, overlay?.excludedMemberIds) === "valid"
     );
   }).length;
-  const totalMembers = households.reduce(
+  const totalMembers = ownedHouseholds.reduce(
     (total, household) => total + household.members.length,
     0,
   );
@@ -350,15 +461,17 @@ export function useHouseholdRegister(actor: string, enabled = true) {
   }
 
   function reload() {
+    serverDataCache.clear();
     setReloadToken((token) => token + 1);
   }
 
   return {
-    households,
+    households: ownedHouseholds,
     loading,
     loadError,
+    refreshError,
     searchError,
-    registerStats,
+    registerStats: ownedRegisterStats,
     statsError,
     reload,
     versionOptions,

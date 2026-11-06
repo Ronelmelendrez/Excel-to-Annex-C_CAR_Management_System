@@ -1,7 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../providers';
-import { isDemoMode } from '../../shared/supabase';
 import { useScrolledPast } from '../../shared/hooks';
 
 const linkBase =
@@ -11,12 +10,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, profile, roles, signOut } = useAuth();
   const navigate = useNavigate();
   const condensed = useScrolledPast(24);
-  const canImport = roles.includes('admin') || roles.includes('operator');
   const canViewHouseholds = roles.some((role) =>
     ['admin', 'operator', 'case_worker', 'reviewer', 'auditor'].includes(role),
   );
   const canAuthorCars = roles.includes('admin') || roles.includes('case_worker');
-  const canReviewCars = roles.includes('reviewer');
   const canGenerateReports = roles.some((role) =>
     ['admin', 'case_worker', 'reviewer'].includes(role),
   );
@@ -35,14 +32,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         Skip to content
       </a>
-
-      {isDemoMode && (
-        <div className="border-b border-[#161512] bg-[#161512] text-[#f4f1ea]">
-          <p className="mx-auto max-w-[1180px] px-4 py-2 font-mono text-[10px] uppercase tracking-[0.16em] sm:px-6">
-            Demo build / Supabase not connected / local mock data only
-          </p>
-        </div>
-      )}
 
       <header
         className={`sticky top-0 z-40 border-b border-[#161512] transition-[background-color,box-shadow] duration-300 ease-out ${
@@ -79,16 +68,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               >
                 Dashboard
               </NavLink>
-              {canImport && (
-                <NavLink
-                  to="/imports"
-                  className={({ isActive }) =>
-                    `${linkBase} ${isActive ? 'font-semibold underline decoration-2' : 'text-[#3f3b34]'}`
-                  }
-                >
-                  Excel imports
-                </NavLink>
-              )}
               {canViewHouseholds && (
                 <NavLink
                   to="/households"
@@ -107,16 +86,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   }
                 >
                   CARs
-                </NavLink>
-              )}
-              {canReviewCars && (
-                <NavLink
-                  to="/review"
-                  className={({ isActive }) =>
-                    `${linkBase} ${isActive ? 'font-semibold underline decoration-2' : 'text-[#3f3b34]'}`
-                  }
-                >
-                  Review queue
                 </NavLink>
               )}
               {canGenerateReports && (

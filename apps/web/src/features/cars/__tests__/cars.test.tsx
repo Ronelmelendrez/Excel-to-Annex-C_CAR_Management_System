@@ -6,15 +6,13 @@ import { CarsPage } from "../components/CarsPage";
 import { CAR_NOT_CONFIGURED_MESSAGE, listCars, createCar, deleteCar, updateCar, listCarTemplates, createCarRevision } from "../api";
 import { listHouseholds } from "../../households/api";
 import type { CarDraft } from "../types";
-import type { HouseholdRecord } from "../../households/mock-data";
+import type { HouseholdRecord } from "../../households/types";
 
-// Tests always run without Supabase credentials (vite.config.ts clears them),
-// so demo mode is forced off here and every data call is stubbed instead.
-const env = vi.hoisted(() => ({ demo: false }));
+const env = vi.hoisted(() => ({ configured: true }));
 
 vi.mock("../../../shared/supabase", () => ({
-  get isDemoMode() {
-    return env.demo;
+  get isSupabaseConfigured() {
+    return env.configured;
   },
   supabase: {
     auth: {
@@ -126,7 +124,7 @@ async function renderLoadedPage() {
 describe("F5 CAR authoring", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    env.demo = false;
+    env.configured = true;
     vi.mocked(useAuth).mockReturnValue(authFor(["case_worker"]));
     vi.mocked(listCars).mockResolvedValue([makeCar({ id: "car-1", reference: "CAR-2026-023" })]);
     vi.mocked(listCarTemplates).mockResolvedValue([
@@ -267,7 +265,7 @@ describe("F5 CAR authoring", () => {
   });
 
   it("shows an explicit not-configured state instead of sample records", () => {
-    env.demo = true;
+    env.configured = false;
 
     render(<CarsPage />);
 

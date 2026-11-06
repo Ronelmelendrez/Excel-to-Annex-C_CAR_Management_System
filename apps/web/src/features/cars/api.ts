@@ -1,5 +1,5 @@
 import { ApiError, apiCall } from "../../shared/api";
-import { isDemoMode } from "../../shared/supabase";
+import { isSupabaseConfigured } from "../../shared/supabase";
 import type { SlotValue, SlotValues } from "@report-template";
 import { ensureInterventions } from "./lib/report/values";
 import type {
@@ -32,12 +32,12 @@ export class CarApiError extends Error {
   }
 }
 
-/** Shown when Supabase credentials are missing (demo mode). */
+/** Shown when Supabase credentials are missing. */
 export const CAR_NOT_CONFIGURED_MESSAGE =
   "CAR data requires Supabase. Configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, then apply the Supabase migrations and deploy the cars function.";
 
 function assertConfigured(): void {
-  if (isDemoMode) {
+  if (!isSupabaseConfigured) {
     throw new CarApiError("NOT_CONFIGURED", CAR_NOT_CONFIGURED_MESSAGE);
   }
 }

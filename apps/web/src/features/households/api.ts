@@ -1,8 +1,5 @@
 import { ApiError, apiCall } from "../../shared/api";
-import { isDemoMode } from "../../shared/supabase";
-import { mockHouseholds } from "./mock-data";
-import { getGranteeStatus } from "./lib/households";
-import type { HouseholdRecord } from "./mock-data";
+import type { HouseholdRecord } from "./types";
 
 export type HouseholdListResponse = {
   households: HouseholdRecord[];
@@ -70,18 +67,8 @@ export function asHousehold(raw: unknown): HouseholdRecord | null {
   };
 }
 
-/**
- * Loads the household register. Demo mode serves the local sample with no
- * network call; real mode reads committed imports through the households
- * edge function.
- */
+/** Loads committed household records through the households edge function. */
 export async function listHouseholds(hhId?: string): Promise<HouseholdListResponse> {
-  if (isDemoMode) {
-    const households = hhId
-      ? mockHouseholds.filter((household) => household.hhId === hhId)
-      : mockHouseholds;
-    return { households, total: households.length };
-  }
   const search = hhId ? `&hh_id=${encodeURIComponent(hhId)}` : "";
   const households: HouseholdRecord[] = [];
   let total = 0;
@@ -114,23 +101,6 @@ export async function listHouseholds(hhId?: string): Promise<HouseholdListRespon
 }
 
 export async function getHouseholdRegisterStats(): Promise<HouseholdRegisterStats> {
-  if (isDemoMode) {
-    const householdCount = mockHouseholds.length;
-    const memberCount = mockHouseholds.reduce(
-      (total, household) => total + household.members.length,
-      0,
-    );
-    const granteeCount = mockHouseholds.filter(
-      (household) => getGranteeStatus(household) === "valid",
-    ).length;
-    return {
-      householdCount,
-      memberCount,
-      granteeCount,
-      needsReviewCount: householdCount - granteeCount,
-    };
-  }
-
   const data = (await apiCall("/households?action=summary")) as Partial<HouseholdRegisterStats>;
   const fields: (keyof HouseholdRegisterStats)[] = [
     "householdCount",

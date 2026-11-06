@@ -3,7 +3,7 @@ import { getHouseholdRegisterStats, listHouseholds } from "../api";
 
 const { apiCall } = vi.hoisted(() => ({ apiCall: vi.fn() }));
 
-vi.mock("../../../shared/supabase", () => ({ isDemoMode: false }));
+vi.mock("../../../shared/supabase", () => ({ isSupabaseConfigured: true }));
 vi.mock("../../../shared/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../shared/api")>();
   return { ...actual, apiCall };

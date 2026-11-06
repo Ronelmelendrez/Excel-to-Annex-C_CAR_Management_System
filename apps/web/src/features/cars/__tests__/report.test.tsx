@@ -33,7 +33,7 @@ import { listCars, createCar, deleteCar, updateCar, listCarTemplates, createCarR
 import { downloadDocx } from "../../templates/lib/annex-c-docx";
 import { listHouseholds } from "../../households/api";
 import type { CarDraft } from "../types";
-import type { HouseholdRecord } from "../../households/mock-data";
+import type { HouseholdRecord } from "../../households/types";
 
 /* ------------------------------------------------------------------ *
  * Plan §9 coverage: golden render, static integrity (no leftover      *
@@ -41,11 +41,11 @@ import type { HouseholdRecord } from "../../households/mock-data";
  * slots, override-with-reason, sensitive masking, and page modes.     *
  * ------------------------------------------------------------------ */
 
-const env = vi.hoisted(() => ({ demo: false }));
+const env = vi.hoisted(() => ({ configured: true }));
 
 vi.mock("../../../shared/supabase", () => ({
-  get isDemoMode() {
-    return env.demo;
+  get isSupabaseConfigured() {
+    return env.configured;
   },
   supabase: {
     auth: { getSession: async () => ({ data: { session: null } }) },
@@ -587,7 +587,7 @@ describe("Annex C intervention plan", () => {
 describe("report page modes and audit behaviour", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    env.demo = false;
+    env.configured = true;
     vi.mocked(useAuth).mockReturnValue(authFor(["case_worker"]));
     vi.mocked(listCars).mockResolvedValue([makeDraft()]);
     vi.mocked(listCarTemplates).mockResolvedValue([]);

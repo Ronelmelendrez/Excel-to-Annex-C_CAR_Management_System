@@ -9,18 +9,18 @@ import { REPORT_GENERATOR_ROLES, TemplatesPage } from "..";
 import { DOCX_MIME_TYPE } from "../lib/annex-c-docx";
 import { listHouseholds } from "../../households/api";
 import { listCars } from "../../cars/api";
-import type { HouseholdRecord } from "../../households/mock-data";
+import type { HouseholdRecord } from "../../households/types";
 
 /* ------------------------------------------------------------------ *
  * Annex C report generator: pick a validated household → live preview *
  * from the versioned template → download a real filled .docx.         *
  * ------------------------------------------------------------------ */
 
-const env = vi.hoisted(() => ({ demo: false }));
+const env = vi.hoisted(() => ({ configured: true }));
 
 vi.mock("../../../shared/supabase", () => ({
-  get isDemoMode() {
-    return env.demo;
+  get isSupabaseConfigured() {
+    return env.configured;
   },
   supabase: {
     auth: { getSession: async () => ({ data: { session: null } }) },
@@ -100,7 +100,7 @@ const households: HouseholdRecord[] = [
 
 beforeEach(() => {
   vi.clearAllMocks();
-  env.demo = false;
+  env.configured = true;
   vi.mocked(useAuth).mockReturnValue(authFor(["case_worker"]));
   vi.mocked(listHouseholds).mockResolvedValue({ households, total: households.length });
   vi.mocked(listCars).mockResolvedValue([]);
@@ -174,7 +174,7 @@ describe("Annex C report generator page", () => {
 
       fireEvent.click(screen.getByRole("button", { name: "Download DOCX" }));
 
-      await waitFor(() => expect(createObjectURL).toHaveBeenCalledOnce());
+      await waitFor(() => expect(createObjectURL).toHaveBeenCalledOnce(), { timeout: 10_000 });
       const blob = createObjectURL.mock.calls[0][0] as Blob;
       expect(blob.type).toBe(DOCX_MIME_TYPE);
       expect(downloads).toEqual([

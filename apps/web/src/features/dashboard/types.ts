@@ -1,31 +1,6 @@
 export type DashboardScope = "assigned" | "system";
 export type DashboardRole = "admin" | "operator" | "case_worker" | "reviewer" | "auditor";
-export type DashboardImportStatus = "committed" | "failed";
 export type DashboardCarStatus = "draft" | "submitted" | "changes_requested" | "approved";
-
-export type DashboardImportRecord = {
-  id: string;
-  scope: DashboardScope;
-  status: DashboardImportStatus;
-  committedAt: string | null;
-  weekLabel: string | null;
-  processedRows: number;
-  householdsDetected: number;
-  granteeIssues: number;
-};
-
-export type DashboardCarStatusCount = {
-  scope: DashboardScope;
-  status: DashboardCarStatus;
-  count: number;
-};
-
-export type DashboardExportJob = {
-  id: string;
-  scope: DashboardScope;
-  status: "verified" | "failed";
-  occurredAt: string;
-};
 
 export type DashboardActivity = {
   id: string;

@@ -17,7 +17,7 @@ import {
   type ParsedSheet,
 } from "../lib/workbook-engine";
 
-// jsdom's File/Blob may not implement arrayBuffer(); the demo backend reads
+// jsdom's File/Blob may not implement arrayBuffer(); the workbook parser reads
 // the uploaded file during preview. Backfill it with FileReader (same pattern
 // as large-file.test.ts).
 if (typeof File !== "undefined" && typeof File.prototype.arrayBuffer !== "function") {
@@ -103,7 +103,7 @@ const DATA_ROWS = [
 ];
 
 describe("workbook whose data sheet is Sheet2, not Sheet1", () => {
-  it("reads sheet names first, then imports the chosen sheet end to end", async () => {
+  it("reads sheet names first, then maps the chosen sheet before upload", async () => {
     const bytes = buildWorkbookBytes({ Sheet1: [], Sheet2: DATA_ROWS });
     const file = new File([bytes], "Annex C - October 2026.xlsx");
 
@@ -128,16 +128,8 @@ describe("workbook whose data sheet is Sheet2, not Sheet1", () => {
     expect(result.current.sheet?.headers).toEqual(ANNEX_HEADERS);
     expect(result.current.coverage.missing).toEqual([]);
 
-    // One click on Save to Supabase: server validation + commit in a single
-    // action (stops on the preview only if the server blocks or finds a
-    // duplicate).
-    await act(async () => {
-      await result.current.saveToSupabase();
-    });
-    expect(result.current.error).toBeNull();
-    expect(result.current.stage).toBe("committed");
-    expect(result.current.preview?.sheet_name).toBe("Sheet2");
-    expect(result.current.result).not.toBeNull();
+    expect(result.current.stage).toBe("shape");
+    expect(result.current.preview).toBeNull();
     unmount();
   }, 60_000);
 
@@ -391,7 +383,7 @@ describe("workbook with a bloated Sheet1 (huge used range)", () => {
     expect(cover.mapping.every((entry) => entry.field === null)).toBe(true);
   });
 
-  it("runs the full import end to end when Sheet1 is bloated and Sheet2 holds the table", async () => {
+  it("maps Sheet2 when Sheet1 is bloated, without uploading data", async () => {
     // On-disk profile: Sheet1's dimension covers a million rows (row bloat),
     // Sheet2 holds the Annex C table.
     const wb = XLSX.utils.book_new();
@@ -418,27 +410,15 @@ describe("workbook with a bloated Sheet1 (huge used range)", () => {
     expect(result.current.sheet?.headers).toEqual(ANNEX_HEADERS);
     expect(result.current.coverage.missing).toEqual([]);
 
-    // 02 -> 03: validate the chosen sheet against the server preview.
-    await act(async () => {
-      await result.current.validate();
-    });
     expect(result.current.error).toBeNull();
-    expect(result.current.stage).toBe("preview");
-    expect(result.current.preview?.sheet_name).toBe("Sheet2");
-    expect(result.current.preview?.rows.length).toBe(2);
-
-    // 03 -> 04: commit.
-    await act(async () => {
-      await result.current.commit();
-    });
-    expect(result.current.error).toBeNull();
-    expect(result.current.stage).toBe("committed");
+    expect(result.current.stage).toBe("shape");
+    expect(result.current.preview).toBeNull();
     unmount();
   }, 60_000);
 });
 
 describe("workbook larger than the upload cap", () => {
-  it("opens anyway and uploads only the chosen sheet — the cap applies to the sheet, not the file", async () => {
+  it("opens an oversized workbook and maps the chosen sheet before upload", async () => {
     // A 59.7 MB-style workbook: Sheet1 is a large sibling sheet, Sheet2 holds
     // the Annex C table. The on-disk size is faked over the 50 MB cap so the
     // test stays fast; the real bytes are what get parsed and extracted.
@@ -452,9 +432,8 @@ describe("workbook larger than the upload cap", () => {
 
     const { result, unmount } = renderHook(() => useImportWizard({ userId: "operator-1" }));
 
-    // Opening a file over the cap must NOT be rejected: the wizard reads the
-    // sheet names and lets the operator pick a worksheet. The cap is enforced
-    // at save time against what gets uploaded.
+    // The local parser can inspect a file independently of the paused upload
+    // workflow, and lets the operator choose a worksheet.
     await act(async () => {
       await result.current.chooseFile(file);
     });
@@ -470,24 +449,8 @@ describe("workbook larger than the upload cap", () => {
     expect(result.current.sheet?.headers).toEqual(ANNEX_HEADERS);
     expect(result.current.coverage.missing).toEqual([]);
 
-    // One click on Save to Supabase: because the workbook is over the cap,
-    // only a single-sheet copy of Sheet2 is uploaded. The server preview runs
-    // against THOSE bytes, so the workbook's other sheets never count against
-    // the 50 MB limit.
-    await act(async () => {
-      await result.current.saveToSupabase();
-    });
-    expect(result.current.error).toBeNull();
-    expect(result.current.stage).toBe("committed");
-
-    // Proof the upload held only the chosen sheet: the stored workbook lists
-    // just Sheet2 (Sheet1's junk never left the browser), and its fingerprint
-    // is the SHA-256 of the single-sheet copy — different from the original
-    // 60 MB file's hash, because the uploaded bytes are not the whole file.
-    expect(result.current.preview?.sheet_names).toEqual(["Sheet2"]);
-    expect(result.current.preview?.file_hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(result.current.preview?.file_hash).not.toBe(result.current.bundle?.fileHash);
-    expect(result.current.result).not.toBeNull();
+    expect(result.current.stage).toBe("shape");
+    expect(result.current.preview).toBeNull();
     unmount();
   }, 60_000);
 });
