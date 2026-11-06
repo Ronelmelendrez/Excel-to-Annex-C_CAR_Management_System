@@ -56,7 +56,7 @@ describe("public landing page", () => {
     expect(screen.getByRole("heading", { name: "Dashboard" })).toBeTruthy();
   });
 
-  it("shows a session check while authentication is loading", () => {
+  it("shows the branded loading screen while authentication is loading", () => {
     vi.mocked(useAuth).mockReturnValue(authState(null, true));
     render(
       <MemoryRouter>
@@ -64,7 +64,7 @@ describe("public landing page", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("status").textContent).toBe("Checking your session…");
+    expect(screen.getByRole("heading", { name: "Preparing your workspace" })).toBeTruthy();
   });
 
   it("navigates the primary call to action to the sign-in page", () => {

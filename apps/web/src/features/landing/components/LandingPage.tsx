@@ -1,5 +1,6 @@
 import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "../../../app/providers";
+import { LoadingScreen } from "../../../components/ui/LoadingScreen";
 
 const workflows = [
   {
@@ -23,11 +24,7 @@ export function LandingPage() {
   const { session, loading } = useAuth();
 
   if (loading) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-[#f4f1ea] px-4 text-sm text-[#5b574e]">
-        <p role="status">Checking your session…</p>
-      </main>
-    );
+    return <LoadingScreen />;
   }
 
   if (session) return <Navigate to="/dashboard" replace />;

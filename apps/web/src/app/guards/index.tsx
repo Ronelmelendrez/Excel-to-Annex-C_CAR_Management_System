@@ -1,13 +1,14 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../providers';
+import { LoadingScreen } from '../../components/ui/LoadingScreen';
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { session, profile, loading } = useAuth();
   const location = useLocation();
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    return <LoadingScreen />;
   }
 
   if (!session) {
@@ -27,7 +28,7 @@ export function RoleGuard({ children, roles }: { children: React.ReactNode; role
   const location = useLocation();
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    return <LoadingScreen />;
   }
 
   if (!session) {

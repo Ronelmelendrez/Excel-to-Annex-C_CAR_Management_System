@@ -1,11 +1,16 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { Router } from './app/router'
+import { LoadingScreen } from './components/ui/LoadingScreen'
 import { clearLocalImportData } from './shared/clear-local-import-data'
 import { isSupabaseConfigured } from './shared/supabase'
 import './index.css'
 
 const root = ReactDOM.createRoot(document.getElementById('root')!)
+
+function renderStartupLoading() {
+  root.render(<LoadingScreen />)
+}
 
 function renderApplication() {
   if (!isSupabaseConfigured) {
@@ -26,6 +31,8 @@ function renderApplication() {
     </React.StrictMode>,
   )
 }
+
+renderStartupLoading()
 
 void clearLocalImportData()
   .then(renderApplication)
