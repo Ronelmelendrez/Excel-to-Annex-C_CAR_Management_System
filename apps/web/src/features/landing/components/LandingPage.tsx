@@ -8,7 +8,7 @@ import {
   FileTextIcon,
   ShieldCheckIcon,
   UsersIcon,
-} from "./icons";
+} from "../../../components/icons";
 
 const workflows = [
   {

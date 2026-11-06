@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { AlertTriangleIcon, ArrowRightIcon } from '../../../components/icons';
 import { usePasswordReset } from '../hooks/usePasswordReset';
 import { AuthLayout } from './AuthLayout';
 import { TextField } from './TextField';
@@ -45,9 +46,10 @@ export function PasswordResetForm() {
           <button
             type="button"
             onClick={() => navigate('/login', { replace: true })}
-            className="inline-flex min-h-[44px] items-center border border-[#161512] bg-[#161512] px-5 py-2.5 text-sm font-semibold text-[#f4f1ea] transition-colors hover:bg-[#7a1f1f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
+            className="group inline-flex min-h-[44px] items-center gap-2 border border-[#161512] bg-[#161512] px-5 py-2.5 text-sm font-semibold text-[#f4f1ea] transition-colors duration-150 hover:bg-[#7a1f1f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
           >
             Back to sign in
+            <ArrowRightIcon className="h-4 w-4 transition-transform duration-150 group-hover:translate-x-1" />
           </button>
           <Link
             to="/"
@@ -75,9 +77,7 @@ export function PasswordResetForm() {
             role="alert"
             className="flex items-start gap-2 border-l-4 border-[#7a1f1f] bg-[#f6eaea] px-4 py-3 text-sm leading-6 text-[#7a1414]"
           >
-            <span aria-hidden="true" className="mt-0.5 leading-none">
-              ▲
-            </span>
+            <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
@@ -101,9 +101,12 @@ export function PasswordResetForm() {
           type="submit"
           disabled={loading}
           aria-busy={loading || undefined}
-          className="flex min-h-[48px] w-full items-center justify-center border border-[#161512] bg-[#161512] px-5 py-3 text-sm font-semibold text-[#f4f1ea] transition-colors hover:bg-[#7a1f1f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f] disabled:cursor-not-allowed disabled:opacity-50"
+          className="group flex min-h-[48px] w-full items-center justify-center gap-3 border border-[#161512] bg-[#161512] px-5 py-3 text-sm font-semibold text-[#f4f1ea] transition-colors duration-150 hover:bg-[#7a1f1f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? 'Sending…' : 'Send reset link'}
+          {!loading && (
+            <ArrowRightIcon className="h-4 w-4 transition-transform duration-150 group-hover:translate-x-1" />
+          )}
         </button>
 
         <p className="text-sm text-[#5b574e]">

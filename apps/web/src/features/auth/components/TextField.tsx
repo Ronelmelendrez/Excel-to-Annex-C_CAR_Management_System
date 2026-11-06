@@ -1,4 +1,5 @@
 import React, { useId, useState } from 'react';
+import { AlertTriangleIcon } from '../../../components/icons';
 
 export type TextFieldProps = {
   label: string;
@@ -96,9 +97,7 @@ export function TextField({
 
       {error ? (
         <p id={errorId} className="flex items-start gap-1.5 text-sm text-[#8b0000]">
-          <span aria-hidden="true" className="mt-0.5 leading-none">
-            ▲
-          </span>
+          <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
           {error}
         </p>
       ) : (

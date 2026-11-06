@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../app/providers';
 import { RouteLoadingSkeleton } from '../../../components/ui/PageSkeletons';
+import { AlertTriangleIcon, ArrowRightIcon } from '../../../components/icons';
 import { useSignIn } from '../hooks/useSignIn';
 import { AuthLayout } from './AuthLayout';
 import { TextField } from './TextField';
@@ -115,9 +116,7 @@ export function LoginForm() {
             role="alert"
             className="flex items-start gap-2 border-l-4 border-[#7a1f1f] bg-[#f6eaea] px-4 py-3 text-sm leading-6 text-[#7a1414] focus:outline-none"
           >
-            <span aria-hidden="true" className="mt-0.5 leading-none">
-              ▲
-            </span>
+            <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
             <span>{errorMessage}</span>
           </div>
         )}
@@ -170,9 +169,12 @@ export function LoginForm() {
           type="submit"
           disabled={loading}
           aria-busy={loading || undefined}
-          className="flex min-h-[48px] w-full items-center justify-center border border-[#161512] bg-[#161512] px-5 py-3 text-sm font-semibold text-[#f4f1ea] transition-colors hover:bg-[#7a1f1f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f] disabled:cursor-not-allowed disabled:opacity-50"
+          className="group flex min-h-[48px] w-full items-center justify-center gap-3 border border-[#161512] bg-[#161512] px-5 py-3 text-sm font-semibold text-[#f4f1ea] transition-colors duration-150 hover:bg-[#7a1f1f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? 'Signing in…' : 'Sign in'}
+          {!loading && (
+            <ArrowRightIcon className="h-4 w-4 transition-transform duration-150 group-hover:translate-x-1" />
+          )}
         </button>
 
         <p className="text-xs leading-5 text-[#5b574e]">
