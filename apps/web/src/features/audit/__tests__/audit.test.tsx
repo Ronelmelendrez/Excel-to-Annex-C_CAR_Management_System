@@ -84,6 +84,17 @@ describe("audit log", () => {
     );
   });
 
+  it("shows a page-level loading skeleton while the first audit request is pending", () => {
+    fetchAuditEvents.mockReturnValue(new Promise(() => {}));
+
+    renderAudit();
+
+    expect(
+      screen.getByRole("status", { name: "Loading Audit trail" }).getAttribute("aria-busy"),
+    ).toBe("true");
+    expect(screen.queryByRole("region", { name: "Audit log filters" })).toBeNull();
+  });
+
   it("reuses cached events when returning to the audit page", async () => {
     const firstView = renderAudit();
     expect(await screen.findAllByText("Import Committed")).toHaveLength(2);
