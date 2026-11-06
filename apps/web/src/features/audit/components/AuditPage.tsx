@@ -92,7 +92,10 @@ export function AuditPage() {
           loading={audit.loading && !invalidDateRange}
           error={audit.error}
         />
-        <AuditEventDetail event={invalidDateRange ? null : audit.selectedEvent} />
+        <AuditEventDetail
+          event={invalidDateRange ? null : audit.selectedEvent}
+          loading={audit.loading && !invalidDateRange && audit.events.length === 0}
+        />
       </div>
       {audit.hasMore && !invalidDateRange && !audit.error && (
         <div className="mt-4">

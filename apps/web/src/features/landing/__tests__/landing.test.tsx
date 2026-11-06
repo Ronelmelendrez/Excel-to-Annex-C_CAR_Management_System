@@ -64,7 +64,9 @@ describe("public landing page", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("heading", { name: "Preparing your workspace" })).toBeTruthy();
+    expect(
+      screen.getByRole("status", { name: "Loading A clearer workspace for CAR operations." }),
+    ).toBeTruthy();
   });
 
   it("navigates the primary call to action to the sign-in page", () => {

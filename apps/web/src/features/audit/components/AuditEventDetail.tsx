@@ -6,7 +6,30 @@ import {
 } from "../lib/audit";
 import type { AuditEvent } from "../types";
 
-export function AuditEventDetail({ event }: { event: AuditEvent | null }) {
+export function AuditEventDetail({
+  event,
+  loading = false,
+}: {
+  event: AuditEvent | null;
+  loading?: boolean;
+}) {
+  if (loading) {
+    return (
+      <SectionCard id="audit-event-detail-heading" title="Audit entry">
+        <div role="status" aria-label="Loading audit entry" className="animate-pulse">
+          <div aria-hidden="true" className="grid gap-5 sm:grid-cols-2">
+            {Array.from({ length: 4 }, (_, index) => (
+              <div key={index}>
+                <div className="h-3 w-20 bg-[#e6e0d4]" />
+                <div className="mt-2 h-4 w-36 bg-[#e6e0d4]" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </SectionCard>
+    );
+  }
+
   if (!event) {
     return (
       <SectionCard id="audit-event-detail-heading" title="Audit entry">

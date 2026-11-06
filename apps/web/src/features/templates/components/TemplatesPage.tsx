@@ -8,6 +8,7 @@ import { householdListError, listHouseholds } from "../../households/api";
 import { getGranteeStatus } from "../../households/lib/households";
 import { annexCDocxFileName, downloadDocx, renderAnnexCDocx } from "../lib/annex-c-docx";
 import { synthesizeDraft } from "../lib/synthesize-draft";
+import { PageDataSkeleton } from "../../../components/ui/PageSkeletons";
 
 /** Households the register marks as a valid CAR source (exactly one grantee). */
 function deriveValidatedHouseholds(
@@ -126,7 +127,14 @@ export function TemplatesPage() {
   if (loading) {
     return (
       <div className="mx-auto max-w-[1180px] px-4 py-8 sm:px-6">
-        <p className="text-sm text-[#3f3b34]">Loading households…</p>
+        <header className="border-b border-[#c9c3b6] pb-4">
+          <h1 className="font-serif text-3xl">Annex C report generator</h1>
+          <p className="mt-2 max-w-[75ch] text-sm leading-6 text-[#3f3b34]">
+            Choose a household with a confirmed grantee, review its Annex C case study report, and
+            download a Word document using the official template.
+          </p>
+        </header>
+        <PageDataSkeleton page="reports" />
       </div>
     );
   }

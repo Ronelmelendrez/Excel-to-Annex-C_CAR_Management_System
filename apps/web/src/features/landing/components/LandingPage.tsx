@@ -1,6 +1,6 @@
 import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "../../../app/providers";
-import { LoadingScreen } from "../../../components/ui/LoadingScreen";
+import { RouteLoadingSkeleton } from "../../../components/ui/PageSkeletons";
 
 const workflows = [
   {
@@ -24,7 +24,7 @@ export function LandingPage() {
   const { session, loading } = useAuth();
 
   if (loading) {
-    return <LoadingScreen />;
+    return <RouteLoadingSkeleton pathname="/" />;
   }
 
   if (session) return <Navigate to="/dashboard" replace />;

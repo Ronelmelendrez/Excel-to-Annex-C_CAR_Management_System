@@ -6,6 +6,7 @@ import type { CarDraft, ValidatedHousehold } from "../types";
 export function CarDraftList({
   drafts,
   households,
+  householdsLoading,
   householdsError,
   actionError,
   creating,
@@ -15,6 +16,7 @@ export function CarDraftList({
 }: {
   drafts: CarDraft[];
   households: ValidatedHousehold[];
+  householdsLoading: boolean;
   householdsError: string | null;
   actionError: string | null;
   creating: boolean;
@@ -40,6 +42,18 @@ export function CarDraftList({
           <p role="alert" className="border-l-4 border-[#7a1f1f] bg-[#f2e4e1] px-3 py-3 text-sm leading-6 text-[#7a1f1f]">
             {householdsError}
           </p>
+        ) : householdsLoading ? (
+          <div
+            role="status"
+            aria-label="Loading households for CAR draft"
+            aria-busy="true"
+            className="space-y-3"
+          >
+            <div aria-hidden="true" className="h-3 w-24 animate-pulse bg-[#e6e0d4]" />
+            <div aria-hidden="true" className="h-11 w-full animate-pulse border border-[#c9c3b6] bg-[#ece7dc]" />
+            <div aria-hidden="true" className="h-11 w-full animate-pulse bg-[#e6e0d4]" />
+            <p className="text-xs text-[#5b574e]">Finding households ready for a CAR…</p>
+          </div>
         ) : (
           <>
             <Label htmlFor="car-household" className="block text-xs font-semibold">

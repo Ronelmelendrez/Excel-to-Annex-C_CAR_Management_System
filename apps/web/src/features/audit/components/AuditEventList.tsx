@@ -33,9 +33,15 @@ export function AuditEventList({
       }
     >
       {events.length === 0 && loading ? (
-        <p role="status" className="px-4 py-8 text-sm text-[#5b574e]">
-          Loading audit events…
-        </p>
+        <div role="status" aria-label="Loading audit events" className="px-3 py-3">
+          {Array.from({ length: 5 }, (_, index) => (
+            <div key={index} aria-hidden="true" className="animate-pulse border-b border-[#e2ddd1] py-3 last:border-0">
+              <div className="h-4 w-2/3 bg-[#e6e0d4]" />
+              <div className="mt-2 h-3 w-1/2 bg-[#e6e0d4]" />
+              <div className="mt-2 h-3 w-3/4 bg-[#e6e0d4]" />
+            </div>
+          ))}
+        </div>
       ) : events.length === 0 && error ? (
         <p className="px-4 py-8 text-sm text-[#5b574e]">
           Audit events could not be loaded.

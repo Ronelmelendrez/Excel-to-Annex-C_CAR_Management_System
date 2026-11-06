@@ -74,6 +74,7 @@ export function useCarAuthoring(enabled = true) {
   const [reloadToken, setReloadToken] = useState(0);
 
   const [households, setHouseholds] = useState<ValidatedHousehold[]>([]);
+  const [householdsLoading, setHouseholdsLoading] = useState(isSupabaseConfigured && enabled);
   const [householdsError, setHouseholdsError] = useState<string | null>(null);
   const [templateVersions, setTemplateVersions] = useState<CarTemplateOption[]>([]);
 
@@ -203,17 +204,20 @@ export function useCarAuthoring(enabled = true) {
   useEffect(() => {
     if (!isSupabaseConfigured || !enabled) return;
     let cancelled = false;
+    setHouseholdsLoading(true);
 
     listHouseholds()
       .then((result) => {
         if (cancelled) return;
         setHouseholds(deriveValidatedHouseholds(result.households));
         setHouseholdsError(null);
+        setHouseholdsLoading(false);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
         setHouseholds([]);
         setHouseholdsError(householdListError(error));
+        setHouseholdsLoading(false);
       });
 
     // Template versions are a convenience: the editor stays usable without them.
@@ -402,6 +406,7 @@ export function useCarAuthoring(enabled = true) {
     notConfigured: !isSupabaseConfigured,
     reload,
     households,
+    householdsLoading,
     householdsError,
     templateVersions,
     selectedDraft,

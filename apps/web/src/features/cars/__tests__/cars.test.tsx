@@ -199,6 +199,23 @@ describe("F5 CAR authoring", () => {
     expect(screen.queryByRole("button", { name: "Submit for review" })).toBeNull();
   });
 
+  it("shows a loading indicator in the household picker until household records arrive", async () => {
+    let resolveHouseholds!: (value: Awaited<ReturnType<typeof listHouseholds>>) => void;
+    vi.mocked(listHouseholds).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveHouseholds = resolve;
+      }),
+    );
+
+    render(<CarsPage />);
+
+    await screen.findByRole("heading", { name: /CAR-2026-023/ });
+    expect(screen.getByRole("status", { name: "Loading households for CAR draft" })).toBeTruthy();
+
+    resolveHouseholds({ households: [validHousehold, invalidHousehold], total: 2 });
+    expect(await screen.findByRole("combobox", { name: "Household" })).toBeTruthy();
+  });
+
   it("creates a draft through the API only after selecting a validated household", async () => {
     await renderLoadedPage();
 

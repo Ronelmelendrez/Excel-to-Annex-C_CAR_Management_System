@@ -1,14 +1,14 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../providers';
-import { LoadingScreen } from '../../components/ui/LoadingScreen';
+import { RouteLoadingSkeleton } from '../../components/ui/PageSkeletons';
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { session, profile, loading } = useAuth();
   const location = useLocation();
 
   if (loading) {
-    return <LoadingScreen />;
+    return <RouteLoadingSkeleton pathname={location.pathname} />;
   }
 
   if (!session) {
@@ -28,7 +28,7 @@ export function RoleGuard({ children, roles }: { children: React.ReactNode; role
   const location = useLocation();
 
   if (loading) {
-    return <LoadingScreen />;
+    return <RouteLoadingSkeleton pathname={location.pathname} />;
   }
 
   if (!session) {

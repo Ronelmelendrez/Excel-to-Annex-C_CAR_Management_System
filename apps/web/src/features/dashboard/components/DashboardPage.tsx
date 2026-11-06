@@ -5,6 +5,7 @@ import { DashboardActivity } from "./DashboardActivity";
 import { DashboardCarPipeline } from "./DashboardCarPipeline";
 import { DashboardMetrics } from "./DashboardMetrics";
 import { DashboardTrend } from "./DashboardTrend";
+import { PageDataSkeleton } from "../../../components/ui/PageSkeletons";
 
 export function DashboardPage() {
   const { roles } = useAuth();
@@ -48,9 +49,7 @@ export function DashboardPage() {
       </header>
 
       {dashboard.loading && !dashboard.summary ? (
-        <p role="status" className="mt-5 border-l-4 border-[#4a5a72] bg-[#e9edf3] px-4 py-4 text-sm">
-          Loading dashboard information…
-        </p>
+        <PageDataSkeleton page="dashboard" />
       ) : dashboard.error && !dashboard.summary ? (
         <div role="alert" className="mt-5 border-l-4 border-[#7a1f1f] bg-[#f2e4e1] px-4 py-4">
           <p className="text-sm">{dashboard.error}</p>

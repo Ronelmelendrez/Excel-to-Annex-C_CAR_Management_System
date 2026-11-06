@@ -63,6 +63,7 @@ export default defineConfig({
       'src/features/dashboard/__tests__/api.test.ts',
       'src/features/audit/__tests__/*.test.{ts,tsx}',
       'src/shared/__tests__/*.test.{ts,tsx}',
+      'src/components/ui/__tests__/*.test.{ts,tsx}',
     ],
     globals: true,
     // Rendering the full Annex C document (60+ slots, three tables) in jsdom

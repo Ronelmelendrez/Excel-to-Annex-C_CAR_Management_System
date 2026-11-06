@@ -1,7 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { Router } from './app/router'
-import { LoadingScreen } from './components/ui/LoadingScreen'
+import { RouteLoadingSkeleton } from './components/ui/PageSkeletons'
 import { clearLocalImportData } from './shared/clear-local-import-data'
 import { isSupabaseConfigured } from './shared/supabase'
 import './index.css'
@@ -9,7 +9,7 @@ import './index.css'
 const root = ReactDOM.createRoot(document.getElementById('root')!)
 
 function renderStartupLoading() {
-  root.render(<LoadingScreen />)
+  root.render(<RouteLoadingSkeleton pathname={window.location.pathname} />)
 }
 
 function renderApplication() {

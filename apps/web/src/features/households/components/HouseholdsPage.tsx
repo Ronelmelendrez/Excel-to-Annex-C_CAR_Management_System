@@ -4,6 +4,7 @@ import { useHouseholdRegister } from "../hooks/useHouseholdRegister";
 import { HouseholdDetail } from "./HouseholdDetail";
 import { HouseholdFilters } from "./HouseholdFilters";
 import { HouseholdList } from "./HouseholdList";
+import { PageDataSkeleton } from "../../../components/ui/PageSkeletons";
 
 export function HouseholdsPage() {
   const { user, profile, roles } = useAuth();
@@ -60,12 +61,9 @@ export function HouseholdsPage() {
       </p>
 
       {register.loading ? (
-        <p
-          role="status"
-          className="mt-5 border-l-4 border-[#4a5a72] bg-[#e9edf3] px-4 py-4 text-sm leading-6 text-[#31405a]"
-        >
-          Loading household records…
-        </p>
+        <div className="mt-5">
+          <PageDataSkeleton page="households" />
+        </div>
       ) : register.loadError ? (
         <div
           role="alert"

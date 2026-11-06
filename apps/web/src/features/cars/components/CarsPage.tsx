@@ -4,6 +4,7 @@ import { CAR_NOT_CONFIGURED_MESSAGE } from "../api";
 import { useCarAuthoring } from "../hooks/useCarAuthoring";
 import { CarDraftList } from "./CarDraftList";
 import { CarEditor } from "./CarEditor";
+import { PageDataSkeleton } from "../../../components/ui/PageSkeletons";
 
 function StatusBadge({ text, tone }: { text: string; tone: "ok" | "warn" | "muted" }) {
   const tones = {
@@ -49,7 +50,7 @@ export function CarsPage() {
   const badge = authoring.notConfigured
     ? { text: "Temporarily unavailable", tone: "warn" as const }
     : authoring.loading
-      ? { text: "Loading CARs…", tone: "muted" as const }
+      ? null
       : authoring.loadError
         ? { text: "CARs unavailable", tone: "warn" as const }
         : { text: "CAR records ready", tone: "ok" as const };
@@ -62,11 +63,7 @@ export function CarsPage() {
       </Panel>
     );
   } else if (authoring.loading) {
-    body = (
-      <Panel title="Loading CARs">
-        <p role="status">Loading CAR drafts…</p>
-      </Panel>
-    );
+    body = <PageDataSkeleton page="cars" />;
   } else if (authoring.loadError) {
     body = (
       <div
@@ -90,6 +87,7 @@ export function CarsPage() {
         <CarDraftList
           drafts={authoring.drafts}
           households={authoring.households}
+          householdsLoading={authoring.householdsLoading}
           householdsError={authoring.householdsError}
           actionError={authoring.createError}
           creating={authoring.creating}
@@ -141,7 +139,15 @@ export function CarsPage() {
               Create a draft from a validated household, record case-worker content, and review a clearly marked preview.
             </p>
           </div>
-          <StatusBadge text={badge.text} tone={badge.tone} />
+          {badge ? (
+            <StatusBadge text={badge.text} tone={badge.tone} />
+          ) : (
+            <span
+              role="status"
+              aria-label="Preparing CAR workspace"
+              className="h-8 w-36 animate-pulse bg-[#e6e0d4]"
+            />
+          )}
         </div>
       </header>
 
