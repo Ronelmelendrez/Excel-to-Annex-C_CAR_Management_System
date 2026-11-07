@@ -173,6 +173,14 @@ describe("F5 CAR authoring", () => {
     expect(screen.getByText("CAR records ready")).toBeTruthy();
     expect(screen.queryByText(/Mock drafts/)).toBeNull();
     expect(screen.getByText("1 records")).toBeTruthy();
+    expect(
+      screen.getByRole("complementary", { name: "CAR authoring panels" }).classList.contains("lg:sticky"),
+    ).toBe(true);
+    expect(
+      screen
+        .getByRole("region", { name: "Scrollable CAR drafts" })
+        .classList.contains("lg:overflow-y-auto"),
+    ).toBe(true);
     expect(screen.getAllByText(/Jomar Ramos/).length).toBeGreaterThan(0);
 
     // The template's fixed wording is rendered read-only; only blanks are dynamic.

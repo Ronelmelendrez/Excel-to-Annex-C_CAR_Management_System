@@ -30,12 +30,16 @@ export function CarDraftList({
   const [householdId, setHouseholdId] = useState("");
 
   return (
-    <aside className="min-w-0 space-y-5" aria-label="CAR drafts">
+    <aside
+      className="min-w-0 space-y-5 lg:sticky lg:top-24 lg:flex lg:max-h-[calc(100dvh-7rem)] lg:flex-col lg:gap-5 lg:space-y-0 lg:self-start"
+      aria-label="CAR authoring panels"
+    >
       <SectionCard
         id="car-new-draft-heading"
         eyebrow="Start a CAR"
         title="Choose a validated household"
         delay={240}
+        className="lg:shrink-0"
         description={
           <span className="text-xs leading-5">
             Only households with exactly one supported GRANTEE=Yes flag can start a CAR.
@@ -123,50 +127,59 @@ export function CarDraftList({
         id="car-drafts-heading"
         title="Drafts"
         delay={300}
-        cardClassName="overflow-hidden"
-        contentClassName="p-0"
+        className="min-h-0 lg:flex lg:flex-1 lg:flex-col"
+        cardClassName="overflow-hidden lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
+        headerClassName="lg:shrink-0"
+        contentClassName="min-h-0 p-0 lg:flex-1 lg:overflow-hidden"
         action={<span className="font-mono text-[10px] text-[#5b574e]">{drafts.length} records</span>}
       >
-        {drafts.length === 0 ? (
-          <p className="px-3 py-5 text-sm leading-6 text-[#5b574e]">
-            No CAR drafts yet. Select a validated household above to begin.
-          </p>
-        ) : (
-          <ul className="divide-y divide-[#c9c3b6]">
-            {drafts.map((draft) => {
-              const selected = draft.id === selectedDraftId;
-              const ready = draft.status === "draft_ready_for_review";
-              return (
-                <li key={draft.id}>
-                  <button
-                    type="button"
-                    aria-pressed={selected}
-                    onClick={() => onSelectDraft(draft.id)}
-                    className={`w-full border-l-4 px-3 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#7a1f1f] ${
-                      selected ? "border-[#7a1f1f] bg-[#ece7dc]" : "border-transparent hover:bg-[#fbf9f4]"
-                    }`}
-                  >
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="font-mono text-sm font-semibold">{draft.reference}</span>
-                      <span
-                        className={`border px-1.5 py-0.5 text-[10px] ${
-                          ready
-                            ? "border-[#161512] text-[#161512]"
-                            : "border-[#b45309] text-[#8a5a00]"
-                        }`}
-                      >
-                        {ready ? "Ready for review" : "Draft"}
+        <div
+          role="region"
+          aria-label="Scrollable CAR drafts"
+          className="lg:min-h-0 lg:h-full lg:overflow-y-auto"
+          tabIndex={0}
+        >
+          {drafts.length === 0 ? (
+            <p className="px-3 py-5 text-sm leading-6 text-[#5b574e]">
+              No CAR drafts yet. Select a validated household above to begin.
+            </p>
+          ) : (
+            <ul className="divide-y divide-[#c9c3b6]">
+              {drafts.map((draft) => {
+                const selected = draft.id === selectedDraftId;
+                const ready = draft.status === "draft_ready_for_review";
+                return (
+                  <li key={draft.id}>
+                    <button
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => onSelectDraft(draft.id)}
+                      className={`w-full border-l-4 px-3 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#7a1f1f] ${
+                        selected ? "border-[#7a1f1f] bg-[#ece7dc]" : "border-transparent hover:bg-[#fbf9f4]"
+                      }`}
+                    >
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-sm font-semibold">{draft.reference}</span>
+                        <span
+                          className={`border px-1.5 py-0.5 text-[10px] ${
+                            ready
+                              ? "border-[#161512] text-[#161512]"
+                              : "border-[#b45309] text-[#8a5a00]"
+                          }`}
+                        >
+                          {ready ? "Ready for review" : "Draft"}
+                        </span>
                       </span>
-                    </span>
-                    <span className="mt-1 block text-xs text-[#5b574e]">
-                      HH_ID {draft.hhId || "Unavailable"} · Revision {draft.revision}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+                      <span className="mt-1 block text-xs text-[#5b574e]">
+                        HH_ID {draft.hhId || "Unavailable"} · Revision {draft.revision}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       </SectionCard>
     </aside>
   );
