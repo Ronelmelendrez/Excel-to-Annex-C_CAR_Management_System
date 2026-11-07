@@ -2,6 +2,7 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../providers';
 import { RouteLoadingSkeleton } from '../../components/ui/PageSkeletons';
+import { isDashboardRole } from '../../features/dashboard/lib/dashboard';
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { session, profile, loading } = useAuth();
@@ -45,6 +46,29 @@ export function RoleGuard({ children, roles }: { children: React.ReactNode; role
   const hasRequiredRole = roles.some((r) => userRoles.includes(r));
   if (!hasRequiredRole) {
     return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+export function DashboardGuard({ children }: { children: React.ReactNode }) {
+  const { session, profile, roles, loading } = useAuth();
+  const location = useLocation();
+
+  if (loading) {
+    return <RouteLoadingSkeleton pathname={location.pathname} />;
+  }
+
+  if (!session) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  if (profile?.status === 'disabled') {
+    return <Navigate to="/login?disabled=1" replace />;
+  }
+
+  if (profile?.status !== 'active' || !roles.some(isDashboardRole)) {
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;

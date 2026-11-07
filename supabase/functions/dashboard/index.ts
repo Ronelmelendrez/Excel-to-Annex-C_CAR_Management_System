@@ -61,20 +61,19 @@ async function dashboardSummary(supabase: any, userId: string, systemScope: bool
     granteeIssues += householdRows.filter((row) => row.grantee_status !== 'valid').length;
   }
 
-  const allAssessments = await fetchAll((from, to) =>
-    supabase
+  const assessments = await fetchAll((from, to) => {
+    let query = supabase
       .from('case_assessments')
       .select('id, case_group_id, status, revision, owner_id, reviewer_id, updated_at, created_at')
       .order('updated_at', { ascending: false })
-      .range(from, to),
-  );
-  const assessments = systemScope
-    ? allAssessments
-    : allAssessments.filter(
-        (row) => row.owner_id === userId || row.reviewer_id === userId,
-      );
+      .range(from, to);
+    if (!systemScope) {
+      query = query.or(`owner_id.eq.${userId},reviewer_id.eq.${userId}`);
+    }
+    return query;
+  });
   const latestByCase = new Map<string, any>();
-  for (const assessment of allAssessments) {
+  for (const assessment of assessments) {
     const current = latestByCase.get(assessment.case_group_id);
     if (!current || Number(assessment.revision) > Number(current.revision)) {
       latestByCase.set(assessment.case_group_id, assessment);

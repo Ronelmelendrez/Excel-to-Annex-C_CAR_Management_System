@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './providers';
-import { AuthGuard, RoleGuard } from './guards';
+import { AuthGuard, DashboardGuard, RoleGuard } from './guards';
 import { AppShell } from './layout';
 import { LoginForm } from '../features/auth';
 import { PasswordResetForm } from '../features/auth/components/PasswordResetForm';
@@ -26,11 +26,11 @@ export function Router() {
           <Route
             path="/dashboard"
             element={
-              <AuthGuard>
+              <DashboardGuard>
                 <AppShell>
                   <DashboardPage />
                 </AppShell>
-              </AuthGuard>
+              </DashboardGuard>
             }
           />
           <Route
