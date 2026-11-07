@@ -173,9 +173,16 @@ describe("F5 CAR authoring", () => {
     expect(screen.getByText("CAR records ready")).toBeTruthy();
     expect(screen.queryByText(/Mock drafts/)).toBeNull();
     expect(screen.getByText("1 records")).toBeTruthy();
+    // Only the Drafts card sticks — the household picker scrolls away.
     expect(
       screen.getByRole("complementary", { name: "CAR authoring panels" }).classList.contains("lg:sticky"),
-    ).toBe(true);
+    ).toBe(false);
+    expect(screen.getByRole("region", { name: "Drafts" }).classList.contains("lg:sticky")).toBe(true);
+    expect(
+      screen
+        .getByRole("region", { name: "Choose a validated household" })
+        .classList.contains("lg:sticky"),
+    ).toBe(false);
     expect(
       screen
         .getByRole("region", { name: "Scrollable CAR drafts" })
@@ -223,8 +230,8 @@ describe("F5 CAR authoring", () => {
     expect(draftRegion.querySelectorAll("li")).toHaveLength(4);
     expect(
       screen
-        .getByRole("complementary", { name: "CAR authoring panels" })
-        .className.includes("lg:h-[calc(100dvh-7rem)]"),
+        .getByRole("region", { name: "Drafts" })
+        .className.includes("lg:max-h-[calc(100dvh-7rem)]"),
     ).toBe(true);
     expect(
       screen.getByRole("region", { name: "Drafts" }).classList.contains("lg:flex"),

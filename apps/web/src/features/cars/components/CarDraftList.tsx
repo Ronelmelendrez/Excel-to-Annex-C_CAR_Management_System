@@ -31,7 +31,11 @@ export function CarDraftList({
 
   return (
     <aside
-      className="min-w-0 space-y-5 lg:sticky lg:top-24 lg:flex lg:h-[calc(100dvh-7rem)] lg:flex-col lg:gap-5 lg:space-y-0 lg:self-start"
+      // The aside itself is NOT sticky: it stretches to the grid row height
+      // (the editor column's height) so the sticky Drafts card inside can
+      // stay pinned for the whole editor scroll, while the household picker
+      // above it scrolls away with the page.
+      className="min-w-0 space-y-5 lg:self-stretch"
       aria-label="CAR authoring panels"
     >
       <SectionCard
@@ -39,7 +43,6 @@ export function CarDraftList({
         eyebrow="Start a CAR"
         title="Choose a validated household"
         delay={240}
-        className="lg:shrink-0"
         description={
           <span className="text-xs leading-5">
             Only households with exactly one supported GRANTEE=Yes flag can start a CAR.
@@ -127,7 +130,10 @@ export function CarDraftList({
         id="car-drafts-heading"
         title="Drafts"
         delay={300}
-        className="min-h-0 lg:flex lg:flex-1 lg:flex-col"
+        // Sticky at the header offset; capped to the viewport so the list
+        // scrolls internally instead of growing past the screen. The section
+        // is the flex parent that fills this cap (previously the aside was).
+        className="lg:sticky lg:top-24 lg:flex lg:max-h-[calc(100dvh-7rem)] lg:flex-col"
         cardClassName="overflow-hidden lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
         headerClassName="lg:shrink-0"
         contentClassName="min-h-0 p-0 lg:flex lg:flex-1 lg:flex-col lg:overflow-hidden"
