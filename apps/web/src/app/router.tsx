@@ -105,6 +105,10 @@ export function Router() {
           />
           <Route path="/documents" element={<Navigate to="/dashboard" replace />} />
           <Route path="/" element={<LandingPage />} />
+          {/* Any other pasted/unknown link falls back to the landing page
+              instead of a blank screen. Real 404s never reach here — Vercel
+              hands every unmatched path to the SPA via vercel.json rewrites. */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
