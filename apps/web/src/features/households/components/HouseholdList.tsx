@@ -19,62 +19,69 @@ export function HouseholdList({
       id="household-list-heading"
       title="Household list"
       delay={360}
-      className="min-w-0"
-      cardClassName="overflow-hidden"
-      contentClassName="p-0"
+      className="min-w-0 lg:sticky lg:top-24 lg:self-start"
+      cardClassName="overflow-hidden lg:flex lg:max-h-[calc(100dvh-7rem)] lg:flex-col"
+      contentClassName="min-h-0 p-0 lg:flex lg:flex-1 lg:flex-col lg:overflow-hidden"
       action={
         <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[#5b574e]">
           {items.length} shown
         </span>
       }
     >
-      {items.length === 0 ? (
-        <div className="px-3 py-8">
-          <p className="font-serif text-lg">
-            {total === 0
-              ? "No households in the register yet."
-              : "No households match those filters."}
-          </p>
-          <p className="mt-1 text-sm leading-6 text-[#5b574e]">
-            {total === 0
-              ? "Import an Excel workbook on the Imports page to build the household register."
-              : "Clear the search or choose a different import version."}
-          </p>
-        </div>
-      ) : (
-        <ul className="divide-y divide-[#c9c3b6]">
-          {items.map(({ household, status }) => {
-            const isSelected = household.id === selectedId;
-            return (
-              <li key={household.id}>
-                <button
-                  type="button"
-                  aria-pressed={isSelected}
-                  onClick={() => onSelect(household.id)}
-                  className={`w-full border-l-4 px-3 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#7a1f1f] ${
-                    isSelected ? "border-[#7a1f1f] bg-[#ece7dc]" : "border-transparent hover:bg-[#fbf9f4]"
-                  }`}
-                >
-                  <span className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-mono text-sm font-semibold tabular-nums">
-                      HH_ID {household.hhId}
+      <div
+        role="region"
+        aria-label="Scrollable household list"
+        className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
+        tabIndex={0}
+      >
+        {items.length === 0 ? (
+          <div className="px-3 py-8">
+            <p className="font-serif text-lg">
+              {total === 0
+                ? "No households in the register yet."
+                : "No households match those filters."}
+            </p>
+            <p className="mt-1 text-sm leading-6 text-[#5b574e]">
+              {total === 0
+                ? "Import an Excel workbook on the Imports page to build the household register."
+                : "Clear the search or choose a different import version."}
+            </p>
+          </div>
+        ) : (
+          <ul className="divide-y divide-[#c9c3b6]">
+            {items.map(({ household, status }) => {
+              const isSelected = household.id === selectedId;
+              return (
+                <li key={household.id}>
+                  <button
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => onSelect(household.id)}
+                    className={`w-full border-l-4 px-3 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#7a1f1f] ${
+                      isSelected ? "border-[#7a1f1f] bg-[#ece7dc]" : "border-transparent hover:bg-[#fbf9f4]"
+                    }`}
+                  >
+                    <span className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-mono text-sm font-semibold tabular-nums">
+                        HH_ID {household.hhId}
+                      </span>
+                      <span className="text-xs text-[#5b574e]">
+                        {household.members.length} members
+                      </span>
                     </span>
-                    <span className="text-xs text-[#5b574e]">
-                      {household.members.length} members
+                    <span className="mt-1 block text-xs text-[#5b574e]">
+                      {household.barangay} · Import v{household.importVersion}
                     </span>
-                  </span>
-                  <span className="mt-1 block text-xs text-[#5b574e]">
-                    {household.barangay} · Import v{household.importVersion}
-                  </span>
-                  <span className="mt-2 block">
-                    <HouseholdStatusLabel status={status} />
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                    <span className="mt-2 block">
+                      <HouseholdStatusLabel status={status} />
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
     </SectionCard>
   );
 }

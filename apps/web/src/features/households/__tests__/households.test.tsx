@@ -62,6 +62,14 @@ describe("F4 household register", () => {
     render(<HouseholdsPage />);
 
     expect(await screen.findByText("Household records")).toBeTruthy();
+    expect(
+      screen.getByRole("region", { name: "Household list" }).classList.contains("lg:sticky"),
+    ).toBe(true);
+    expect(
+      screen
+        .getByRole("region", { name: "Scrollable household list" })
+        .classList.contains("lg:overflow-y-auto"),
+    ).toBe(true);
     expect(screen.getAllByText("Multiple Yes flags").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Confirmed grantee").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Blank flag").length).toBeGreaterThan(0);
