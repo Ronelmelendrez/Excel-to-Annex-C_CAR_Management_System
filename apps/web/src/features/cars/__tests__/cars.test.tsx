@@ -209,6 +209,30 @@ describe("F5 CAR authoring", () => {
     expect(screen.queryByRole("button", { name: "Submit for review" })).toBeNull();
   });
 
+  it("shows all drafts in a viewport-sized scrollable list", async () => {
+    vi.mocked(listCars).mockResolvedValue(
+      ["023", "024", "025", "026"].map((number) =>
+        makeCar({ id: `car-${number}`, reference: `CAR-2026-${number}` }),
+      ),
+    );
+
+    render(<CarsPage />);
+
+    const draftRegion = await screen.findByRole("region", { name: "Scrollable CAR drafts" });
+    expect(screen.getByText("4 records")).toBeTruthy();
+    expect(draftRegion.querySelectorAll("li")).toHaveLength(4);
+    expect(
+      screen
+        .getByRole("complementary", { name: "CAR authoring panels" })
+        .className.includes("lg:h-[calc(100dvh-7rem)]"),
+    ).toBe(true);
+    expect(
+      screen.getByRole("region", { name: "Drafts" }).classList.contains("lg:flex"),
+    ).toBe(true);
+    expect(draftRegion.classList.contains("lg:flex-1")).toBe(true);
+    expect(draftRegion.classList.contains("lg:overflow-y-auto")).toBe(true);
+  });
+
   it("shows a loading indicator in the household picker until household records arrive", async () => {
     let resolveHouseholds!: (value: Awaited<ReturnType<typeof listHouseholds>>) => void;
     vi.mocked(listHouseholds).mockReturnValueOnce(

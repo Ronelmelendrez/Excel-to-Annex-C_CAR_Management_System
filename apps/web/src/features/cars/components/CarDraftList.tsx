@@ -31,7 +31,7 @@ export function CarDraftList({
 
   return (
     <aside
-      className="min-w-0 space-y-5 lg:sticky lg:top-24 lg:flex lg:max-h-[calc(100dvh-7rem)] lg:flex-col lg:gap-5 lg:space-y-0 lg:self-start"
+      className="min-w-0 space-y-5 lg:sticky lg:top-24 lg:flex lg:h-[calc(100dvh-7rem)] lg:flex-col lg:gap-5 lg:space-y-0 lg:self-start"
       aria-label="CAR authoring panels"
     >
       <SectionCard
@@ -130,13 +130,13 @@ export function CarDraftList({
         className="min-h-0 lg:flex lg:flex-1 lg:flex-col"
         cardClassName="overflow-hidden lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
         headerClassName="lg:shrink-0"
-        contentClassName="min-h-0 p-0 lg:flex-1 lg:overflow-hidden"
+        contentClassName="min-h-0 p-0 lg:flex lg:flex-1 lg:flex-col lg:overflow-hidden"
         action={<span className="font-mono text-[10px] text-[#5b574e]">{drafts.length} records</span>}
       >
         <div
           role="region"
           aria-label="Scrollable CAR drafts"
-          className="lg:min-h-0 lg:h-full lg:overflow-y-auto"
+          className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
           tabIndex={0}
         >
           {drafts.length === 0 ? (
