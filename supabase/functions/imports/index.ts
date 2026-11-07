@@ -18,7 +18,7 @@ import { analyzeWorkbook, sha256Hex, type WorkbookAnalysisResult } from "./workb
 import { buildErrorReportCsv } from "./report.ts";
 
 const IMPORT_ROLES = ["admin", "operator"];
-const IMPORTS_ENABLED = false;
+const IMPORTS_ENABLED = true;
 const BUCKET = "imports";
 const MAX_LIST_LIMIT = 50;
 

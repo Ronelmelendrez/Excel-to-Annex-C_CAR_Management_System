@@ -13,7 +13,7 @@ function visit(path: string) {
   window.history.pushState({}, "", path);
 }
 
-describe("paused imports", () => {
+describe("imports route", () => {
   beforeEach(() => {
     localStorage.clear();
     window.history.replaceState({}, "", "/");
@@ -32,12 +32,20 @@ describe("paused imports", () => {
     cleanup();
   });
 
-  it("shows a clear unavailable state without sample import data", async () => {
+  it("shows the import wizard instead of the paused notice", async () => {
     visit("/imports");
     render(<Router />);
 
-    expect(await screen.findByRole("heading", { name: "Excel imports are paused" })).toBeTruthy();
-    expect(screen.queryByRole("link", { name: "Excel imports" })).toBeNull();
-    expect(screen.queryByText(/SY2026_Q1_household_profiles.xlsx/)).toBeNull();
+    expect(
+      await screen.findByRole("heading", { name: /Drop a workbook here/ }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Excel imports are paused" })).toBeNull();
+  });
+
+  it("offers the Excel imports nav link to operators", async () => {
+    visit("/imports");
+    render(<Router />);
+
+    expect(await screen.findByRole("link", { name: "Excel imports" })).toBeTruthy();
   });
 });

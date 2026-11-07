@@ -48,6 +48,11 @@ const hasAnyRole = (roles: string[], allowed: string[]) =>
 const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', canSee: () => true },
   {
+    to: '/imports',
+    label: 'Excel imports',
+    canSee: (roles) => hasAnyRole(roles, ['admin', 'operator']),
+  },
+  {
     to: '/households',
     label: 'Households',
     canSee: (roles) => hasAnyRole(roles, ['admin', 'operator', 'case_worker', 'reviewer', 'auditor']),

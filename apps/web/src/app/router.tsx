@@ -12,7 +12,7 @@ import { ReviewPage } from '../features/review';
 import { TemplatesPage, REPORT_GENERATOR_ROLES } from '../features/templates';
 import { DashboardPage } from '../features/dashboard';
 import { AuditPage } from '../features/audit';
-import { ImportsUnavailablePage } from '../features/imports/components/ImportsUnavailablePage';
+import { ImportsPage } from '../features/imports';
 import { LandingPage } from '../features/landing';
 
 export function Router() {
@@ -39,7 +39,7 @@ export function Router() {
               <AuthGuard>
                 <RoleGuard roles={['admin', 'operator']}>
                   <AppShell>
-                    <ImportsUnavailablePage />
+                    <ImportsPage />
                   </AppShell>
                 </RoleGuard>
               </AuthGuard>
