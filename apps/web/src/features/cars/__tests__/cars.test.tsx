@@ -173,6 +173,8 @@ describe("F5 CAR authoring", () => {
     expect(screen.getByText("CAR records ready")).toBeTruthy();
     expect(screen.queryByText(/Mock drafts/)).toBeNull();
     expect(screen.getByText("1 records")).toBeTruthy();
+    // The register rows carry no CS_CATEGORY headers here, so no filter shows.
+    expect(screen.queryByRole("combobox", { name: "CS category" })).toBeNull();
     // Only the Drafts card sticks — the household picker scrolls away.
     expect(
       screen.getByRole("complementary", { name: "CAR authoring panels" }).classList.contains("lg:sticky"),
@@ -238,6 +240,65 @@ describe("F5 CAR authoring", () => {
     ).toBe(true);
     expect(draftRegion.classList.contains("lg:flex-1")).toBe(true);
     expect(draftRegion.classList.contains("lg:overflow-y-auto")).toBe(true);
+  });
+
+  it("filters the household picker by the workbook CS_CATEGORY column", async () => {
+    // Rows shaped like the Supabase response: headers in file order with each
+    // member's raw cells aligned to them.
+    const householdWithCategory = (
+      id: string,
+      hhId: string,
+      category: string,
+      granteeName: string,
+    ): HouseholdRecord => ({
+      id,
+      hhId,
+      barangay: "Poblacion II",
+      municipality: "Tanauan City",
+      importName: "SY2026_Q1_household_profiles.xlsx",
+      importVersion: 3,
+      headers: ["HH_ID", "FIRST_NAME", "GRANTEE", "CS_CATEGORY"],
+      members: [
+        {
+          id: `${id}-1`,
+          entryId: `${hhId}01`,
+          name: granteeName,
+          relationship: "Grantee",
+          age: 17,
+          granteeFlag: "Yes",
+          sourceRow: 10,
+          raw: [hhId, granteeName, "Yes", category],
+        },
+      ],
+      car: null,
+    });
+
+    vi.mocked(listHouseholds).mockResolvedValue({
+      households: [
+        householdWithCategory("hh-ip", "000101", "IP", "Ana Cruz"),
+        householdWithCategory("hh-4ps", "000102", "4Ps", "Ben Reyes"),
+      ],
+      total: 2,
+    });
+
+    render(<CarsPage />);
+
+    const categoryFilter = await screen.findByRole("combobox", { name: "CS category" });
+    // "All CS categories" plus one option per distinct value.
+    expect(categoryFilter.querySelectorAll("option")).toHaveLength(3);
+
+    fireEvent.change(categoryFilter, { target: { value: "4Ps" } });
+
+    const householdSelect = screen.getByRole("combobox", { name: "Household" });
+    expect(
+      Array.from(householdSelect.querySelectorAll("option")).map((option) => option.textContent),
+    ).toEqual(["Select a household", "000102 · Ben Reyes"]);
+
+    // Re-selecting the other category restores its household.
+    fireEvent.change(categoryFilter, { target: { value: "IP" } });
+    expect(
+      Array.from(householdSelect.querySelectorAll("option")).map((option) => option.textContent),
+    ).toEqual(["Select a household", "000101 · Ana Cruz"]);
   });
 
   it("shows a loading indicator in the household picker until household records arrive", async () => {

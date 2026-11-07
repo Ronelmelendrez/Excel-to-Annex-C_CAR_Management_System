@@ -31,3 +31,37 @@ export function formatHouseholdEventTime(value: string) {
     timeStyle: "short",
   });
 }
+
+/**
+ * Value of a workbook column (e.g. `CS_CATEGORY`) for a household, read from
+ * the stored import row: `member.raw[i]` is the cell under `headers[i]`.
+ *
+ * The grantee's row wins because the CAR is written about the grantee; the
+ * other members are only a fallback for a blank grantee cell. Returns "" when
+ * the column is absent (imports from before the column existed, or snapshot
+ * records that carry no headers).
+ */
+export function workbookColumnValue(household: HouseholdRecord, column: string): string {
+  const headers = household.headers;
+  if (!headers || headers.length === 0) return "";
+
+  const wanted = column.trim().toUpperCase();
+  const index = headers.findIndex((header) => header.trim().toUpperCase() === wanted);
+  if (index < 0) return "";
+
+  const members = household.members;
+  const granteeIndex = members.findIndex(
+    (member) => normalizeGrantee(member.granteeFlag) === true,
+  );
+  const ordered =
+    granteeIndex >= 0
+      ? [members[granteeIndex], ...members.filter((_, i) => i !== granteeIndex)]
+      : members;
+
+  for (const member of ordered) {
+    const cell = member.raw?.[index];
+    const value = (typeof cell === "string" ? cell : "").trim();
+    if (value) return value;
+  }
+  return "";
+}

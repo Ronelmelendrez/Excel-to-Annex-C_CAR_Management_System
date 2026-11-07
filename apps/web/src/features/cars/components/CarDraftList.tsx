@@ -1,7 +1,9 @@
 import React, { useState } from "react";
+import { FIELD_LABELS } from "@import-domain";
 import { AlertTriangleIcon, ArrowRightIcon } from "../../../components/icons";
 import { Label } from "../../../components/ui/label";
 import { SectionCard } from "../../../components/ui/section-card";
+import { workbookColumnValue } from "../../households/lib/households";
 import type { CarDraft, ValidatedHousehold } from "../types";
 
 export function CarDraftList({
@@ -28,6 +30,23 @@ export function CarDraftList({
   onCreateDraft: (householdId: string) => void;
 }) {
   const [householdId, setHouseholdId] = useState("");
+  const [csCategory, setCsCategory] = useState("");
+
+  // Distinct CS_CATEGORY values across the register, read from the imported
+  // workbook rows that Supabase returns with each household (headers + raw).
+  const csCategories = React.useMemo(() => {
+    const values = new Set<string>();
+    for (const household of households) {
+      const value = workbookColumnValue(household, "CS_CATEGORY");
+      if (value) values.add(value);
+    }
+    return Array.from(values).sort((a, b) => a.localeCompare(b));
+  }, [households]);
+
+  // The picker offers the households matching the active CS_CATEGORY filter.
+  const visibleHouseholds = csCategory
+    ? households.filter((household) => workbookColumnValue(household, "CS_CATEGORY") === csCategory)
+    : households;
 
   return (
     <aside
@@ -71,20 +90,56 @@ export function CarDraftList({
           </div>
         ) : (
           <>
+            {csCategories.length > 0 && (
+              <div className="mb-4">
+                <Label htmlFor="car-cs-category" className="block text-xs font-semibold">
+                  {FIELD_LABELS.CS_CATEGORY}
+                </Label>
+                <select
+                  id="car-cs-category"
+                  value={csCategory}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    setCsCategory(next);
+                    // Drop the pick if the filter hides the chosen household.
+                    if (householdId) {
+                      const stillVisible = households.some(
+                        (household) =>
+                          household.id === householdId &&
+                          (!next || workbookColumnValue(household, "CS_CATEGORY") === next),
+                      );
+                      if (!stillVisible) setHouseholdId("");
+                    }
+                  }}
+                  className="mt-1 min-h-[44px] w-full border border-[#c9c3b6] bg-white px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
+                >
+                  <option value="">All CS categories</option>
+                  {csCategories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <Label htmlFor="car-household" className="block text-xs font-semibold">
               Household
             </Label>
             <select
               id="car-household"
               value={householdId}
-              disabled={creating || households.length === 0}
+              disabled={creating || visibleHouseholds.length === 0}
               onChange={(event) => setHouseholdId(event.target.value)}
               className="mt-1 min-h-[44px] w-full border border-[#c9c3b6] bg-white px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f] disabled:cursor-not-allowed disabled:bg-[#ece7dc]"
             >
               <option value="">
-                {households.length === 0 ? "No validated household available" : "Select a household"}
+                {visibleHouseholds.length === 0
+                  ? households.length === 0
+                    ? "No validated household available"
+                    : "No household matches this CS category"
+                  : "Select a household"}
               </option>
-              {households.map((household) => (
+              {visibleHouseholds.map((household) => (
                 <option key={household.id} value={household.id}>
                   {household.hhId} · {household.grantee.name}
                 </option>
