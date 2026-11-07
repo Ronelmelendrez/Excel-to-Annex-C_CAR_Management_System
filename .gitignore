@@ -2,6 +2,7 @@ node_modules
 .env
 .env.*
 !.env.example
+.vercel/
 dist
 build
 .DS_Store
@@ -9,3 +10,6 @@ build
 .supabase
 supabase/.temp/
 .agents/
+
+.vercel
+.env*
