@@ -86,3 +86,24 @@ export function AlertTriangleIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+/** Mobile header menu toggle — open state. */
+export function MenuIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M4 6h16" />
+      <path d="M4 12h16" />
+      <path d="M4 18h16" />
+    </svg>
+  );
+}
+
+/** Mobile header menu toggle — close state. */
+export function XIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  );
+}

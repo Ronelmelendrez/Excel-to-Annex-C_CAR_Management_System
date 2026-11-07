@@ -381,8 +381,8 @@ export function RouteLoadingSkeleton({ pathname }: { pathname: string }) {
       <header className="border-b border-[#161512] py-4">
         <div className="mx-auto flex w-full max-w-[1180px] flex-wrap items-center justify-between gap-x-8 gap-y-3 px-4 sm:px-6">
           <span className="font-serif text-xl leading-none">Annex C</span>
-          {/* Mirrors the account unit: identity cell + sign-out cell. */}
-          <SkeletonBlock className="h-[46px] w-56" />
+          {/* Mirrors the header controls: menu toggle below lg, account unit at lg and up. */}
+          <SkeletonBlock className="h-10 w-10 lg:h-[46px] lg:w-56" />
         </div>
       </header>
       <main
