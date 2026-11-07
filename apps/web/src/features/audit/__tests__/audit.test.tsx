@@ -76,6 +76,14 @@ describe("audit log", () => {
     expect(screen.getByText(event.entityId)).toBeTruthy();
     expect(screen.getByText("Sensitive before-and-after details are not displayed here."))
       .toBeTruthy();
+    expect(
+      screen.getByRole("region", { name: "Audit events" }).classList.contains("lg:sticky"),
+    ).toBe(true);
+    expect(
+      screen
+        .getByRole("region", { name: "Scrollable audit events" })
+        .classList.contains("lg:overflow-y-auto"),
+    ).toBe(true);
     expect(screen.queryByText("Status: Submitted")).toBeNull();
     expect(fetchAuditEvents).toHaveBeenCalledWith(
       { search: "", actor: "", entityType: "all", dateFrom: "", dateTo: "" },

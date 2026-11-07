@@ -127,24 +127,14 @@ export function AuditPage() {
               onSelect={audit.setSelectedId}
               loading={audit.loading && !invalidDateRange}
               error={audit.error}
+              hasMore={audit.hasMore && !invalidDateRange && !audit.error}
+              onLoadMore={audit.loadMore}
             />
             <AuditEventDetail
               event={invalidDateRange ? null : audit.selectedEvent}
               loading={audit.loading && !invalidDateRange && audit.events.length === 0}
             />
           </div>
-          {audit.hasMore && !invalidDateRange && !audit.error && (
-            <div className="mt-4">
-              <button
-                type="button"
-                onClick={audit.loadMore}
-                disabled={audit.loading}
-                className="min-h-[44px] border border-[#161512] px-4 text-sm font-semibold hover:bg-[#161512] hover:text-[#f4f1ea] disabled:cursor-wait disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1f1f]"
-              >
-                {audit.loading ? "Loading…" : "Load more audit events"}
-              </button>
-            </div>
-          )}
         </>
       )}
     </div>
