@@ -6,6 +6,20 @@ import { SectionCard } from "../../../components/ui/section-card";
 import { workbookColumnValue } from "../../households/lib/households";
 import type { CarDraft, ValidatedHousehold } from "../types";
 
+// The household picker filters: an exact CS_CATEGORY match when a category is
+// chosen, plus a case-insensitive substring match on the HH_ID.
+function matchesPickerFilters(
+  household: ValidatedHousehold,
+  csCategory: string,
+  hhIdQuery: string,
+): boolean {
+  const matchesCategory =
+    !csCategory || workbookColumnValue(household, "CS_CATEGORY") === csCategory;
+  const query = hhIdQuery.trim().toLowerCase();
+  const matchesHhId = !query || household.hhId.toLowerCase().includes(query);
+  return matchesCategory && matchesHhId;
+}
+
 export function CarDraftList({
   drafts,
   households,
@@ -31,6 +45,7 @@ export function CarDraftList({
 }) {
   const [householdId, setHouseholdId] = useState("");
   const [csCategory, setCsCategory] = useState("");
+  const [hhIdQuery, setHhIdQuery] = useState("");
 
   // Distinct CS_CATEGORY values across the register, read from the imported
   // workbook rows that Supabase returns with each household (headers + raw).
@@ -43,10 +58,31 @@ export function CarDraftList({
     return Array.from(values).sort((a, b) => a.localeCompare(b));
   }, [households]);
 
-  // The picker offers the households matching the active CS_CATEGORY filter.
-  const visibleHouseholds = csCategory
-    ? households.filter((household) => workbookColumnValue(household, "CS_CATEGORY") === csCategory)
-    : households;
+  // The picker offers the households matching the active CS_CATEGORY filter
+  // and HH_ID search.
+  const visibleHouseholds = households.filter((household) =>
+    matchesPickerFilters(household, csCategory, hhIdQuery),
+  );
+
+  // Drop the pick if the filters hide the chosen household.
+  const ensurePickVisible = (nextCategory: string, nextQuery: string) => {
+    if (!householdId) return;
+    const stillVisible = households.some(
+      (household) =>
+        household.id === householdId && matchesPickerFilters(household, nextCategory, nextQuery),
+    );
+    if (!stillVisible) setHouseholdId("");
+  };
+
+  const activeFilters = (csCategory ? 1 : 0) + (hhIdQuery.trim() ? 1 : 0);
+  const emptyLabel =
+    households.length === 0
+      ? "No validated household available"
+      : activeFilters > 1
+        ? "No household matches these filters"
+        : csCategory
+          ? "No household matches this CS category"
+          : "No household matches this HH ID search";
 
   return (
     <aside
@@ -90,6 +126,23 @@ export function CarDraftList({
           </div>
         ) : (
           <>
+            <div className="mb-4">
+              <Label htmlFor="car-hh-id-search" className="block text-xs font-semibold">
+                Search households by HH ID
+              </Label>
+              <input
+                id="car-hh-id-search"
+                type="search"
+                value={hhIdQuery}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  setHhIdQuery(next);
+                  ensurePickVisible(csCategory, next);
+                }}
+                placeholder="e.g. 000101"
+                className="mt-1 min-h-[44px] w-full border border-[#c9c3b6] bg-white px-3 text-sm placeholder:text-[#8c877c] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
+              />
+            </div>
             {csCategories.length > 0 && (
               <div className="mb-4">
                 <Label htmlFor="car-cs-category" className="block text-xs font-semibold">
@@ -101,15 +154,8 @@ export function CarDraftList({
                   onChange={(event) => {
                     const next = event.target.value;
                     setCsCategory(next);
-                    // Drop the pick if the filter hides the chosen household.
-                    if (householdId) {
-                      const stillVisible = households.some(
-                        (household) =>
-                          household.id === householdId &&
-                          (!next || workbookColumnValue(household, "CS_CATEGORY") === next),
-                      );
-                      if (!stillVisible) setHouseholdId("");
-                    }
+                    // Drop the pick if the filters hide the chosen household.
+                    ensurePickVisible(next, hhIdQuery);
                   }}
                   className="mt-1 min-h-[44px] w-full border border-[#c9c3b6] bg-white px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f]"
                 >
@@ -133,11 +179,7 @@ export function CarDraftList({
               className="mt-1 min-h-[44px] w-full border border-[#c9c3b6] bg-white px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7a1f1f] disabled:cursor-not-allowed disabled:bg-[#ece7dc]"
             >
               <option value="">
-                {visibleHouseholds.length === 0
-                  ? households.length === 0
-                    ? "No validated household available"
-                    : "No household matches this CS category"
-                  : "Select a household"}
+                {visibleHouseholds.length === 0 ? emptyLabel : "Select a household"}
               </option>
               {visibleHouseholds.map((household) => (
                 <option key={household.id} value={household.id}>

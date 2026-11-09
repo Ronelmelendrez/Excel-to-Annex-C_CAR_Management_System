@@ -301,6 +301,70 @@ describe("F5 CAR authoring", () => {
     ).toEqual(["Select a household", "000101 · Ana Cruz"]);
   });
 
+  it("filters the household picker by an HH_ID search", async () => {
+    const household = (id: string, hhId: string, granteeName: string): HouseholdRecord => ({
+      id,
+      hhId,
+      barangay: "Poblacion II",
+      municipality: "Tanauan City",
+      importName: "SY2026_Q1_household_profiles.xlsx",
+      importVersion: 3,
+      headers: ["HH_ID", "FIRST_NAME", "GRANTEE"],
+      members: [
+        {
+          id: `${id}-1`,
+          entryId: `${hhId}01`,
+          name: granteeName,
+          relationship: "Grantee",
+          age: 17,
+          granteeFlag: "Yes",
+          sourceRow: 10,
+          raw: [hhId, granteeName, "Yes"],
+        },
+      ],
+      car: null,
+    });
+
+    vi.mocked(listHouseholds).mockResolvedValue({
+      households: [
+        household("hh-a", "000101", "Ana Cruz"),
+        household("hh-b", "000102", "Ben Reyes"),
+        household("hh-c", "700007993656", "Cely Santos"),
+      ],
+      total: 3,
+    });
+
+    render(<CarsPage />);
+
+    const search = await screen.findByRole("searchbox", { name: "Search households by HH ID" });
+    const optionLabels = () =>
+      Array.from(
+        screen.getByRole("combobox", { name: "Household" }).querySelectorAll("option"),
+      ).map((option) => option.textContent);
+
+    // Partial match narrows the picker.
+    fireEvent.change(search, { target: { value: "00010" } });
+    expect(optionLabels()).toEqual(["Select a household", "000101 · Ana Cruz", "000102 · Ben Reyes"]);
+
+    // The search is a case-insensitive substring match on the HH_ID.
+    fireEvent.change(search, { target: { value: "79936" } });
+    expect(optionLabels()).toEqual(["Select a household", "700007993656 · Cely Santos"]);
+
+    // A pick hidden by the search is dropped, so Create draft stays disabled.
+    fireEvent.change(search, { target: { value: "" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Household" }), {
+      target: { value: "hh-b" },
+    });
+    fireEvent.change(search, { target: { value: "000101" } });
+    expect(screen.getByRole("button", { name: /Create draft/ }).hasAttribute("disabled")).toBe(true);
+    expect(optionLabels()).toEqual(["Select a household", "000101 · Ana Cruz"]);
+
+    // No match leaves a clear empty state.
+    fireEvent.change(search, { target: { value: "not-in-the-register" } });
+    expect(optionLabels()).toEqual(["No household matches this HH ID search"]);
+    expect(screen.getByRole("button", { name: /Create draft/ }).hasAttribute("disabled")).toBe(true);
+  });
+
   it("shows a loading indicator in the household picker until household records arrive", async () => {
     let resolveHouseholds!: (value: Awaited<ReturnType<typeof listHouseholds>>) => void;
     vi.mocked(listHouseholds).mockReturnValueOnce(
