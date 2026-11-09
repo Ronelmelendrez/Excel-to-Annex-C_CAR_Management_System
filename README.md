@@ -1,7 +1,6 @@
 # Excel-to-Annex-C CAR Management System
 
-A staff-facing application for reviewing household records and preparing Case
-Assessment Reports (CARs) in the Annex C format.
+'The Excel-to-Annex C CAR Management System is designed to streamline the preparation and management of Case Assessment Reports. It provides a centralized platform for importing household records from Excel workbooks, validating household member information, managing case assessments, and generating standardized Annex C documents using a structured DOCX template. The system aims to reduce manual data encoding, improve data consistency, and support a more organized report preparation and review workflow.
 
 **Stack:** React · TypeScript · Vite · Supabase  
 **Status:** Imports and CAR review decisions are paused. Some backend endpoints
