@@ -70,6 +70,14 @@ export type SlotValue = {
 
 export type SlotValues = Record<string, SlotValue | undefined>;
 
+/** Signatories who may sign the "Concurred by (SWO III)" line: the Social
+ *  Welfare Officer III slot is a pick list, not free text (owner request).
+ *  Kept in title case so the stored value and the option list match. */
+export const SIGNATORY_SWO_OPTIONS = [
+  'Ma. Charo P. Poligrates, RSW',
+  'Michael Angelo Ado, RSW',
+];
+
 export const SLOT_DEFS: SlotDef[] = [
   // Header
   { key: 'report_date', label: 'Date', type: 'date', source: 'manual', section: 'header', required: true, format: 'date_long', note: 'Defaults to today while Draft; editable.' },
@@ -90,9 +98,9 @@ export const SLOT_DEFS: SlotDef[] = [
   { key: 'religion', label: 'Religion', type: 'text', source: 'manual', section: 'identity', required: false, note: 'No workbook column.' },
   { key: 'ip_affiliation', label: 'IP Affiliation', type: 'text', source: 'derived', section: 'identity', required: true, from: 'grantee.data.IP_AFFLIATION' },
   { key: 'source_of_information', label: 'Source of Information', type: 'text', source: 'manual', section: 'identity', required: true },
-  { key: 'wellbeing_present', label: 'HH level of well-being (present)', type: 'text', source: 'manual', section: 'identity', required: false },
+  { key: 'wellbeing_present', label: 'HH level of well-being (present)', type: 'select', source: 'manual', section: 'identity', required: false, options: ['Level 1', 'Level 2', 'Level 3'] },
   { key: 'previous_assessment', label: 'Previous assessment (if applicable)', type: 'text', source: 'manual', section: 'identity', required: false },
-  { key: 'hh_risk_level', label: 'HH Risk Level Category', type: 'text', source: 'manual', section: 'identity', required: false },
+  { key: 'hh_risk_level', label: 'HH Risk Level Category', type: 'select', source: 'manual', section: 'identity', required: false, options: ['Low', 'Medium', 'High'] },
   { key: 'case_category', label: 'Case Category (for special cases)', type: 'text', source: 'manual', section: 'identity', required: false, note: 'Workbook CS_CATEGORY/CLIENT_STATUS exist but are unconfirmed.' },
 
   // IV.A Background Information — The Family
@@ -134,7 +142,7 @@ export const SLOT_DEFS: SlotDef[] = [
   { key: 'prepared_by_name', label: 'Prepared by (name)', type: 'text', source: 'setting', section: 'signatory', required: false, from: 'setting:report.signatories.prepared_by.name' },
   { key: 'prepared_by_title', label: 'Prepared by (title)', type: 'text', source: 'setting', section: 'signatory', required: false, from: 'setting:report.signatories.prepared_by.title' },
   { key: 'prepared_by_date', label: 'Prepared by (date)', type: 'date', source: 'manual', section: 'signatory', required: false, note: 'Left blank for wet-ink signing (owner Q6).' },
-  { key: 'concurred_by_name', label: 'Concurred by (name)', type: 'text', source: 'setting', section: 'signatory', required: false, from: 'setting:report.signatories.concurred_by.name' },
+  { key: 'concurred_by_name', label: 'Concurred by (name)', type: 'select', source: 'setting', section: 'signatory', required: false, from: 'setting:report.signatories.concurred_by.name', options: SIGNATORY_SWO_OPTIONS },
   { key: 'concurred_by_title', label: 'Concurred by (title)', type: 'text', source: 'setting', section: 'signatory', required: false, from: 'setting:report.signatories.concurred_by.title' },
   { key: 'concurred_by_date', label: 'Concurred by (date)', type: 'date', source: 'manual', section: 'signatory', required: false },
   { key: 'approved_by_name', label: 'Approved by (name)', type: 'text', source: 'setting', section: 'signatory', required: false, from: 'setting:report.signatories.approved_by.name' },
@@ -154,11 +162,11 @@ export const DEFAULT_REPORT_SETTINGS: Record<string, string> = {
   'report.locality': 'Tagbilaran City, Bohol',
   'report.goal_year': '2027',
   'report.adult_age_threshold': '18',
-  'report.signatories.prepared_by.name': 'JAY ANN L. EMBUSCADO, RSW',
+  'report.signatories.prepared_by.name': 'Jay Ann L. Embuscado, RSW',
   'report.signatories.prepared_by.title': 'City Link',
-  'report.signatories.concurred_by.name': 'MICHAEL ANGELO ADO, RSW',
+  'report.signatories.concurred_by.name': 'Ma. Charo P. Poligrates, RSW',
   'report.signatories.concurred_by.title': 'Social Welfare Officer III',
-  'report.signatories.approved_by.name': 'LUZ C. FEGARIDO, RSW',
+  'report.signatories.approved_by.name': 'Luz C. Fegarido, RSW',
   'report.signatories.approved_by.title': 'Provincial Link',
 };
 
@@ -470,37 +478,43 @@ function yesNo(value: string | undefined): string {
 
 /** Cell value: overlay (case-worker correction) wins, else the derived
  *  workbook value, else '' (a blank on the paper form). Raw import rows are
- *  never modified (REQ-RPT-007). */
+ *  never modified (REQ-RPT-007) — ALL-CAPS cells are only re-cased for
+ *  display, and a case-worker correction is shown exactly as typed.
+ *  The Monitored Child column stays verbatim because it is compared to the
+ *  literal YES/NO marks in the split columns. */
 export function familyCellDisplay(column: FamilyColumnKey, member: FamilyMemberLike): string {
   const overlay = member.overlay ?? {};
   if (Object.prototype.hasOwnProperty.call(overlay, column)) return overlay[column];
   const data = member.data ?? {};
-  switch (column) {
-    case 'name':
-      return member.name ?? '';
-    case 'age':
-      return member.age === null || member.age === undefined ? '' : String(member.age);
-    case 'relationship':
-      return (member.relationship ?? '').trim() || (data.RELATION_TO_HH_HEAD ?? '');
-    case 'sex':
-      return data.SEX ?? '';
-    case 'civilStatus':
-      return data.CIVIL_STATUS ?? '';
-    case 'stayingWithHh':
-      return data.MEMBER_STATUS ?? '';
-    case 'monitoredChild':
-      return yesNo(data.CHILD_BENE) || yesNo(data.EDUC_MONITORED);
-    case 'educationalAttainment':
-      return data.GRADE_LEVEL ?? '';
-    case 'occupation':
-      return '';
-    case 'monthlyIncome':
-      return '';
-    case 'typeOfDisability':
-      return data.DISABILITY_TYPES ?? '';
-    default:
-      return '';
-  }
+  const value = ((): string => {
+    switch (column) {
+      case 'name':
+        return member.name ?? '';
+      case 'age':
+        return member.age === null || member.age === undefined ? '' : String(member.age);
+      case 'relationship':
+        return (member.relationship ?? '').trim() || (data.RELATION_TO_HH_HEAD ?? '');
+      case 'sex':
+        return data.SEX ?? '';
+      case 'civilStatus':
+        return data.CIVIL_STATUS ?? '';
+      case 'stayingWithHh':
+        return data.MEMBER_STATUS ?? '';
+      case 'monitoredChild':
+        return yesNo(data.CHILD_BENE) || yesNo(data.EDUC_MONITORED);
+      case 'educationalAttainment':
+        return data.GRADE_LEVEL ?? '';
+      case 'occupation':
+        return '';
+      case 'monthlyIncome':
+        return '';
+      case 'typeOfDisability':
+        return data.DISABILITY_TYPES ?? '';
+      default:
+        return '';
+    }
+  })();
+  return column === 'monitoredChild' ? value : titleCaseValue(value);
 }
 
 /* --------------------------------------------------- intervention catalog */
@@ -637,18 +651,81 @@ export function formatDateLong(raw: string): string {
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
+/* ------------------------------------------------------------ display casing */
+
+/**
+ * Workbook cells and older signatory defaults arrive in ALL CAPS. Every
+ * *displayed* value passes through this so the report reads like the paper
+ * form: first letter capital, the rest small, word by word
+ * ("POBLACION II, TANAUAN CITY" → "Poblacion II, Tanauan City").
+ *
+ * Only an entirely-uppercase value is touched (a value the case worker typed
+ * in mixed case is left exactly as entered), and two exceptions survive:
+ *   - short abbreviations and initials stay uppercase (RSW, IP, NCR, L.),
+ *   - roman numerals stay uppercase (POBLACION II, BARANGAY VIII).
+ *
+ * Raw import rows are never rewritten (REQ-RPT-007): this is display only.
+ */
+const KEEP_UPPERCASE_LONG = new Set([
+  'DSWD',
+  'TESDA',
+  'CHED',
+  'DOST',
+  'NHTS',
+  'MLGU',
+  'PLGU',
+  'PAGASA',
+]);
+
+/** Short all-caps words that are ordinary words, not abbreviations. */
+const TITLE_CASE_SHORT = new Set(['YES', 'NO', 'MA', 'MR', 'MRS', 'MS', 'DR', 'JR', 'SR']);
+
+const ROMAN_NUMERAL_RE =
+  /^(?=[MDCLXVI]+$)M{0,4}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3})$/;
+
+/** One already-uppercase token: capitalise its first letter, lowercase the
+ *  rest ("MARRIED" → "Married", "4PS" → "4Ps"). */
+function titleCaseToken(token: string): string {
+  const firstLetter = token.search(/[A-Za-z]/);
+  if (firstLetter < 0) return token;
+  return (
+    token.slice(0, firstLetter) +
+    token[firstLetter].toUpperCase() +
+    token.slice(firstLetter + 1).toLowerCase()
+  );
+}
+
+export function titleCaseValue(raw: string): string {
+  const value = String(raw ?? '');
+  // Empty, or already mixed case — never re-case what someone typed.
+  if (!value || value !== value.toUpperCase()) return value;
+  return value.replace(/[A-Za-z0-9'’]+/g, (token) => {
+    const letters = token.replace(/[^A-Za-z]/g, '');
+    const upper = letters.toUpperCase();
+    const hasDigit = /\d/.test(token);
+    // Digits usually mark a coded value: "4PS" → "4Ps", but a single letter
+    // ("4H", "P8") is left exactly as written.
+    if (hasDigit) return letters.length >= 2 ? titleCaseToken(token) : token;
+    if (TITLE_CASE_SHORT.has(upper)) return titleCaseToken(token);
+    if (letters.length <= 3) return token; // initials + short acronyms (RSW, IP)
+    if (ROMAN_NUMERAL_RE.test(letters)) return token; // VIII, XIV …
+    if (KEEP_UPPERCASE_LONG.has(upper)) return token;
+    return titleCaseToken(token);
+  });
+}
+
 /** Formatted display text for a filled slot; '' when the raw value is empty. */
 export function formatSlotValue(def: SlotDef | undefined, raw: string): string {
-  if (!def) return raw;
+  if (!def) return titleCaseValue(raw);
   const value = String(raw ?? '');
-  if (def.format === 'money') return formatMoney(value);
-  if (def.format === 'date_long') return formatDateLong(value);
+  if (def.format === 'money') return titleCaseValue(formatMoney(value));
+  if (def.format === 'date_long') return titleCaseValue(formatDateLong(value));
   if (def.format === 'phrase' && def.phrase) {
     const count = Number(value);
-    if (!Number.isFinite(count)) return value;
-    return `${count} ${count === 1 ? def.phrase.one : def.phrase.many}`;
+    if (!Number.isFinite(count)) return titleCaseValue(value);
+    return titleCaseValue(`${count} ${count === 1 ? def.phrase.one : def.phrase.many}`);
   }
-  return value;
+  return titleCaseValue(value);
 }
 
 /** Display text for a slot, or null when it is still a blank (`____`). */
@@ -1115,6 +1192,7 @@ export const FORBIDDEN_STATIC_NAMES = [
   'JAY ANN L. EMBUSCADO',
   'MICHAEL ANGELO ADO',
   'LUZ C. FEGARIDO',
+  'Ma. Charo P. Poligrates',
 ];
 
 export type TemplateLintIssue = {

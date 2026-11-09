@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { SlotDef, SlotValue } from "@report-template";
-import { SLOT_BY_KEY, formatSlotValue, parseSegments, slotDisplay } from "@report-template";
+import { SLOT_BY_KEY, formatSlotValue, parseSegments, slotDisplay, titleCaseValue } from "@report-template";
 
 /**
  * One dynamic blank (`____`) of the template.
@@ -61,9 +61,15 @@ export function SlotChip({
     };
   }, [open]);
 
+  /** Editor opens on the value on screen; an ALL-CAPS workbook cell is
+   *  re-cased first so the field reads like the rest of the report. */
+  function initialDraftValue() {
+    return slotValue?.value ? titleCaseValue(slotValue.value) : "";
+  }
+
   function openEditor() {
     if (mode !== "edit") return;
-    setDraftValue(slotValue?.value ?? "");
+    setDraftValue(initialDraftValue());
     setReason("");
     setOpen(true);
     window.setTimeout(() => inputRef.current?.focus(), 0);
@@ -135,7 +141,7 @@ export function SlotChip({
     >
       <button
         type="button"
-        onClick={isComputed ? () => { setDraftValue(slotValue?.value ?? ""); setReason(""); setOpen(true); } : openEditor}
+        onClick={isComputed ? () => { setDraftValue(initialDraftValue()); setReason(""); setOpen(true); } : openEditor}
         title={triggerTitle}
         aria-label={`${def.label}${missing ? " (needs input)" : ""}`}
         aria-expanded={open}
@@ -196,6 +202,10 @@ export function SlotChip({
                     {option}
                   </option>
                 ))}
+                {/* A value saved before the options existed still shows. */}
+                {draftValue && !def.options.includes(draftValue) ? (
+                  <option value={draftValue}>{draftValue}</option>
+                ) : null}
               </select>
             ) : (
               <input

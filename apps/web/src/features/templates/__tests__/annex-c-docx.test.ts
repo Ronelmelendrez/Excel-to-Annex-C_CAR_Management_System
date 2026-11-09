@@ -35,7 +35,7 @@ function makeDraft(): ReportDraftLike {
       contact_info: { value: '0917 123 4567', source: 'manual' },
       religion: { value: 'Catholic', source: 'manual' },
       source_of_information: { value: 'Home visit interview', source: 'manual' },
-      wellbeing_present: { value: 'Low', source: 'manual' },
+      wellbeing_present: { value: 'Level 1', source: 'manual' },
       previous_assessment: { value: 'None', source: 'manual' },
       hh_risk_level: { value: 'High', source: 'manual' },
       case_category: { value: 'None', source: 'manual' },

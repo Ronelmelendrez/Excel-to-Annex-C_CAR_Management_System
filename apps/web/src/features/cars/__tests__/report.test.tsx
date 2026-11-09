@@ -7,6 +7,7 @@ import {
   FORBIDDEN_STATIC_NAMES,
   INTERVENTION_COLUMNS,
   REPORT_TEMPLATE,
+  SIGNATORY_SWO_OPTIONS,
   SLOT_BY_KEY,
   SLOT_DEFS,
   computeMissingKeys,
@@ -16,6 +17,7 @@ import {
   lintReportTemplate,
   mergeMemberReportData,
   resolveSlotValues,
+  titleCaseValue,
   type ReportDraftLike,
   type SlotValues,
 } from "@report-template";
@@ -150,7 +152,7 @@ const manualSamples: Record<string, string> = {
   place_of_birth: "Tanauan City, Bohol",
   contact_info: "0917 123 4567",
   religion: "Roman Catholic",
-  wellbeing_present: "Low",
+  wellbeing_present: "Level 2",
   previous_assessment: "None on record",
   hh_risk_level: "Medium",
   case_category: "Child education risk",
@@ -434,6 +436,152 @@ describe("sensitive slots", () => {
       />,
     );
     expect(screen.getByText("000091")).toBeTruthy();
+  });
+});
+
+/* -------------------------------------------- household card dropdowns */
+
+describe("household card dropdowns", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("offers Level 1-3 for well-being and Low/Medium/High for the risk category", () => {
+    expect(SLOT_BY_KEY.wellbeing_present.type).toBe("select");
+    expect(SLOT_BY_KEY.wellbeing_present.options).toEqual(["Level 1", "Level 2", "Level 3"]);
+    expect(SLOT_BY_KEY.hh_risk_level.type).toBe("select");
+    expect(SLOT_BY_KEY.hh_risk_level.options).toEqual(["Low", "Medium", "High"]);
+  });
+
+  it("makes the SWO III signatory a pick list headed by Ma. Charo P. Poligrates", () => {
+    expect(SLOT_BY_KEY.concurred_by_name.type).toBe("select");
+    expect(SLOT_BY_KEY.concurred_by_name.options).toEqual(SIGNATORY_SWO_OPTIONS);
+    expect(SIGNATORY_SWO_OPTIONS).toContain("Ma. Charo P. Poligrates, RSW");
+    expect(DEFAULT_REPORT_SETTINGS["report.signatories.concurred_by.name"]).toBe(
+      "Ma. Charo P. Poligrates, RSW",
+    );
+    // The other signatories read as names, not shouting.
+    expect(DEFAULT_REPORT_SETTINGS["report.signatories.prepared_by.name"]).toBe(
+      "Jay Ann L. Embuscado, RSW",
+    );
+    expect(DEFAULT_REPORT_SETTINGS["report.signatories.approved_by.name"]).toBe(
+      "Luz C. Fegarido, RSW",
+    );
+  });
+
+  it("opens the well-being blank as a dropdown in Edit mode", () => {
+    const onEditCalls: string[] = [];
+    render(
+      <SlotChip
+        def={SLOT_BY_KEY.wellbeing_present}
+        slotValue={undefined}
+        mode="edit"
+        onEdit={(value) => onEditCalls.push(value)}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "HH level of well-being (present) (needs input)" }),
+    );
+    const select = screen.getByRole("combobox", { name: "HH level of well-being (present)" });
+    expect(
+      Array.from(select.querySelectorAll("option")).map((option) => option.textContent),
+    ).toEqual(["Select…", "Level 1", "Level 2", "Level 3"]);
+
+    fireEvent.change(select, { target: { value: "Level 3" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(onEditCalls).toEqual(["Level 3"]);
+    cleanup();
+  });
+
+  it("keeps a value saved before the options existed visible in the dropdown", () => {
+    const onEditCalls: string[] = [];
+    render(
+      <SlotChip
+        def={SLOT_BY_KEY.hh_risk_level}
+        slotValue={{ value: "CRITICAL", source: "manual" }}
+        mode="edit"
+        onEdit={(value) => onEditCalls.push(value)}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "HH Risk Level Category" }));
+    const select = screen.getByRole("combobox", { name: "HH Risk Level Category" });
+    // The legacy value is re-cased for display but still selectable.
+    expect(
+      Array.from(select.querySelectorAll("option")).map((option) => option.textContent),
+    ).toEqual(["Select…", "Low", "Medium", "High", "Critical"]);
+    cleanup();
+  });
+});
+
+/* ----------------------------------------------------- display casing */
+
+describe("display casing (ALL CAPS → first letter big, rest small)", () => {
+  it("re-cases an all-uppercase value word by word", () => {
+    expect(titleCaseValue("MARRIED")).toBe("Married");
+    expect(titleCaseValue("POBLACION II, TANAUAN CITY")).toBe("Poblacion II, Tanauan City");
+    expect(titleCaseValue("GRADE 11")).toBe("Grade 11");
+    expect(titleCaseValue("JOMAR DELA CRUZ, RSW")).toBe("Jomar Dela Cruz, RSW");
+    expect(titleCaseValue("JOMAR DELA CRUZ JR.")).toBe("Jomar Dela Cruz Jr.");
+    expect(titleCaseValue("4PS")).toBe("4Ps");
+  });
+
+  it("keeps initials, short acronyms, roman numerals and numbers as written", () => {
+    expect(titleCaseValue("VIII")).toBe("VIII");
+    expect(titleCaseValue("NCR")).toBe("NCR");
+    expect(titleCaseValue("DSWD")).toBe("DSWD");
+    expect(titleCaseValue("N/A")).toBe("N/A");
+    expect(titleCaseValue("000091")).toBe("000091");
+    expect(titleCaseValue("YES")).toBe("Yes");
+  });
+
+  it("never re-cases what the case worker typed in mixed case", () => {
+    expect(titleCaseValue("San Isidro")).toBe("San Isidro");
+    expect(titleCaseValue("tuition fees and medicine")).toBe("tuition fees and medicine");
+    expect(titleCaseValue("")).toBe("");
+  });
+
+  it("renders ALL-CAPS workbook cells and signatories in proper case", () => {
+    const member = {
+      ...fixtureDraft.familyComposition[0],
+      name: "CELIA RAMOS",
+      relationship: "",
+      data: {
+        SEX: "FEMALE",
+        CIVIL_STATUS: "MARRIED",
+        GRADE_LEVEL: "GRADE 11",
+        CHILD_BENE: "YES",
+        RELATION_TO_HH_HEAD: "HOUSEHOLD HEAD",
+        REGION: "VII",
+        PROVINCE: "BOHOL",
+        MUNICIPALITY: "TANAUAN CITY",
+        BARANGAY: "POBLACION II",
+      },
+    };
+    const values = resolveSlotValues({ ...fixtureDraft, familyComposition: [member] });
+
+    // Household card fields and the grantee line.
+    expect(fillText("{{grantee_name}}", values)).toBe("Celia Ramos");
+    expect(fillText("{{civil_status}}", values)).toBe("Married");
+    expect(fillText("{{educational_attainment}}", values)).toBe("Grade 11");
+    expect(fillText("{{present_address}}", values)).toBe(
+      "VII, Bohol, Tanauan City, Poblacion II",
+    );
+    // Signatories read as names, with the initials and RSW intact.
+    expect(fillText("{{concurred_by_name}}", values)).toBe("Ma. Charo P. Poligrates, RSW");
+    expect(fillText("{{prepared_by_name}}", values)).toBe("Jay Ann L. Embuscado, RSW");
+
+    // Family composition table cells — but the YES/NO marks stay literal.
+    expect(familyCellDisplay("name", member)).toBe("Celia Ramos");
+    expect(familyCellDisplay("sex", member)).toBe("Female");
+    expect(familyCellDisplay("civilStatus", member)).toBe("Married");
+    expect(familyCellDisplay("relationship", member)).toBe("Household Head");
+    expect(familyCellDisplay("monitoredChild", member)).toBe("YES");
+    // A case-worker correction is shown exactly as typed.
+    expect(
+      familyCellDisplay("civilStatus", { ...member, overlay: { civilStatus: "ANNULLED" } }),
+    ).toBe("ANNULLED");
   });
 });
 
